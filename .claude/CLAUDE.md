@@ -36,6 +36,10 @@ Semester1/
 - **权威来源优先**：转写文本（`weekN.txt`）由语音识别生成，噪声多且术语常被错拼（如 "Tang" 实为 Tay Wee Peng、"Depo" 实为 Wang Lipo、"CLAP" 实为 Wooclap、"pyro" 实为 prior、"livelihood" 实为 likelihood、"gaucin" 实为 Gaussian、"data" 常指参数 θ 等）。整理时需对照同周文件夹内的官方课件 PDF 修正，以 PDF 为准；不要照抄转写错字。
 - 正确术语示例：Bayes、Bernoulli、Gaussian、prior/posterior/likelihood、EM、MCMC、Wooclap、NTULearn。
 
+## 可用 skill
+
+- **`coursework-notes`**（`.claude/skills/coursework-notes/SKILL.md`）：把某课程每周的录播转写 `weekN.txt` + 官方课件 PDF 整理成 `Learning_note.md` 的详细教学版中文笔记（英文术语保留原词），含 ASR 转写噪声按 PDF 修正、Week 1 优先行政/考核信息、公式推导、Wooclap 例题、下一周预告等完整流程与检查清单。处理"按之前方式总结 / 完成 XXXX 课程 / 第 N 周内容"类请求时使用。
+
 ## .gitignore
 
 不要忽略 `.claude/`（项目级约定与 memory 随仓库管理）。转写原文 `*.txt` 可按需保留或忽略，默认保留。

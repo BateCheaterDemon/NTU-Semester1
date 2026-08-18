@@ -7,3 +7,4 @@
 - [transcript-quality-noise](memory/transcript-quality-noise.md) — 转写有语音识别噪声，整理笔记需还原正确术语
 - [ee6407-course-info](memory/ee6407-course-info.md) — EE6407 遗传算法与机器学习考核结构（CA40%+期末60%；前4周仅一次闭卷Quiz占10%，无作业无考勤）
 - [note-language-english-terms](memory/note-language-english-terms.md) — 笔记中文讲解但保留英文术语原词（英文授课+英文考试，术语要能对应考题）
+- [coursework-notes-skill](memory/coursework-notes-skill.md) — "转写+课件→中文笔记"工作流已固化为 skill：.claude/skills/coursework-notes/SKILL.md
