@@ -18,6 +18,7 @@
   - **前 4 周（Week 1–4）**：**A/P LIM Meng Hiot**（School of EEE，办公室 S1-B1b-46，emhlim@ntu.edu.sg），主讲遗传算法/进化计算。
   - **后半（Week 5 起，机器学习部分）**：由另一位教授接手（转写误拼为 "prop mole"/"Malco"，**待 Week5 课件确认**）。
 - **教材**：课件标注一本参考书（老师因与作者为友可自由使用其材料）。复杂度理论部分引用经典书 **Garey & Johnson, *Computers and Intractability***。
+- **参考论文**：`week1/IJCAT NQ.pdf` — Bah-Hwee Gwee & Meng-Hiot Lim, *An evolution search algorithm for solving N-queen problems*, IJCAT 2003。演示 N-queens 的 GA 求解（N-permutation 编码、适应度度量、可解到 2000 皇后），与课程 N-Queens 主题直接相关。
 
 ### 2. ⭐ 考核要求（重要）
 

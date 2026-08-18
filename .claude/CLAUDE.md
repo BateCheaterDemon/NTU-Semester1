@@ -27,7 +27,10 @@ Semester1/
 
 ## 笔记撰写规范
 
-- 语言：**中文为主**，专有名词/术语保留英文。
+- 语言：中文讲解 + **英文术语保留原词**。课程为英文授课、英文考试，术语必须保留英文以与考题对应。
+  - 做法：首次出现写成 `English term（中文释义）`，之后直接用英文 term；不要让中文译名"喧宾夺主"。
+  - 必须保留英文的包括：算法名/模型名（GA、EM、MCMC、HMM、Baum-Welch）、概率概念（prior、posterior、likelihood、conjugate prior、expectation、variance、covariance、PDF/PMF、IID）、问题类型（optimization、modeling、simulation、CSP/COP/FOP、search problem、NP-hard/complete）、GA 算子（fitness、selection、crossover、mutation、recombination、genotype、phenotype、chromosome）、平台名（Wooclap、NTULearn）等。
+  - 中文仅用于组织句意、连接、补充释义，不替代核心术语。
 - 结构：每周一个二级标题（`## Week N — 标题`），全部周汇总在同一 `Learning_note.md`。
 - 开课周优先突出考核与行政信息，用表格列明占比与关键日期。
 - **权威来源优先**：转写文本（`weekN.txt`）由语音识别生成，噪声多且术语常被错拼（如 "Tang" 实为 Tay Wee Peng、"Depo" 实为 Wang Lipo、"CLAP" 实为 Wooclap、"pyro" 实为 prior、"livelihood" 实为 likelihood、"gaucin" 实为 Gaussian、"data" 常指参数 θ 等）。整理时需对照同周文件夹内的官方课件 PDF 修正，以 PDF 为准；不要照抄转写错字。
