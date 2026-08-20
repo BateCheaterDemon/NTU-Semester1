@@ -12,6 +12,7 @@ EE6407 Genetic Algorithms and Machine Learning（NTU，AY26-27 Semester1）。
 **考核占比**：
 - Continuous Assessment (CA) **40%**
   - CA Part 1（Lim 的 4 周内）：**仅一次 Quiz 占 10%**，**闭卷**、受控环境书面作答，在 **Week 4** 进行；**无作业、不考核出勤**（来否自便）。
+    - ⭐ 具体细节（Week 2 末宣布）：**9 月 1 日 9:30–10:30**，约 15 分钟；三考场 **LT 19A / LT 2A / LT 5**（去哪个在 NTULearn 公布）；隔座就坐，带 ID+笔，**不需计算器**，禁手机/智能设备。
   - CA Part 2（后半 ML 部分）：占 30%，由后半教授安排（待确认）。
 - Final Exam **60%**（3 小时，覆盖全课程）。
 

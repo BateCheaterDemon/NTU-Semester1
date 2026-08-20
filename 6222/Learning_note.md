@@ -3,7 +3,7 @@
 > 课程学习笔记总览。每周一节，按周总结重点内容。
 > 第一周（开课周）特别关注考核要求、任课教师、课程结构等行政性信息。
 >
-> **权威来源说明**：本笔记先由 `week1.txt` 录播转写整理，再以 `EE6222_lecturenote1to9.pdf`（官方讲义，Jiang Xudong，2026-08-11）核对修正。转写有大量语音识别噪声（如 "Ji Shi Dong" 实为 Jiang Xudong、"19/night" 实为 light、"cner/nel" 实为 color、"st g/quam" 实为 histogram、"ninear/menia" 实为 linear、"ATI" 实为 LTI、"compion" 实为 convolution、"fear/fuel" 实为 Fourier），均以 PDF 为准修正。
+> **权威来源说明**：本笔记先由各周录播转写（`week1.txt`、`week2.txt`…）整理，再以 `EE6222_lecturenote1to9.pdf`（官方讲义，Jiang Xudong，2026-08-11）核对修正。转写有大量语音识别噪声（如 "Ji Shi Dong" 实为 Jiang Xudong、"19/night" 实为 light、"cner/nel" 实为 color、"st g/quam" 实为 histogram、"ninear/menia" 实为 linear、"ATI" 实为 LTI、"compion" 实为 convolution、"fear/fuel" 实为 Fourier），均以 PDF 为准修正。
 
 ---
 
@@ -385,4 +385,542 @@ g(4,4) = 7·1 + 5·2 + 3·3 + 9·4 + 8·5 + 7·6 + 9·7 + 6·8 + 5·9
 
 ---
 
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, sampling, Nyquist, feature extraction 等）。中文用于组织句意与补充释义。
+## Week 2 — Topic 2 续：Fourier Transform / DFT / Image Sampling ＋ Topic 3 起：Point Processing 与 Histogram Equalization
+
+> **本周权威来源说明**：由 `week2.txt` 转写整理，以 `EE6222_lecturenote1to9.pdf` 第 53–83 页核对修正。本周转写噪声尤其严重，典型错拼对照：
+>
+> | 转写错拼 | 实际术语 |
+> |---|---|
+> | fear / fue / fuel / fluid / full year / free / fi / fid transform | **Fourier transform** |
+> | full year theory | **Fourier series** |
+> | same wave / say / cos and say | **sine wave / sinusoid**（cosine and sine） |
+> | impasse / impulse tr / impasse ray / array / string | **impulse / impulse train** |
+> | sync function | **sinc function** |
+> | no pass / no path / no puss filter | **low-pass filter** |
+> | Niclie rate / cse rate | **Nyquist rate** |
+> | st gram / hestogram / se qui / squa / hem / HQ / cystogram / scram | **histogram** |
+> | gama / comma correction | **gamma correction** |
+> | no garism / ngithm / no go transform | **log transform** |
+> | environment / enviart / vari / v | **invariant**（⭐ 如 "rotation environment" 实为 rotation invariant） |
+> | grid value / gvalue / qui value / ge value | **gray value / gray level** |
+> | AI system / T system / SI system | **LSI system** |
+> | snope / nine | **slope / line** |
+> | poredic / potic | **periodic** |
+> | congugate | **conjugate** |
+> | z padding | **zero padding** |
+> | 19 strengths | **light strength（光照强度）** |
+> | TJ Palm Master | **IEEE TPAMI** |
+> | pica / pratica / pritic / predicon | "pretty clear"（老师口头禅） |
+
+### 1. 承上：为什么还要学 Fourier transform
+
+- 上周结论：空间域处理 = 输入与 impulse response 的 **convolution**。老师再次强调：**整个 signal processing 只有两根支柱**——**convolution** 与 **transform**。
+- 两者同源于一个核心思想 **signal decomposition（信号分解）**：
+  - **Convolution**：把信号分解为 **impulse** 之和 → 得到卷积。
+  - **Fourier transform**：把信号分解为 **sinusoid（正弦波）** 之和 → 得到频谱。
+  - 抓住"分解"这一点，两者都顺理成章。
+- **为什么不能只学 deep learning？**（老师回应学生提问）
+  - 有学生问："计算机视觉现在都用 deep learning 和 Transformer，还需要 Fourier transform 吗？传统理论是不是过时了？"→ **不是**。
+  - 老师 2025 年发表于 **IEEE TPAMI** 的工作（*Revisiting One-stage Deep Uncalibrated Photometric Stereo via Fourier Embedding*）就是例子：对图像做 Fourier transform 后分离 **magnitude 与 phase**——
+    - **magnitude** 与**光照强度（light strength）**密切相关；
+    - **phase** 与**物体的结构（structure）**密切相关。
+  - 借此可从**单张 2-D 图像**估计 **3-D 信息**（photometric stereo），当然还要配合 deep model。
+- **为什么学过那么多种 transform？** Fourier series → 连续 Fourier transform → **DTFT** → **DFT** → **FFT** → 及其他变换。老师：**它们全部来自同一个 idea**；彻底理解其中一个，其余都是简单扩展，不必分别死记。
+
+### 2. 1-D 连续 Fourier Transform：定义与物理意义
+
+#### 2.1 定义（PDF p.53）
+
+```
+正变换：  F(u) = ℑ{f(x)} = ∫_{−∞}^{∞} f(x)·exp(−j2πux) dx
+逆变换：  f(x) = ℑ⁻¹{F(u)} = ∫_{−∞}^{∞} F(u)·exp(j2πux) du
+
+其中  exp(j2πux) = cos(2πux) + j·sin(2πux)，  j = √(−1)
+u 为 frequency variable，x 为时间/空间变量
+```
+
+- 存在逆变换 ⇒ **Fourier transform 是 lossless transform（无损变换）**：变换后不丢失任何信息，可由 F(u) 完全恢复 f(x)。
+
+#### 2.2 ⭐ 从逆变换读出物理意义（老师的讲法：先看逆变换）
+
+- 把积分理解成求和（**integration 与 summation 完全等价**，只是一个用于连续、一个用于离散；离散信号"可数"故用 Σ，连续信号"不可数"故用 ∫）。
+- 于是逆变换在说：**任意信号 f(x) = 许多 sinusoid 之和**。
+  - 求和的"基函数"是 `exp(j2πux)`——它的实部是 cosine、虚部是 sine，**本质就是一个 sine wave**。
+  - `F(u)` 不是 x 的函数，只是每个频率上的**缩放因子（复数）**。
+- ⭐ **F(u) 的物理意义**：
+  - **|F(u)|（magnitude）** = 频率 u 处那个 sinusoid 的 **amplitude（幅度）**；
+  - **∠F(u)（phase）** = 该 sinusoid 的 **initial phase（初相位）**。
+  - 因为 F(u) = |F(u)|·exp(jφ(u))，与 exp(j2πux) 相乘时**指数相加**，φ 自然落进 cos/sin 的相角里。
+- **一句话**：任意信号 = 不同频率的 sinusoid 之和，每个频率的幅度与初相位由 F(u) 这个复数给出。
+
+#### 2.3 为什么用 complex exponential 而不直接用 cos / sin？
+
+老师专门澄清（学生最怕复数）：**引入复指数是为了带来方便，不是为了增加难度**。
+
+- 复指数相乘 = **指数直接相加**：`e^{jα}·e^{jβ} = e^{j(α+β)}`，极其简洁。
+- 若用实函数：`cos α · cos β = ½[cos(α+β) + cos(α−β)]`，非常繁琐。
+- 相位的处理也因此变得 straightforward（相位就在指数里，相乘即相加）。
+
+#### 2.4 ⭐ 正变换为什么"挑得出"某个频率（关键直觉）
+
+设 f(x) 只含单一频率 u₀（写成 `exp(j2πu₀x)`），代入正变换：
+
+```
+F(u) = ∫ exp(j2πu₀x) · exp(−j2πux) dx = ∫ exp[j2π(u₀−u)x] dx
+```
+
+- **若 u = u₀**：指数相消 → 被积函数 = 常数 1 → `∫_{−∞}^{∞} 1 dx = ∞`（极大值）。
+- **若 u ≠ u₀**：被积函数仍是一个 sinusoid → 在整个周期上积分 = **0**（半个周期给出 ±1，与无穷相比可忽略）。
+
+⭐ **结论**：`F(u)` 只在信号真实含有的频率处非零，其余处为零。若 f(x) 含多个频率成分，改变 u 就能**逐个提取**各频率成分的幅度与相位。这正是 Fourier transform 的工作原理，也再次体现复指数的便利（相乘只需看指数和是否为常数 0）。
+
+### 3. 复数与复函数（老师专门复习的部分）
+
+学生对复函数的恐惧其实源于对复数本身不清楚。老师的观点：**复函数的所有性质与复数完全一样**。
+
+- **复数本质 = 把两个数放在一起研究**。很多场景本就需要同时研究两个数（如地图上指定一个位置必须用两个数）。用 `j` 把两个数隔开而已。
+- 两种坐标系表示同一个点：
+  - **Cartesian（直角）**：`c = a + jb`，横轴 real part、纵轴 imaginary part。
+  - **Polar（极坐标）**：`c = r·e^{jφ}`，r 为 magnitude、φ 为 phase/angle。
+  - 互换（PDF p.55）：`a = r cos φ`，`b = r sin φ`；`r = √(a²+b²)`，`φ = tan⁻¹(b/a)`。
+- 对 Fourier transform：
+  ```
+  F(u,v) = R(u,v) + jI(u,v) = |F(u,v)|·exp[jφ(u,v)]
+  |F(u,v)| = √(R² + I²),    φ(u,v) = tan⁻¹(I/R)
+  R = |F|cos φ,             I = |F|sin φ
+  ```
+- 需要额外记的只有一件事：**j = √(−1)**。除此之外没有别的。
+
+### 4. 2-D Fourier Transform 与 Separability
+
+#### 4.1 定义（PDF p.53）
+
+图像是二元函数，2-D FT 只是 1-D 的**简单扩展**：
+
+```
+F(u,v) = ∫∫ f(x,y)·exp[−j2π(ux + vy)] dx dy
+f(x,y) = ∫∫ F(u,v)·exp[ j2π(ux + vy)] du dv
+```
+u 是沿 x 方向的频率，v 是沿 y 方向的频率。
+
+#### 4.2 ⭐ Separable（可分离性，PDF p.54）
+
+利用复指数的良好性质 `exp[−j2π(ux+vy)] = exp(−j2πux)·exp(−j2πvy)`：
+
+```
+F(u,v) = ∫ [ ∫ f(x,y)·exp(−j2πux) dx ] · exp(−j2πvy) dy
+       = ∫ F_x(u,y) · exp(−j2πvy) dy
+```
+
+- **含义**：2-D Fourier transform = **做两次 1-D Fourier transform**——先把 x 当变量做一次，再把 y 当变量做一次。可同理推广到 N 维。
+- ⚠️ **PDF 上的问号（易错）**：`F(u,v) = F_x(u)·F_y(v)` **只有在 f(x,y) = f₁(x)·f₂(y) 时才成立**（即图像本身可分离）。"变换可分离计算"与"结果可写成乘积"是两回事，不要混淆。
+- 若用 cosine/sine 实函数则无法轻易拆成两个因子相乘——这又一次体现了复指数的优势。
+
+### 5. DFT（Discrete Fourier Transform）
+
+#### 5.1 定义（PDF p.56）
+
+对 m×n 的离散图像 f(x,y)：
+
+```
+F(u,v) = Σ_{x=0}^{m−1} Σ_{y=0}^{n−1} f(x,y)·exp[−j2π(ux/m + vy/n)]
+
+f(x,y) = (1/mn) Σ_{u=0}^{m−1} Σ_{v=0}^{n−1} F(u,v)·exp[ j2π(ux/m + vy/n)]
+```
+
+- **与连续 FT 相比，唯一的区别是把 integration 换成 summation**——没有别的区别。
+  - 连续定义用 −∞ 到 ∞ 是为了通用；对具体数字图像，求和只需覆盖图像范围（图像外视作 0，加零不改变结果）。
+- **常数 `1/mn` 不重要**：可放在正变换、可放在逆变换，有的教材两边各放 `1/√(mn)`。老师用绿色标注它、明确说**不必记忆**——因为图像处理关心的是变换域内的**相对值**，统一乘常数不影响任何结论。
+
+#### 5.2 ⭐⭐ 为什么定义里要除以 m、n？（老师花最多时间讲的"为什么"，重点理解）
+
+推理链条如下：
+
+1. **frequency = period 的倒数**（连续、离散都一样）。
+2. **离散信号的 period 是什么？** 连续信号的周期是一段"时间长度"（可以是 1 毫秒、1 小时，任意实数）；但离散信号只有采样点，其周期只能是**一个周期内包含多少个点**。
+3. 于是 **离散信号的 period 必须 ≥ 1**（不可能是 0.5 个点；最短周期是 2 个点，即 `1, −1, 1, −1, …`）。
+4. **period ≥ 1 ⇒ frequency ≤ 1**。所以离散信号的频率**不可能大于 1**；若取 1.5，它等价于 0.5（`cos(2π·1.5·x)` 与 `cos(2π·0.5·x)` 在整数 x 上完全相同，可自行验证）。
+5. 这正是 **DTFT（Discrete Time Fourier Transform）** 的情形：x, y 离散（整数），但 u, v **连续**且只取 [0, 1) 内的值。
+6. **但我们希望 u, v 也是离散整数** 0, 1, 2, …, m−1，好逐点计算。离散值来自对连续量采样 → 需要把 [0, 1) 这段区间采成 m 个点。
+7. **办法就是在指数里除以 m、n**：`ux/m` 中，当 u 取 0…m−1 时，`u/m` 恰好落在 [0, 1) 内。
+
+⭐ **一句话**：`/m`、`/n` 的唯一作用，是把频率变量的取值范围从 [0,1) **拉伸**到 [0, m)、[0, n)，从而让 u, v 也能取整数。这就是 DTFT 与 DFT 的全部差别。
+
+| | x, y | u, v | 说明 |
+|---|---|---|---|
+| 连续 FT | 连续 | 连续，(−∞, ∞) | 数学工具最丰富 |
+| **DTFT** | 离散（整数） | **连续，但必须 ∈ [0,1)** | 不除以 m、n |
+| **DFT** | 离散（整数） | **离散整数，0…m−1 / 0…n−1** | 除以 m、n 才能实现 |
+
+#### 5.3 DFT 的 separability
+
+与连续情形完全一样（求和与积分具有相同性质）：给定图像，**先对每一行做 1-D DFT，再对每一列做 1-D DFT**，即得 2-D DFT（PDF p.57 的 Row Transforms → Column Transforms 示意图）。
+
+### 6. ⭐ DFT 的性质（PDF p.58–59）
+
+| 性质 | 表达式 | 理解 |
+|---|---|---|
+| **Periodicity** | `F(u,v) = F(u+m,v) = F(u,v+n) = F(u+m,v+n)` | 源于离散信号频率只能落在 [0,1)（除 m 后为 [0,m)），超出范围只是**重复自身** |
+| **Conjugate symmetry**（实图像） | `F(u,v) = F*(−u,−v)`，`\|F(u,v)\| = \|F(−u,−v)\|` | m×n 个**实数**变换后得到 m×n 个**复数**（信息量 2 倍）→ 必然冗余，只有一半是真信息。含义：**magnitude 偶对称、phase 奇对称** |
+| **Linearity** | `ℑ{αf₁ + βf₂ + …} = αF₁ + βF₂ + …` | 由定义直接可得，FT 是线性变换 |
+| **Scaling** | `ℑ{f(αx, βy)} = (1/\|αβ\|)·F(u/α, v/β)` | 一个域**拉伸** ⇔ 另一个域**压缩**。例：常数（极平坦）↔ impulse（只含零频）；impulse（变化极快、含丰富频率）↔ 极平坦的谱 |
+| ⭐ **Convolution theorem** | `f(x,y)*g(x,y) ⇔ F(u,v)·G(u,v)`<br>`f(x,y)·g(x,y) ⇔ F(u,v)*G(u,v)` | 一个域的卷积 = 另一个域的相乘。见下方⚠️ |
+| **Translation** | `f(x−x₀, y−y₀) ⇔ F(u,v)·exp[−j2π(x₀u/m + y₀v/n)]` | 见下方⭐ |
+| **Rotation** | `f(r, θ+θ₀) ⇔ F(ω, φ+θ₀)`（极坐标下） | 空间旋转 ⇒ 频谱同角度旋转 |
+
+#### 6.1 ⚠️ Convolution theorem 的陷阱（老师特别强调，很多教材忽略）
+
+- 这条性质**严格来说只对连续函数成立**。
+- 对**离散**信号/图像，频域相乘对应的不是普通卷积，而是 **circular convolution（循环卷积）**。
+- **解决办法：zero padding（补零）**。把信号/图像补零扩展到约两倍尺寸后，circular convolution 就等价于 linear convolution。
+  - **为什么？** circular convolution 把整个信号首尾相接成一个"圈"，移位是 **circular shift**；补零使圈内一半是信号、一半是零，此时循环移位的效果与线性移位相同。
+- ⭐ 考点：**要在数字图像上使用"频域相乘代替卷积"，两个信号都必须先做 zero padding**（PDF p.58 明确写着 "Apply zero padding!"）。
+
+#### 6.2 ⭐ Translation ⇒ magnitude 是 translation invariant
+
+- 平移只让频谱乘上一个 `exp(−j2π(x₀u/m + y₀v/n))` 因子，而**这个因子的模为 1**——它**只改变 phase，不改变 magnitude**。
+- 即：常数背景上的一个物体，**移到任何位置，|F(u,v)| 完全相同**，变的只是相位。
+- **为什么重要**：object recognition 要求"无论车停在画面哪里都能认出是车"，因此需要 **translation invariant 的 feature**。取 Fourier transform 的 **magnitude** 就天然具备这一不变性。
+
+#### 6.3 Rotation ⇒ DFT **不是** rotation invariant → Polar Harmonic Transform
+
+- 物体旋转，频谱同角度旋转（用极坐标表示最容易看出）。所以 DFT magnitude **不具备**旋转不变性。
+- 原因：DFT 是沿 x、y **两条直角轴**做变换。
+- **解决思路**：改用 **polar coordinate (r, θ)** 表示图像，沿 r 与 θ 两个轴做变换 → **Polar Harmonic Transform**，其 magnitude 即为 **rotation invariant**。
+  - 老师工作：P. Yap, X. Jiang, A. Kot, *"Two Dimensional Polar Harmonic Transforms for Invariant Image Representation," IEEE TPAMI*, vol. 32, no. 7, 2010。
+
+#### 6.4 频谱示例与画法
+
+- ⭐ **经典变换对**：图像中一个 **rectangle / square** ⇔ 其频谱是 **2-D sinc function**（信号处理中著名的"矩形 ↔ sinc"对）。
+  - PDF 例图中 sinc 的水平与垂直宽度**不相等**：因为整幅图像本身不是正方形，**相对整幅图像归一化后**那个方块并非正方形。
+- 旋转物体 → 频谱同步旋转（示例图）。
+- **两种画法表示同一个函数**：
+  - **3-D plot**：三条轴，高度表示函数值；
+  - **2-D image**：两条轴是坐标（图像域为空间坐标、频域为频率坐标），**用亮度表示函数值**。
+- PDF 另附 FT 性质表与常用 **FT pairs 表**（p.63–64），老师说不逐条讲，需要时查表即可。
+
+### 7. ⭐ Image Sampling（图像采样理论，PDF p.65–71）
+
+#### 7.1 为什么要学采样理论
+
+- 数字图像本来就是离散的，但**连续函数的数学工具远比离散丰富**（微分、积分、闭式解）。图像处理/分析中常把图像**当作连续函数**来推导。
+- 因此必须搞清楚：**连续函数与离散函数究竟是什么关系**？采样理论正是连接两者的桥梁。
+- 老师另一个动机：很多人被采样理论里"连续 impulse 的值是无穷大"吓住，这一节专门澄清。
+
+#### 7.2 采样在数学上极其简单
+
+```
+f_d(m,n) = f_c(mΔx, nΔy) = f_c(x,y)|_{x=mΔx, y=nΔy}
+```
+- 就是把连续变量 x, y **替换**为 mΔx, nΔy（m, n 为整数，Δx 为采样间隔）。仅此而已。
+- **难的不是采样，而是分析关系**：`f_d = f_c` 只在采样点上成立；**两个采样点之间 f_d 是 undefined（未定义）**，而 f_c 处处有值。
+- 真正要回答的问题（PDF p.65）：**f_d(m,n) 是否包含与 f_c(x,y) 相同的信息？在什么条件下是？** 这才需要更抽象的数学工具。
+
+#### 7.3 前提：Band-limited（带限）假设
+
+```
+F_c(u,v) = 0,   for |u| > U₀, |v| > V₀
+```
+- **bandwidth = 2U₀ 与 2V₀**（x、y 两个方向）。
+- ⭐ **PDF 的思考题"Why 2U₀ and 2V₀?"**——老师给了两条理由，并**建议采用"2 倍最高频率"这个定义**：
+  1. Fourier transform 有**负频率**部分，非零区间实际从 −U₀ 到 U₀，长度为 2U₀。
+  2. 若对信号做 **modulation（调制）** 搬移到高频，非零频率范围确实变成 2U₀ 宽。
+  - （有些教材把 bandwidth 定义为最高频率 U₀ 本身，注意区分。）
+- **实际图像总能近似为 band-limited**：真实世界虽连续，但传感器（以及人眼）分辨率有限，变化过快的高频成分要么感知不到、要么信息量极小；能量主要集中在某个频带内。
+
+#### 7.4 Sampling function（impulse train）
+
+```
+s(x,y) = Σ_{m=−∞}^{∞} Σ_{n=−∞}^{∞} δ(x − mΔx, y − nΔy)
+
+其 Fourier transform：
+S(u,v) = (1/ΔxΔy) Σ_m Σ_n δ(u − m/Δx, v − n/Δy)
+```
+- **impulse train 的 FT 仍是 impulse train**，间隔从 Δx, Δy 变为 **1/Δx, 1/Δy**（互为倒数）。
+
+⭐ **老师对"impulse = ∞"的澄清（重要且常令人困惑）**：
+- 连续域中，impulse 的值**必须是无穷大**（否则积分即面积为零、没有意义），积分为 1。图上用带箭头的竖线表示，箭头意即"其实是无穷"。
+- **不要被这个无穷吓到**——它只是一个想象出来的数学工具。**实际中我们从不使用 impulse 本身，只使用 impulse response**（系统/滤波器对 impulse 的输出，是有限值）。impulse 只是定义 impulse response 的跳板。
+- ⭐ **impulse train 的妙处**：它是一个**连续函数**（不是离散函数），却**只在离散采样点上非零**——正好是连接连续与离散的桥梁。
+
+#### 7.5 ⭐ 核心推导：采样后频谱是原频谱的周期复制
+
+**第一步（空间域）**：连续图像乘以 impulse train
+
+```
+f_d(x,y) = f_c(x,y)·s(x,y) = Σ_m Σ_n f_c(mΔx, nΔy)·δ(x − mΔx, y − nΔy)
+```
+- 依据：**函数 × impulse = 该 impulse 位置上的函数值 × impulse**（因为 impulse 在别处为 0，0 乘任何数仍为 0）。
+- ⚠️ 注意：**f_d(x,y) 仍是连续函数**（x, y 连续），只是只在采样点非零。
+
+**第二步（频域）**：相乘 ⇔ 卷积（convolution theorem）
+
+```
+F_d(u,v) = F_c(u,v) * S(u,v)
+         = (1/ΔxΔy) Σ_m Σ_n F_c(u,v) * δ(u − m/Δx, v − n/Δy)
+         = (1/ΔxΔy) Σ_m Σ_n F_c(u − m/Δx, v − n/Δy)
+         = (1/ΔxΔy) Σ_m Σ_n F_c(u − m·f_xs, v − n·f_ys)
+```
+- 依据：**函数与 impulse 卷积 = 函数本身，且被搬移到该 impulse 的位置**（卷积的 shift-invariance）。
+- 记号：`f_xs = 1/Δx`、`f_ys = 1/Δy` 为采样频率。
+
+⭐ **结论**：`F_d(u,v)` 是 `F_c(u,v)` 在频率平面上、以 **(1/Δx, 1/Δy) 为间隔**、在矩形网格上的**周期复制（periodic replication）**。
+
+#### 7.6 无混叠条件与重建
+
+**条件（PDF p.69）**：只要各份复制品**不重叠**——
+
+```
+f_xs = 1/Δx ≥ 2U₀   且   f_ys = 1/Δy ≥ 2V₀
+等价于  Δx ≤ 1/(2U₀)  且  Δy ≤ 1/(2V₀)
+```
+
+**恢复方法**：用 **low-pass filter** 只保留中心那一份、滤掉其余复制品
+
+```
+H(u,v) = { ΔxΔy,  (u,v) ∈ ℜ
+         { 0,     otherwise
+
+F_c(u,v) = F_d(u,v)·H(u,v)      （频域相乘）
+f_c(x,y) = f_d(x,y) * h(x,y)    （空间域卷积）
+```
+
+**重建公式的推导（PDF p.70）**：
+
+```
+f_c(x,y) = h(x,y) * f_d(x,y)
+         = h(x,y) * Σ_m Σ_n f_c(mΔx, nΔy)·δ(x − mΔx, y − nΔy)
+         = Σ_m Σ_n f_c(mΔx, nΔy)·h(x − mΔx, y − nΔy)
+         = Σ_m Σ_n f_d(m,n)·h(x − mΔx, y − nΔy)
+```
+
+⭐⭐ **老师的点睛之笔**：推导**从 impulse（无穷大）开始，却以 impulse response（有限、就是滤波器 mask）结束——impulse 中途消失了**。最终公式里没有任何无穷，只有：
+- **离散的像素值 f_d(m,n)**（蓝色部分）；
+- 一个**连续的 low-pass filter 的 impulse response h(x,y)**，且对任何图像都是同一个滤波器。
+
+即：**用离散像素值去加权一个连续的低通滤波器并求和，就能得到连续图像**。这样一来，两个采样点之间"未定义"的值也被恢复了——**对所有 x, y 都建立起了连续与离散的关系**。
+
+#### 7.7 Sampling Theorem（PDF p.71）
+
+> 带宽为 (2U₀, 2V₀) 的 band-limited 图像 f_c(x,y)，若以间隔 (Δx, Δy) 在矩形网格上均匀采样，且**采样率 (f_xs, f_ys) 大于 Nyquist rates**，则可由采样值 f_d(m,n) **无误差地完全恢复** f_c(x,y)。
+
+- **Nyquist rate（奈奎斯特率）/ Nyquist frequency**：所需采样率的下界，即带宽本身；其倒数称 **Nyquist interval**。
+- **Aliasing（混叠）**：采样率低于 Nyquist rate 时，`F_c(u,v)` 的周期复制品会**重叠**，`F_d(u,v)` 被扭曲，`F_c(u,v)` **不可逆地丢失**——重建出的图像与原图不同。
+- **抗混叠**：采样**之前**先做 **low-pass filtering**，把带宽压到采样频率以下。
+  - ⭐ **PDF 留的思考题："at the expense of what?"**（代价是什么？）→ 代价是**主动丢弃高频细节**，图像变模糊；但这好过让混叠把整个频谱污染。
+
+#### 7.8 ⭐ 采样理论的最终意义
+
+只要图像是 band-limited 且满足采样定理，**连续图像与离散（数字）图像在信息上完全等价**。因此我们可以放心地把数字图像当作连续函数来做微分、积分等数学分析——**连续用 ∫、离散用 Σ，效果完全相同，没有区别**。
+
+---
+
+### 8. Topic 3 — Image Enhancement：Point Processing（本周进入）
+
+> 课间休息后进入 Topic 3。Topic 3 outline（PDF p.72）：Simple Point Processing → **Histogram Equalization** → Image Smoothing → Image Sharpening → Nonlinear Image Processing。本周讲到 histogram equalization 为止。
+
+#### 8.1 什么是 point processing
+
+- **定义**：把输入图像灰度按 `g = T(f)` 映射为输出灰度。
+- ⭐ **又称 memoryless operation（无记忆操作）**：系统不需要记忆——输出像素值**只取决于该点自身的输入灰度**，与**位置 (x,y) 无关**。
+  - 因此可以把 x, y 省略，直接写 `g = T(f)`：给定同一个 f 值，无论它在图像哪个位置，输出都是同一个 g。
+
+#### 8.2 三种简单变换（PDF p.73–76）
+
+| 变换 | 公式 | 别名/用途 |
+|---|---|---|
+| **Power Transformation** | `g = c·f^γ` | 又称 **gamma correction**，Photoshop 等传统图像处理工具中的经典操作 |
+| **Log Transformation** | `g = c·log(1 + f)` | 形状与 γ<1 的 power transform 相似 |
+| **Piecewise Linear Transformation** | 见下 | 又称 **contrast stretching** |
+
+**Piecewise Linear（PDF p.73/76 完整公式）**：
+
+```
+        ⎧ αf,                      0 ≤ f < a
+g = T(f)⎨ β(f − a) + T(a),         a ≤ f < b
+        ⎩ γ(f − b) + T(b),         b ≤ f < L
+```
+分段直线、各段斜率不同，整体是**非线性**函数。
+
+#### 8.3 ⭐ Gamma correction 的效果分析（老师讲得最细的部分）
+
+**曲线形状**：
+- **γ = 1**：直线（恒等映射）。
+- **γ > 1**：曲线在直线**下方**（如 γ=2 即 `g = f²` 的形状）。
+- **γ < 1**：曲线在直线**上方**。
+
+⭐ **为什么必须用非线性变换？**
+- 有人想："要提高对比度，把每个像素乘 100 不就行了？原来差 1 现在差 100。"——**这不是对比度增强**。因为**人眼的敏感范围有限**，只能在某个范围内感知差异。
+- 所以 power transform 里的常数 **c 就是用来把输出范围归回与输入相同的 [0, L]**——**总范围不变**。
+- ⭐⭐ **核心守恒思想**：既然总范围不变，**要增强某段灰度的对比度，就必须牺牲（压缩）另一段的对比度**。所有 point processing 都遵循这个"此消彼长"的原则。
+
+**两种情形（考点）**：
+
+| 情形 | 曲线 | 效果 | 适用图像 |
+|---|---|---|---|
+| **γ > 1** | 在直线下方 | **拉伸亮部（bright range）对比度**，压缩暗部 | **过亮 / over-exposed** 的图像（大部分像素在高灰度，牺牲暗部无所谓） |
+| **γ < 1**（≈ log transform） | 在直线上方 | **拉伸暗部（dark range）对比度**，压缩亮部 | **过暗** 的图像（大部分像素在低灰度） |
+
+- **从 histogram 角度理解**（老师用暗图举例）：暗图的 histogram 密集堆在低灰度端、高灰度端稀疏。γ<1 的变换把**密集分布拉成稀疏分布**（不同像素灰度差变大 = 对比度增强），代价是把原本稀疏的亮部**压得更密集**。整体灰度范围前后不变。
+
+**Piecewise linear 的效果**：
+- **斜率 > 1 的段** → 输入的小范围映射到输出的大范围 → **对比度增强**；
+- **斜率 < 1 的段** → 输入的大范围映射到输出的小范围 → **对比度压缩**。
+- 适用于 **low contrast image**（不太亮也不太暗，但灰度差都很小）：中间段斜率设 > 1，两端设 < 1。
+- ⭐ **极端情形**：若中间段斜率设为 **∞（竖直线）**，两端为水平线 → 变成**阶跃函数** → 输出只有 0 与最大值两种取值 → 得到 **binary image**，此时**对比度最高**（像素非最小即最大）。
+
+#### 8.4 承上启下：自适应的需求
+
+上述变换都需要**事先知道图像"病"在哪**（太亮？太暗？低对比度？）才能选对。**若不知道呢？** → 需要一种能**自适应于输入图像问题**的方法 → **Histogram Equalization**。
+
+### 9. ⭐⭐ Histogram Equalization（本周最重要考点，PDF p.77–83）
+
+#### 9.1 目标
+
+把输入图像的灰度 f 变换为输出灰度 g，使**输出图像的 histogram 尽可能均匀（uniform）**。此时所有像素均匀分布在最小到最大灰度之间，**对比度达到最大**。
+
+#### 9.2 算法（PDF p.77）—— ⚠️ 两个公式必须分清
+
+```
+① c(f) = Σ_{t=0}^{f} p_f(t) = Σ_{t=0}^{f} n_t / n        ← ⭐ 这才是 histogram equalization
+
+② g = T(f) = round[ (c(f) − c_min) / (1 − c_min) · L ]   ← 只是把 [0,1] 线性归一化到 [0,L] 再取整
+```
+- `p_f(t)`：输入图像的 histogram（灰度 t 的像素数 n_t 除以总像素数 n）；`t` 是求和的 dummy variable；`c_min` 是所有 c(f) 中的最小值。
+
+**做法一句话**：给定输入灰度 f，**把输入 histogram 从 0 累加到 f，这个累加和就作为输出灰度**。
+
+#### 9.3 ⭐⭐⭐ 老师的考试警告（原话强调，务必记住）
+
+> 教科书介绍 histogram equalization 时总是给出两个公式（上面的①和②）。但在老师看来，**公式②与 histogram equalization 毫无关系**——它只是一个**简单的归一化**（任何图像处理之后都可以做：减最小值、除以范围、乘 L、取整），可用于任何处理场合。
+>
+> ⚠️ **往年考试中，不止个别学生**在遇到 histogram equalization 的题目时，**只背了公式②并用它作答，完全忽略公式①** ——这种答案**判零分（zero mark）**。
+>
+> **真正的 histogram equalization 来自公式①（累加 histogram）**。
+
+#### 9.4 ⭐ 连续情形的严格证明（PDF p.78–79，考点）
+
+**前提条件**：
+- 设 f 为归一化到 [0,1] 的连续灰度；
+- 变换 `g = T(f)` 是 **single-valued（单值）** 且 **monotonically increasing（单调递增）**，`0 ≤ T(f) ≤ 1`；
+- 其逆变换 `f = T⁻¹(g)` 也是单值、单调递增的。
+
+**第一步：概率论关系**
+
+```
+p_g(g) = p_f(f)·|df/dg|
+```
+- **为什么？** 把 f、g 看作 random variable。`p_f(f)·df` 是"随机变量落在小区间 df 内"的**概率**（PDF 是概率密度，密度 × 区间 = 概率）。由于 **g 完全由 f 决定**，f 落在 df 内的概率必然等于 g 落在对应区间 dg 内的概率：
+  ```
+  p_f(f)·df = p_g(g)·dg   ⟹   p_g(g) = p_f(f)·df/dg
+  ```
+- ⭐ 老师说明：histogram 概念上虽不是 PDF（见 Week 1 的辨析），但它满足 PDF 的一切性质、是 PDF 的 estimate；连续图像情形下可直接当 PDF 用。
+
+**第二步：取变换为 cdf**
+
+```
+g = T(f) = ∫₀^f p_f(t) dt        （f 的 cumulative distribution function，cdf）
+```
+- cdf 天然是**单值且单调递增**的，满足前提条件。
+
+**第三步：代入**
+
+```
+∵ dg/df = p_f(f)                （积分的导数就是被积函数）
+∴ p_g(g) = p_f(f)·(df/dg) = p_f(f)·(1/p_f(f)) = 1
+```
+
+⭐ **结论**：变换后的灰度服从 **uniform distribution**。∎
+
+**离散版本**就是把积分换成求和，即公式①：`c(f) = Σ_{t=0}^{f} p_f(t)` 是 `∫₀^f p_f(t)dt` 的离散版。
+
+#### 9.5 ⭐ 直观理解：为什么这么简单的式子就能均衡？
+
+老师用**暗图**举例（histogram 密集堆在低灰度端）：
+
+- 输出灰度 = **累计到该灰度为止的像素比例**。
+- **某灰度区间像素很多** → 累加和上升很快 → 该区间被**大幅拉开（放大）**。
+  - 例：若某点之前已累计 50% 的像素，则该输入灰度被映射到输出的 0.5（最大值为 1）。
+- **某灰度区间几乎没有像素** → 累加和几乎不变 → 该区间被**压缩到几乎一点**。
+  - 例：暗图中最亮的那一小段几乎没有像素，这一整段输入都被映射到接近最大值 1 的同一处。
+- ⭐ 所以它**自适应**：像素集中在哪里，就把哪里拉开；哪里没像素，就把哪里压掉。**输入实际占据的灰度范围被拉伸到几乎整个输出范围**。
+
+#### 9.6 ⭐ 离散情形无法严格均匀（重要洞察）
+
+- 连续情形可严格证明得到 uniform；**但离散图像做不到严格均匀**，只能"尽量接近"。
+- **为什么？** ⭐ **任何 point transform 都不能改变 histogram 中每根竖线的高度，只能改变它的位置**。
+  - 因为同一灰度的像素，经过同一个变换后**必然仍是同一灰度**——不可能把它们拆散到不同灰度去。若某灰度有 50 个像素，变换后这 50 个像素仍然共享同一个新灰度值。
+  - 所以竖线的**高度（像素数）永远不变**，变的只是**横轴上的位置**：某些区间被压缩、某些被拉伸（重新分布），但**纵轴上什么也不会发生**。
+- ⭐ **用途**：这条可以用来判断教材插图的对错。老师指出 PDF 中"均衡化前后彩色图 + histogram"那张图里的 histogram **并非真实计算所得**，只是示意——因为真实的均衡化不可能改变每根线的高度。
+
+#### 9.7 ⭐ 考试形式提示（老师主动透露）
+
+- 考 histogram equalization 时，若给出完整图像的 histogram，计算量太大。因此题目通常只给**几根线**。
+- **数学上会用 impulse function 来表示这几根线**（PDF p.80）：
+  ```
+  P_f(f) = a₁·δ(f − b₁) + a₂·δ(f − b₂) + a₃·δ(f − b₃)
+  ```
+  - 每个 impulse 代表一根线：**b₁, b₂, b₃ 是线的位置（灰度值）**，**a₁, a₂, a₃ 是线的高度（像素比例）**。
+- ⚠️ **往年不止个别学生**看到这种写法**不认识 impulse、不明白它表示什么**，因而整道题答不出来。老师专门提醒了这一点。
+
+#### 9.8 其他
+
+- **Local histogram equalization**（PDF p.83）：在局部窗口内做均衡化，效果更强，老师本周只作展示。
+- 相关工作：J. Ren, X. Jiang, J. Yuan, *"A Chi-Squared-Transformed Subspace of LBP Histogram for Visual Recognition," IEEE TIP*, vol. 24, no. 6, 2015。
+- 老师**跳过**了 PDF 上的一小节（"不是主流内容"），并把 **low-pass / high-pass filter 设计**留到下周。
+
+### 10. ⭐ 本周考点速查
+
+| 考点 | 关键结论 | 节号 |
+|---|---|---|
+| Fourier transform 物理意义 | 信号 = sinusoid 之和；\|F\|=amplitude，∠F=initial phase | §2.2 |
+| 为何用 complex exponential | 相乘 = 指数相加，远比 cos·cos 简洁 | §2.3 |
+| 正变换如何提取频率 | u = u₀ 时被积函数为常数 → ∞；u ≠ u₀ 时为 sinusoid → 积分 0 | §2.4 |
+| 2-D FT separable | 做两次 1-D FT；`F=F_x·F_y` 仅当 `f=f₁(x)f₂(y)` | §4.2 |
+| ⭐ DFT 为何除以 m、n | 离散信号 period ≥ 1 ⇒ frequency ≤ 1；除以 m 把 [0,1) 拉成 [0,m) 使 u 可取整数 | §5.2 |
+| DTFT vs DFT | DTFT 的 u,v 连续∈[0,1)；DFT 的 u,v 离散整数 | §5.2 表 |
+| Periodicity 由来 | 频率超过 1 只是重复自身 | §6 |
+| Conjugate symmetry 由来 | m×n 实数 → m×n 复数，信息 2 倍，必有冗余 | §6 |
+| ⚠️ Convolution theorem | 离散情形对应 circular convolution，**须先 zero padding** | §6.1 |
+| ⭐ Translation invariance | 平移只改 phase 不改 magnitude ⇒ \|F\| 可作识别特征 | §6.2 |
+| Rotation | DFT 非旋转不变；Polar Harmonic Transform 的 magnitude 才是 | §6.3 |
+| 变换对 | rectangle ⇔ 2-D sinc | §6.4 |
+| Bandwidth 定义 | 取 **2U₀**（因有负频率 / 调制后范围） | §7.3 |
+| 采样频域结论 | `F_d` 是 `F_c` 以 (1/Δx, 1/Δy) 为间隔的周期复制 | §7.5 |
+| Sampling theorem | `1/Δx ≥ 2U₀`；低于则 aliasing 且不可逆 | §7.6–7.7 |
+| 抗混叠代价 | 采样前低通滤波 → 丢失高频细节 | §7.7 |
+| Point processing | memoryless，`g=T(f)` 与位置无关 | §8.1 |
+| ⭐ Gamma 守恒原则 | 总范围不变 ⇒ 增强一段必压缩另一段 | §8.3 |
+| γ>1 / γ<1 | γ>1 增强亮部（修过亮图）；γ<1 增强暗部（修过暗图） | §8.3 表 |
+| ⭐⭐ Histogram equalization | **`c(f)=Σp_f(t)` 才是本体**；归一化式与它无关 | §9.2–9.3 |
+| HE 连续证明 | 取 g=cdf ⇒ dg/df=p_f ⇒ p_g=1（uniform） | §9.4 |
+| ⭐ 离散不能严格均匀 | point transform 不改变竖线**高度**，只改**位置** | §9.6 |
+
+### 11. ⚠️ 本周易错点清单
+
+1. **只用归一化公式②做 histogram equalization 题 → 零分**。必须先算累加 `c(f) = Σ p_f(t)`。
+2. **不认识 `P_f(f)=a₁δ(f−b₁)+…` 的 impulse 表示法**（a=高度、b=位置）→ 整题失分。
+3. 认为离散图像做完 HE 后 histogram **严格**均匀 → 错。只能近似；竖线高度永远不变。
+4. 在数字图像上直接用"频域相乘 = 空间域卷积" → 错，那是 circular convolution，**必须 zero padding**。
+5. 把 `F(u,v) = F_x(u)·F_y(v)` 当作普遍成立 → 错，只在 `f(x,y)=f₁(x)f₂(y)` 时成立。
+6. 认为 DFT magnitude 也是 rotation invariant → 错，只有 translation invariant。
+7. 混淆 bandwidth 是 U₀ 还是 2U₀ → 本课**采用 2U₀**。
+8. 认为"每个像素乘以一个大常数"就是 contrast enhancement → 错，人眼感知范围有限，且总范围应保持。
+9. 忘记连续域 impulse 的值是 **∞**（离散域才是 1）。
+10. 把 DFT 定义中的常数 `1/mn` 当作必须记忆的要点 → 老师明确说它不重要、可任意放置。
+
+### 12. 行政信息（回答"本周有无签到/考勤/quiz"）
+
+- ⭐ **本周录播中没有任何签到、考勤或 quiz 安排的通知**。全程为知识讲授，无平台点名（无 Wooclap/NTULearn 互动环节）。
+- 转写中出现的 "quiz" 全部是**出题方式的提示**，而非考试通知，共两处，均已记入上文：
+  - §9.3：往年考试中只用归一化公式作答 histogram equalization 者判**零分**；
+  - §9.7：quiz 中会用 **impulse 形式**给出 histogram，往年有学生不认识该写法。
+- 已知考核安排仍以 Week 1 为准：**Quiz 10%（Week 7 课堂内 30 分钟）+ Assignment ×2 共 30% + Final 60%**。
+
+---
+
+> **下一周（Week 3）预告**：继续 Topic 3 Image Enhancement——用 LSI 系统设计 **low-pass filter 与 high-pass filter**（image smoothing 与 image sharpening），随后进入 **nonlinear image processing / rank filter**（如 **median filter**）。老师本周明确表示："这部分今晚做不完，下周讲。"
+
+---
+
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction 等）。中文用于组织句意与补充释义。
