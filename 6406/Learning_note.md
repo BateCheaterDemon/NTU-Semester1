@@ -3,7 +3,7 @@
 > 课程学习笔记总览。每周一节，按周总结重点内容。
 > 第一周（开课周）特别关注考核要求、任课教师、课程定位与整体结构。
 >
-> **权威来源说明**：本笔记先由 `week1.txt` 录播转写整理，再以 `EE6406-Lecture1-LZP-v1.pdf`（官方讲义，Zhiping Lin，AY2026-27 S1）核对修正。转写有大量语音识别噪声（如 "Dinger Ping" 实为 Zhiping Lin、"proto/Tok" 实为 Toh Kar-Ann、"Simon Le/Dell" 实为 Simon Liu、"seemal/on sample" 实为 ensemble、"sample learning" 实为 ensemble learning、"pyro" 等概率词本周较少），均以 PDF 为准修正。Week 1 转写仅覆盖 Lecture 1（课程导论），Lecture 2（Data Preprocessing）与 Lecture 2 Supplement（Mathematics Review）虽已下发但属下周内容，本周不展开。
+> **权威来源说明**：本笔记先由各周录播转写（`week1.txt`、`week2.txt`…）整理，再以对应官方讲义 PDF（`EE6406-Lecture1/2-LZP-v1.pdf`、`EE6406-Lecture2Suppl-LZP-v1.pdf`，Zhiping Lin，AY2026-27 S1）核对修正。转写有大量语音识别噪声（如 "Dinger Ping/P L" 实为 Zhiping Lin、"proto/Tok" 实为 Toh Kar-Ann、"Simon Le/Dell" 实为 Simon Liu、"seemal/on sample" 实为 ensemble、"sample learning" 实为 ensemble learning、"fear" 实为 field、"etction" 实为 extraction、"n by n/n to n dives" 实为 end-to-end、"mean ski/Mosk/means co ski" 实为 Minkowski、"humming" 实为 Hamming、"matrix" 常实为 metric、"lacung/lacungan/logngan" 实为 Lagrange(Lagrangian)、"copian" 实为 Jacobian、"fi" 实为 affine、"S score/score stang" 实为 z-score(standardization)、"packing lot" 实为 log、"sikmoi" 实为 sigmoid、"biliion/valian/variant" 实为 variance、"neumic/neumatical" 实为 numeric(numerical)、"Odiner" 实为 ordinal、"chromo" 实为 cofactor、"alg gate/adj gate" 实为 adjugate、"atom" 实为 codomain 等），均以 PDF 为准修正。Week 1 转写仅覆盖 Lecture 1（课程导论）；Week 2 转写覆盖 Lecture 2（Data Preprocessing）与 Lecture 2 Supplement（Mathematics Review）。
 
 ---
 
@@ -327,6 +327,354 @@
 
 ---
 
-> **下周（Week 2）预告**：Lecture 2 **Data Preprocessing**——What is data、data types、distance metrics、preprocessing methods，外加 **Mathematics Review**（线性代数、矩阵分解、最小二乘、正则化、凸优化等 analytic learning 所需工具）。本周不展开，待学后整理。
+## Week 2 — Data Preprocessing（Lecture 2）＋ Mathematics Review（Lecture 2 Supplement）
+
+> 本周由 Zhiping Lin 主讲，是 Part 1 的共用基础。转写覆盖 Lecture 2（Data Preprocessing，50 页）与 Lecture 2 Supplement（Mathematics Review，43 页）两份 PDF。Lecture 1 不进 quiz/exam，**但 Lecture 2（data preprocessing）会进 quiz 与 final exam**，本周内容务必重视。
+
+### 0. 课前行政提醒
+
+- **Quiz logistics**：第一次 quiz（CA1）在 **Week 5**（距本周三周），仅 **15 分钟**，in-class，需 **lockdown browser**。计划在 **Week 4 开头**用 10–15 分钟做一次 try-run 测试设备。**PC + Windows 最稳**；Mac/Unix 可能有麻烦；iPad 可用但不稳。Lecture 8 由两位教授合上（Part 1 收尾）；之后由 Toh (proto) 接手。
+- **教材**：主教材电子版在 NTU 图书馆可免费访问（用学号登录），应可下载 PDF；书中每章有习题 + 解答，作为练习资源足够，无需额外索题。录像已上 NTULearn。
+- **本周录播中无新的考勤/签到安排**；与考勤相关的只有上述 in-class quiz 要求。
+
+---
+
+### Part A：Lecture 2 — Data Preprocessing
+
+#### 1. Pattern Recognition Pipeline（学习管线）
+
+机器学习/模式识别的通用流程（本周聚焦其中的 preprocessing 与 feature extraction）：
+
+```
+Raw data → Preprocessing → Feature Extraction → Training Features / Test Features
+        → Model Selection → Learning → Learned Model
+        → (Test) Trained Prediction / Test Prediction
+        → Decision & Performance Evaluation
+```
+
+- **Data Preprocessing**：为数据准备有意义的表示。
+  - **Normalization**（此处泛指规整）：去除非代表性或冗余部分、做相关调整；主要目的是 **防止 anomalies（异常）主导分析**。
+  - **Data conversion**：在 nominal/ordinal/interval/ratio 等不同 data type 间转换。
+- **Feature Extraction**：从大批数据中提取 informative、relevant、non-redundant 成分，常大幅降低数据维度，故与 **dimension reduction** 相关，常涉及 data transformation。
+  - **Feature selection**（= variable selection）：选 relevant feature 子集，相对简单（按准则选/赋权）。
+  - **Feature extraction**：做变换使特征更具代表性，可进一步降维。
+  - 两大路线：
+    - **Generic dimension reduction**：**PCA**（principal component analysis）、**ICA**（independent component analysis）、isomap、multilinear subspace learning、autoencoder。
+    - **Extracting semantic features**：edge detection、corner detection、blob detection、ridge detection、**SIFT**（scale-invariant feature transform）。
+  - 即便 end-to-end deep learning 可把这些步骤一并学，理解各步仍重要——尤其中小规模实际问题。
+- **Learning**：学一个函数 $Y = f(X)$（$X$ 输入、$Y$ 输出，均可为 scalar 或 vector）。$f$ 的形式未知，任务是评估手头算法哪个最好描述问题。
+- **Decision & Performance Evaluation**：
+  - 训练后用 optimized model $f$ 对 unseen data $X_t$ 得预测 $Y_t = f(X_t)$；classification 时再加 threshold decision 定类别。
+  - **Generalization capability** 关键——训练数据常受采集与预算限制，模型须在有限样本上仍能泛化。
+  - **N-fold cross-validation**：数据均分 N 折，N−1 折训练、1 折测试，轮换使每折恰好做一次测试集，最终性能取 N 次平均；充分利用全部数据。**Lecture 8（Toh）会详讲 performance evaluation**。
+
+#### 2. What is Data?
+
+据 Wikipedia：data 是 "a collection of discrete or continuous values that convey information, describing the quantity, quality, fact, statistics, other basic units of meaning, or simply sequences of symbols"。**datum** 是其中单个值。
+
+- 要点：data 携带的信息**未必正确**——可能是错误或误导信息，故 raw data 后仍需考察质量。
+- 例子：
+  - **Optdigit dataset**：手写数字 0–9，用 gray level/intensity 表示，像素值 0–255。
+  - **Spiral pattern**（高度非线性，多 spiral 同属一类）与 **bar graph**（日常分布可视化，如各国/各校学生人数）——常用于测试模型能否识别非线性结构。
+- **Discrete vs Continuous**：
+  - Discrete variable：可映射到可数集，可无限大（如整数）或仅有限范围；相邻值间有间隔。
+  - Continuous variable：稠密，任意两值间总能取另一值，不可数（如 $[0,1]$ 内有无穷多个值）。
+  - 物理量（如温度）本质 continuous，但计算机处理时常 **sampling** 成 discrete。
+
+#### 3. Data Types（四类，按度量层次）
+
+| 类型 | 别名 | 是否有序 | 数值? | 绝对零点? | 例子 |
+|---|---|---|---|---|---|
+| **Nominal** | categorical / qualitative | 无 | 否 | — | gender、race、blood type、place、ID、鱼/水果名 |
+| **Ordinal** | — | 有 | 否（仅 rank） | — | good/better/fair、excellent/good/average、patient priority、survey satisfaction、small/medium/large、undergrad→MSc→PhD |
+| **Interval** | — | 有 | 是 | **否**（零点 arbitrary，负值允许） | Celsius 温度（0℃ ≠ 无温度，故 60℃ ≠ 30℃ 的两倍热） |
+| **Ratio** | — | 有 | 是 | **是**（absolute zero） | Kelvin 温度、age、height、weight（40kg = 20kg 的两倍） |
+
+- **层级关系**：qualitative（nominal）→ quantitative（discrete/continuous）。Continuous 再细分为 interval 与 ratio（区别在于有无 natural/absolute zero point）。Discrete 为 nominal 与 ordinal 共用（类别数不能无穷）。
+- **Binary / Non-binary**：binary 仅 0/1；non-binary 可 0,1,2,…。
+
+##### 3.1 Nominal data 的数值编码（Numeric Conversion / Data Encoding）
+
+- **Arbitrary assignment**（如 male=1, female=2）：简单，但大/小数值在计算中可能造成"大值更具影响力"的误导；且会丢失内在关系（如 north/east/south/west=1/2/3/4 丢失邻近关系）。
+- **Binary coding**：按位数丰富表示，含 binary-coded decimal、n-ary gray codes、**one-hot encoding**。
+  - **One-hot encoding**：每个类别用一个向量，仅对应位置为 1 其余为 0，用位置标记类别，避免赋值带来虚假序。**处理无序类别（如水果名）时推荐**。
+- 进阶编码会考虑各 attribute 的 probability distribution。转换后 binary feature vector 可用 **Hamming distance、Spearman distance** 等比较。
+
+##### 3.2 Ordinal data 的数值编码
+
+- 可用 percentage / frequency of occurrence；与 nominal 不同，**赋数值后可算 mean、median、mode**——但 mean 须谨慎（rank 间距未知，mean 可能非整数、意义可疑；mode/median 更稳）。
+- **Rank encoding with normalization**：rank $r=1,\dots,R$ 归一化到 $[0,1]$：
+
+$$
+d = \frac{r-1}{R-1} \tag{1}
+$$
+
+- 比较两 rank 向量的距离：
+  - **Spearman distance**：正比于两 rank 向量 Euclidean 距离的平方。例：$x=[2,3,1]$、$y=[3,2,1]$，$d(x,y) \propto \sqrt{(2-3)^2+(3-2)^2+(1-1)^2}=\sqrt{2}$（课件写正比于 2，即未开方的平方和）。
+  - **Hamming distance**：等长 rank 串中对应位置不同的个数。$[2,3,1]$ vs $[3,2,1]$ → 前两位不同 → 2。
+  - **Chebyshev distance**（= maximum value distance）：两 ordinal 向量各分量绝对差的最大值。
+  - 其它：Kendall、Cayley、Ulam distance。
+
+##### 3.3 Interval vs Ratio（关键区别）
+
+- 唯一区别：**有无 absolute zero point**。
+- **Celsius = interval**（0℃ 非绝对零点，不能说 60℃ 是 30℃ 的两倍）；**Kelvin = ratio**（0 K = 分子运动完全停止 = 绝对零点，60 K 确为 30 K 的两倍）。
+- 两类都可定义两点距离，但 **scaling 后解释不同**，故 normalization 时须注意 scaling 的影响。
+
+#### 4. Distance Metrics（距离度量）
+
+> 在 unsupervised learning / clustering 中尤其重要——无 ground truth 时靠度量样本间距离判断聚合。
+
+##### 4.1 定义与四公理
+
+距离映射 $d(x,y): \mathcal{X}\times\mathcal{X} \mapsto [0,\infty)$，须满足：
+
+| 公理 | 条件 |
+|---|---|
+| Non-negativity | $d(x,y) > 0$ |
+| Identity of indiscernibles | $d(x,y) = 0 \iff x=y$ |
+| Symmetry | $d(x,y)=d(y,x)$ |
+| Triangle inequality | $d(x,z) \le d(x,y)+d(y,z)$ |
+
+满足者称 **metric**；带 metric 的集合称 **metric space**。
+
+##### 4.2 常见 metric
+
+| 距离 | 别名 / 关系 |
+|---|---|
+| **Hamming distance** | 是 metric（满足四公理） |
+| **Euclidean metric** | 2-norm / $L_2$-norm，几何距离 |
+| **Manhattan / taxicab metric** | 1-norm / $L_1$-norm |
+| **Minkowski distance** | p-norm metric，$L_1$/$L_2$ 的推广 |
+
+公式（$d$ 维）：
+
+$$
+\text{1-norm: } d=\sum_{i=1}^d |x_i-y_i|,\quad
+\text{2-norm: } d=\Big(\sum_{i=1}^d |x_i-y_i|^2\Big)^{1/2},\quad
+\text{p-norm: } d=\Big(\sum_{i=1}^d |x_i-y_i|^p\Big)^{1/p}
+$$
+
+$$
+\text{$\infty$-norm: } d=\lim_{p\to\infty}\Big(\sum_{i=1}^d |x_i-y_i|^p\Big)^{1/p} = \max_i |x_i-y_i|
+$$
+
+- **关键考点**：**Minkowski distance 当 $p \ge 1$ 时是 metric**（满足四公理）；**$p < 1$ 时不是 metric**——**违反 triangle inequality**。
+- 课件 Fig.5 画了 $L_{0.1}, L_{0.5}, L_1, L_2, L_3, L_{10}$ 的单位等距线：$p<1$ 时等距线凹（concave），两中转点之间不满足三角不等式；$p\ge1$ 时凸。**往年考题有相关题，务必会判断 $p<1$ 非 metric。**
+
+#### 5. Preprocessing Methods
+
+数据可能来自 nominal/ordinal/interval/ratio 多种类型、多个来源、长时间跨度，空间维度大、含时序，须做 preprocessing 以保证 representation 的一致性。
+
+##### 5.1 Cleaning / Cleansing（数据清洗）
+
+检测、纠正、移除 corrupted、incomplete、erroneous、inaccurate 样本。四项质量要求：
+
+| 要求 | 含义 |
+|---|---|
+| **Completeness** | 所有必需测量都可得；不可得则重测或移除缺失样本 |
+| **Consistency** | 相近条件下测量可复现；stationary data 不应 drift，non-stationary 的 drift 需建模 |
+| **Uniformity** | 同一 unit/scale 表示（如 kg vs pounds 须统一） |
+| **Validity** | 符合既定约束（如百分比总和须为 100%） |
+
+> 老师举的 validity 实例：院系教授绩效评估本应 40% research + 40% teaching + 20% service = 100%，结果有人填成 40/50/20，被当场质疑——百分比类数据必须总和 100%。
+
+##### 5.2 Alignment（对齐）
+
+图像处理中常需先提取相关区域。如 face recognition 中，基于眼/鼻/嘴位置裁出人脸（排除头发与饰物），只比较这些 landmark 周围区域；**不做对齐会导致错误比较**。
+
+##### 5.3 Normalization（归一化，本周重点）
+
+测量数据范围可能很大，ML 模型通常更易处理落在 normalized range（如 $[0,1]$、$[-1,1]$）的输入。三种方法：
+
+**(1) Min-max scaling**（已知 bounds 或可估 $\min/\max$）：
+
+$$
+x_i = \frac{x_i^{raw} - x_{\min}}{x_{\max} - x_{\min}},\quad i=1,\dots,M \tag{8}
+$$
+
+**(2) Standardization（z-score）**（数据近似 normal distribution，或 $\min/\max$ 不可知——如 Gaussian 理论上 $\min/\max$ 无穷）：
+
+$$
+x_i = \frac{x_i^{raw} - E[X]}{\sigma(X)},\quad i=1,\dots,M \tag{9}
+$$
+
+实际 $E[X],\sigma(X)$ 常未知，用样本估计：
+
+$$
+\hat\mu = \frac{1}{M}\sum_{i=1}^M x_i,\qquad \hat\sigma^2 = \frac{1}{M}\sum_{i=1}^M (x_i-\hat\mu)^2 \tag{10,11}
+$$
+
+此过程统计学中亦称 **standardization**。
+
+**(3) Median Absolute Deviation (MAD)**——用 median 替代 mean 作参考，对 outlier 更稳健：
+
+$$
+\mathrm{MAD} = \mathrm{median}\big(|x_i - \mathrm{median}(X)|\big),\qquad x_i = \frac{x_i^{raw} - \mathrm{median}(X)}{\mathrm{MAD}} \tag{12,13}
+$$
+
+> **为何用 median？** 100 人工资中若有一人挣百万（outlier），mean 被拉高、给出"平均工资很高"的误导印象；**median（中位点）更具代表性**。故有 outlier 时用 MAD 而非 z-score。图像处理中 **median filter** 也因此常用。
+
+##### 5.4 Other Transformations
+
+- **平移/缩放**：乘、加、减某值把数据线性移到目标范围。
+- **log 变换** $\log(x_i)$：数据跨指数尺度（如 1 到 1 百万）时，取 log 压缩范围、削弱大值对小值的 masking。**注意：log 仅适用于非负值**（负值取 log 数学上无意义）。
+- **exp 变换** $\exp(x_i)$：数据过于平坦/密集时拉伸，凸显差异。
+- **非线性拉伸**：**sigmoid** 与 **hyperbolic tanh**（神经网络常用）：
+
+$$
+x_i = \frac{1}{1+e^{-h(x_i^{raw})}},\qquad x_i = \tanh\big(h(x_i^{raw})\big) \tag{14,15}
+$$
+
+其中 $h(\cdot)$ 可取上述任一 normalization 形式（如 (9)）。
+
+##### 5.5 ⭐ Normalization 与 Train/Test 的 data leakage（重要）
+
+- **若在切分 train/test 前对整个数据集做 global preprocessing**（如算 global mean/variance），会导致 **data leakage（train-test contamination）**。
+- **正确做法**：normalization 参数**只在 training set 上计算**，再应用到 validation/test set。
+- 否则相当于用测试集信息训练，不公平且高估泛化性能。
+
+#### 6. Lecture 2 小结
+
+- **Data**：discrete/continuous、convey information（可能错误/误导）。
+- **Data types**：nominal（categorical）、ordinal（有序但差异未知）、interval & ratio（numeric，区别在 absolute zero）。
+- **Distance metrics**：$L_1, L_2, L_p$ 等；**Minkowski 仅 $p\ge1$ 为 metric**。
+- **Data normalization**：min-max、z-score standardization、MAD 等；**train/test 分离防 leakage**。
+
+---
+
+### Part B：Lecture 2 Supplement — Mathematics Review
+
+> 服务 Part 1（analytic learning 需数学工具；Part 2 要求略低）。EE 硕士项目无 machine learning/AI 数学基础课，故各课自带复习。本补充 PDF 已在 NTULearn。大纲：Linear Algebra → Systems of Linear Equations（Linear Dependency）→ Functions → Constrained Optimization。
+
+#### 7. Linear Algebra：Notations, Vectors & Matrices
+
+- **Scalar**：单一数值（如 68、$-3.13$），用斜体字母 $x, a$；本课聚焦**实数**。
+- **Summation / Product**：$\sum_{i=1}^m x_i$、$\prod_{i=1}^m x_i$。
+- **Vector**：有序标量列表（attributes），用**粗体小写** $\mathbf{x,w}$；常**列向量**表示，可视为多维空间中的点或箭头。元素用带下标的斜体 $a_j, x_j$（$j$ 表维度）。
+- **Matrix**：行列排列的数表，用**粗体大写** $\mathbf{A,X,W}$。元素 $x_{i,j}$（先行后列）。变量可有多下标，如神经网络 $x_{l,u}^{(j)}$ 表第 $l$ 层第 $u$ 个 unit 的第 $j$ 个输入特征。
+  - 例：Iris 数据集——4 个 feature（维度=4）、150 个样本、3 类（setosa/versicolor/virginica），用 $y$ 标 label。
+- **向量运算**：加减按元素；标量乘除按元素（除数不为零）。
+- **Transpose** $\mathbf{x}^T, \mathbf{X}^T$：列↔行；$m\times n$ 矩阵转置为 $n\times m$。
+- **Dot product / Inner product**：$\mathbf{x}\cdot\mathbf{y}=\mathbf{x}^T\mathbf{y}=\sum x_i y_i$。
+  - **几何定义**：$\mathbf{y}\cdot\mathbf{x}=\|\mathbf{y}\|\|\mathbf{x}\|\cos\theta$，$\theta$ 为夹角，$\|\mathbf{z}\|=\sqrt{\mathbf{z}\cdot\mathbf{z}}$ 为 Euclidean 长度。
+  - $\theta=0$（同向）→ $\cos\theta=1$ → inner product 最大；$\theta=90°$（正交）→ $\cos\theta=0$ → inner product 为 0。
+- **Matrix-Vector / Vector-Matrix / Matrix-Matrix product**：须**维度相容**（内维匹配）。矩阵乘矩阵可视为"矩阵逐列乘向量"组合。**考试常考简单乘法，务必熟练，维度不匹配会算错。**
+
+##### 7.1 Matrix Inverse（矩阵逆）
+
+- $d\times d$ 方阵 $\mathbf{A}$ **可逆（invertible / nonsingular）**当且仅当存在 $d\times d$ 方阵 $\mathbf{B}$ 使 $\mathbf{AB}=\mathbf{BA}=\mathbf{I}$（identity matrix）。
+- 公式：
+
+$$
+\mathbf{A}^{-1} = \frac{1}{\det(\mathbf{A})}\mathrm{adj}(\mathbf{A})
+$$
+
+- $\det(\mathbf{A})$ 为 determinant；$\mathrm{adj}(\mathbf{A})$（adjugate/adjoint）为 cofactor matrix 的转置。
+- **可逆 ⟺ full rank ⟺ 行列线性无关 ⟺ $\det(\mathbf{A})\ne 0$**。
+
+##### 7.2 Determinant 与 Cofactor
+
+- **$2\times2$**：$\det\begin{pmatrix}a&b\\c&d\end{pmatrix}=ad-bc$。
+- **$3\times3$**：用 **cofactor（Laplace）展开**——任选一行（如第一行 $a,b,c$），交叉划掉对应行列后余 $2\times2$ 子式，符号 $+,-,+$ 交替：
+
+$$
+\det = a\cdot M_{11} - b\cdot M_{12} + c\cdot M_{13}
+$$
+
+- **Cofactor matrix** $C$：$c_{ij}=(-1)^{i+j}M_{ij}$（$M_{ij}$ 为删第 $i$ 行第 $j$ 列的 minor）。需对每位置算，符号棋盘格 $+,-,+,\dots$。
+- **Adjugate** $\mathrm{adj}(\mathbf{A}) = C^T$（cofactor matrix 的转置）。
+- **手动计算上限**：$2\times2$ 必会，$3\times3$ 是挑战但仍要求（展开/求逆/求 cofactor 都到 $3\times3$）；更高维极繁琐，不要求手算。
+- **求逆步骤**：算 $\det$ → 算 cofactor matrix → 转置得 adjugate → 除以 $\det$。
+
+##### 7.3 Linear Dependency（线性相关/无关）
+
+- $d$-向量组 $\mathbf{x}_1,\dots,\mathbf{x}_m$（$m>1$）**linearly dependent**：存在不全为零的标量 $\beta_1,\dots,\beta_m$ 使
+
+$$
+\beta_1\mathbf{x}_1+\cdots+\beta_m\mathbf{x}_m = \mathbf{0}
+$$
+
+- **linearly independent**：上式仅当所有 $\beta_i=0$ 时成立（即 not linearly dependent）。
+- 几何直觉（2D）：两向量同向 → dependent；平面内两不同向量可张成平面，但无法表示平面外的第三向量 → 该第三向量与前两者 independent。
+- 与矩阵可逆性直接挂钩（行列 independent ⟺ 可逆）。
+
+#### 8. Set & Function
+
+- **Set**：无序、元素唯一的集合；用花体大写 $\mathbb{R,N,C}$（实数/整数/复数；本课基本只用 real 与 integer）。
+  - 有限集用花括号 $\{1,3,18\}$；可无限。
+  - 区间：闭区间 $[a,b]$（含端点）、开区间 $(a,b)$（不含端点）；$\mathbb{R}$ 含全体实数。
+  - 运算：交 $\cap$、并 $\cup$（并集不重复元素）。
+- **Function**：把 domain（定义域）每个 $x$ 映射到 codomain（陪域）中单值 $y=f(x)$。
+  - **Range / image**：实际映射到的子集（区别于 codomain 这个"可去"的全集）。
+  - 可 scalar→scalar、vector→scalar、vector→vector 等；记法 $f:\mathbb{R}^d\to\mathbb{R}$ 表"d-向量到实数"的 scalar-valued function。
+
+##### 8.1 Linear & Affine Function
+
+- **Linear function** $f:\mathbb{R}^d\to\mathbb{R}$ 满足两性质（合称 **superposition**）：
+  - **Homogeneity**：$f(\alpha\mathbf{x})=\alpha f(\mathbf{x})$。
+  - **Additivity**：$f(\mathbf{x}+\mathbf{y})=f(\mathbf{x})+f(\mathbf{y})$。
+- 内积函数 $f(\mathbf{x})=\mathbf{w}^T\mathbf{x}=\sum w_i x_i$ 是线性（可验证 superposition）。
+- **Affine function**：$f(\mathbf{x})=\mathbf{w}^T\mathbf{x}+b$，即 linear 加一个标量 **offset / bias** $b$。
+  - 几何区别：linear 过原点；affine 不过原点（有 offset）。例 $f(\mathbf{x})=2.3-2x_1+1.3x_2-x_3$ 是 affine（$b=2.3$）。
+
+##### 8.2 Local / Global Minimum；max / argmax
+
+- **Local minimum** at $x=c$：$f(x)>f(c)$ 在 $c$ 的某开区间内成立。
+- **Global minimum**：所有 local minimum 中最小者。
+- $\max_{a\in A} f(a)$：返回**最高函数值**（来自 range/codomain）。
+- $\arg\max_{a\in A} f(a)$：返回**使 $f$ 最大的元素 $a$**（来自 domain）。$\min/\arg\min$ 同理。
+
+##### 8.3 Derivative & Gradient
+
+- 导数 $f'$ 描述 $f$ 增减快慢；$f'>0$ 增、$f'<0$ 减、$f'=0$ 处斜率水平。
+- **标量函数对向量求导 → gradient**（$d\times1$ 向量）：
+
+$$
+\frac{df(\mathbf{x})}{d\mathbf{x}} = \nabla_{\mathbf{x}} f = \begin{bmatrix}\partial f/\partial x_1\\ \vdots\\ \partial f/\partial x_d\end{bmatrix}
+$$
+
+- **向量函数对向量求导 → Jacobian**（$h\times d$ 矩阵，$h$ 为函数输出维）：
+
+$$
+\frac{d\mathbf{f}(\mathbf{x})}{d\mathbf{x}} = \begin{bmatrix}\partial f_1/\partial x_1 & \cdots & \partial f_1/\partial x_d\\ \vdots & & \vdots\\ \partial f_h/\partial x_1 & \cdots & \partial f_h/\partial x_d\end{bmatrix}
+$$
+
+- **向量-矩阵求导公式**（考试会给，不必死记）：
+
+$$
+\frac{d\mathbf{A}\mathbf{x}}{d\mathbf{x}}=\mathbf{A},\qquad \frac{d\mathbf{y}^T\mathbf{A}\mathbf{x}}{d\mathbf{x}}=\mathbf{A}^T\mathbf{y},\qquad \frac{d\mathbf{x}^T\mathbf{A}\mathbf{x}}{d\mathbf{x}}=(\mathbf{A}+\mathbf{A}^T)\mathbf{x}
+$$
+
+  - 第三式：若 $\mathbf{A}$ 对称则简化为 $2\mathbf{A}\mathbf{x}$。注意 $\mathbf{y}$ 视为独立于 $\mathbf{x}$。
+
+#### 9. Constrained Optimization（约束优化）— Lagrangian
+
+求 $f(\mathbf{x})$ 在约束 $g(\mathbf{x})=0$ 下的极值。构造 **Lagrangian**：
+
+$$
+\mathcal{L}(\mathbf{x},\lambda) = f(\mathbf{x}) + \lambda\, g(\mathbf{x}) \tag{2}
+$$
+
+其中 $\lambda$ 为 **Lagrange multiplier（拉格朗日乘子，标量）**。对 $\mathbf{x}$ 求导并令零：
+
+$$
+\frac{\partial\mathcal{L}}{\partial\mathbf{x}} = \frac{\partial f(\mathbf{x})}{\partial\mathbf{x}} + \lambda\frac{\partial g(\mathbf{x})}{\partial\mathbf{x}} = \mathbf{0} \tag{3}
+$$
+
+再结合 $\partial\mathcal{L}/\partial\lambda=0$（即 $g(\mathbf{x})=0$），用微积分方法联立解出 $\lambda$ 与极值点 $\mathbf{x}$。**把约束优化转为无约束问题**。细节留给 Toh 在后续 6 讲展开。
+
+### 10. Week 2 关键要点（Key Takeaways）
+
+- **Lecture 2 会进 quiz 与 final exam**（Lecture 1 不会）。
+- 数据四类型（nominal/ordinal/interval/ratio）的区别与编码方式（尤其 one-hot、rank normalization）。
+- **Minkowski distance 仅 $p\ge1$ 为 metric**（$p<1$ 违反 triangle inequality）——高频考点。
+- Normalization 三法（min-max / z-score standardization / MAD）的选择依据（有 outlier 用 MAD）。
+- **Normalization 参数只在 training set 上算**，防 data leakage。
+- 数学工具：矩阵求逆（$\det$/cofactor/adjugate）、linear vs affine（offset）、gradient/Jacobian、Lagrangian 约束优化——为 Part 1 analytic learning（closed-form 解）铺路。
+
+---
+
+> **下周（Week 3）预告**：由 **Toh Kar-Ann** 接手，进入 **Lecture 3 — Linear Parametric Models**（Part 1 Analytic Learning 主体起点）。将用本周复习的线性代数与 least-squares 工具，从 closed-form 视角建立线性参数模型。本周数学补充是直接前置知识，建议先消化 gradient、matrix inverse、Lagrangian 三块。
 >
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine learning, supervised/unsupervised/semi-supervised/reinforcement learning, analytic learning, ensemble learning, closed-form solution, iterative optimization, gradient descent, SGD, Adam, hyperparameter, learning rate, bagging, boosting, random forest, Adaboost, gradient boosting, XGBoost, LightGBM, bias, variance, diversity, voting, averaging, regularization, least-squares, kernel ridge regression, matrix inversion, overfitting, interpretability, generalization, continual learning, hybrid learning, lockdown browser 等）。中文用于组织句意与补充释义。
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine learning, supervised/unsupervised/semi-supervised/reinforcement learning, analytic learning, ensemble learning, closed-form solution, iterative optimization, gradient descent, SGD, Adam, hyperparameter, learning rate, bagging, boosting, random forest, Adaboost, gradient boosting, XGBoost, LightGBM, bias, variance, diversity, voting, averaging, regularization, least-squares, kernel ridge regression, matrix inversion, overfitting, interpretability, generalization, continual learning, hybrid learning, lockdown browser, pattern recognition pipeline, feature extraction/selection, dimension reduction, PCA, ICA, SIFT, nominal/ordinal/interval/ratio data, one-hot encoding, rank encoding, Hamming/Spearman/Chebyshev/Minkowski distance, metric/metric space, triangle inequality, L1/L2/Lp-norm, cleansing, completeness/consistency/uniformity/validity, alignment, min-max scaling, standardization, z-score, median absolute deviation (MAD), data leakage, log/exp/sigmoid/tanh transform, vector/matrix, transpose, inner/dot product, determinant, cofactor, adjugate, identity matrix, invertible/nonsingular, linearly dependent/independent, set, domain/codomain/range, linear/affine function, offset/bias, local/global minimum, max/argmax, gradient, Jacobian, Lagrangian, Lagrange multiplier, constrained optimization 等）。中文用于组织句意与补充释义。

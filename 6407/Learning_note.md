@@ -139,9 +139,9 @@
 
 ---
 
-## Week 2 — 进化算法 (EA) 框架 + 算子 + Eight-Queens/SGA 建模实例
+## Week 2 — 进化算法 (EA) 框架 + Representation/Mutation/Recombination 算子 + Eight-Queens/SGA 建模实例
 
-> **权威来源说明**：本周仍用 Week 1 的官方课件 `week1/L1(2-1).pdf`（第 34–72 页，作者 Meng-Hiot Lim），无新课件。转写 `week2/week2.txt` 噪声较多，以 PDF 为准。本周典型错拼修正：
+> **权威来源说明**：本周官方课件为 `week2/L2(2-1).pdf`（**Representation, Mutation, and Recombination**，作者 Meng-Hiot Lim，59 页），并对照 `week1/L1(2-1).pdf` 后段框架页。转写 `week2/week2.txt` 噪声较多，以 PDF 为准。本周典型错拼修正：
 > - "Rul hw / Ruled wheel / Rule view / ult wheel / Ruleth" → **roulette wheel**（轮盘赌）
 > - "low side L OCI" → **loci**（locus 的复数）；"all / allege / allo" → **allele**
 > - "eight quin / Queensb / Qin" → **eight queens**；"veristy / verity / eth / Arty" → **arity**
@@ -149,6 +149,7 @@
 > - "survival of the fits / fitters" → **survival of the fittest**
 > - "memetic / mimetic" → **memetic algorithm**；"Gb / Ober" → **Goldberg**
 > - "figure of merit" → figure of merit；"NT n / NTN" → **NTULearn**
+> - "fitters" → fittest；"algor m / algorm" → algorithm；"etionary strategy / programming" → evolution strategies / evolutionary programming
 
 ### 1. 本周主线
 
@@ -243,7 +244,7 @@ Initialization → [Population] → Parent selection → [Parents]
 - **Age-based**：生多少子代就删多少父代。
 - **Elitism（精英保留）**：stochastic 与 deterministic 混合，保住最优不丢。
 
-### 7. Variation Operators（变异算子）
+### 7. Variation Operators（变异算子）— 按 arity 分类
 
 按 **arity（输入个体数）** 分类：
 
@@ -252,11 +253,129 @@ Initialization → [Population] → Parent selection → [Parents]
 | 1 | **mutation** | 作用于 1 个 genotype，小随机扰动 |
 | >1 | **recombination** | 合并多亲本信息；arity=2 即 **crossover**；arity>2 少用 |
 
-- variation operator **必须匹配 representation**。
+- variation operator **必须匹配 representation**——这是本周 Lecture 2 的主线：不同表示有不同 mutation/crossover 实现。
 - **mutation vs recombination 谁更重要？** 都重要。但若**只能留一个**，**只有 mutation 能独立求解**（早期 evolution strategies / evolutionary programming 基本只靠 mutation）。recombination 需配合 mutation 用。
-- **mutation**：binary 串上以小概率（如 1%）逐 gene 翻硬币，命中则 0↔1 翻转——改动很小，但可能引起 phenotype 巨变；随机性是它与其它 unary 启发式的本质区别；可保证搜索空间连通性。
+- **Crossover OR mutation（PDF 三页结论，重要）**：
+  - **mutation-only EA 可行；crossover-only EA 不可行**（crossover 不改变 allele 频率——例：首 bit 50% 为 0 的种群做任意次 crossover，0 的比例不变；要达到 optimum 常需一次 lucky mutation）。
+  - **exploration vs exploitation**（PDF 的另一种分工视角，与 §2.2 的"两股力"互补）：
+    - **Crossover is explorative**：跳到两亲本"之间"的某区域，大跳跃。
+    - **Mutation is exploitative**：在亲本附近做小幅扰动，就地优化。
+  - 两者既有 **co-operation 又有 competition**。
+- **mutation**：binary 串上以小概率逐 gene 翻硬币，命中则 0↔1 翻转——改动很小，但可能引起 phenotype 巨变；随机性是它与其它 unary 启发式的本质区别；可保证搜索空间连通性。
 - **recombination/crossover**：≥2 亲本，传递 traits（一种"学习"）；定义 **crossover site（切点）**，切后互换。
   - 例 `1 1 1 | 1 1 1 1` + `0 0 0 | 0 0 0 0` → `1 1 1 0 0 0 0` + `0 0 0 1 1 1 1`。
+
+---
+
+### 7A. ⭐ 五种 Representation 下的算子详解（Lecture 2 核心，按 PDF 顺序）
+
+> 建立任何 GA，**先选表示 → 再按表示选 variation operator**。selection 只用 fitness，与表示无关，故通用。下表汇总五种主流表示及其 mutation/crossover。
+
+#### 7A.1 Binary Representation（二进制，最早最经典）
+
+genotype = 二进制串。历史对应 **Genetic Algorithms (Holland 1975)**。
+
+- **Mutation**：逐 gene 独立以概率 $p_m$（mutation rate）翻转 0↔1。$p_m$ 通常取 **1/pop_size 到 1/chromosome_length** 之间。
+  - 单点翻转可能引起 phenotype 巨变 → 可用 **gray coding（格雷码）** 缓冲（相邻整数二进制只差 1 bit，减小 Hamming cliffs）。
+- **1-point crossover**：随机选切点，两亲本交换尾部产生两子代。$p_c$ 通常 **0.6–0.9**。
+- **n-point crossover**：选 n 个切点，沿切点交替拼接两亲本片段（1-point 的推广，仍有 positional bias）。
+- **Uniform crossover**：给一个亲本"正面"、另一个"反面"，逐 gene 抛硬币决定第一个子继承谁，第二个子取反；**继承与位置无关**（无 positional bias）。
+- **为何需要多种 crossover？** 1-point 的性能**依赖表示中变量的排列顺序**——相邻 gene 更易被一起保留，但**永远无法同时保留串两端的 gene**。这叫 **Positional Bias（位置偏置）**：若了解问题结构可利用之，否则换用 n-point / uniform。
+
+#### 7A.2 Integer Representation（整数）
+
+现代认为数值变量直接编码（整数/浮点）更好；图像处理参数等天然整数；类别变量取自固定集（如 {blue, green, yellow, pink}）。
+
+- **Crossover**：直接复用 binary 的 n-point / uniform。
+- **Mutation**（bit-flip 的推广）：
+  - **Creep mutation（爬行）**：以概率 $p$ 给每个 gene 加一个小整数（正或负），倾向于移到**相近值**。
+  - **Random resetting（随机重置）**：以 $p_m$ 给 gene 随机选一个新值（类别变量尤其用此）。
+- **图着色（graph coloring / k-colouring）** 是典型整数表示应用：找最小颜色数 k 使相邻区域不同色。问"k=3 时编码？目标函数？能否解？k=4 时改写？"——常见建模练习。
+
+#### 7A.3 Real-Valued / Floating-Point Representation（实值/浮点）
+
+对应连续参数优化 $f:\mathbb{R}^n\to\mathbb{R}$（如 Ackley function，EC 常用 benchmark）。
+
+- **Mapping real values on bit strings**（二进制近似实值）：区间 $[x,y]$ 用 L-bit 串 $\{a_1,\dots,a_L\}\in\{0,1\}^L$ 表示，须 **one phenotype per genotype**（可逆）：
+
+$$
+g(a_1,\dots,a_L) = x + \frac{y-x}{2^L-1}\sum_{j=0}^{L-1} a_{L-j}\cdot 2^j \in [x,y]
+$$
+
+  - 仅 $2^L$ 个离散值代表无穷集；**L 决定最大精度**——精度高则 chromosome 长、进化慢。
+  - 例 $A=\langle1000100011\rangle$，$z\in[0.25,1.88]$ → 求 $g(A)$（按公式代入）。
+
+- **Uniform Mutation**：$x'_i$ 从 $[LB_i, UB_i]$ 均匀随机抽取（类比 binary bit-flip / integer random resetting）。
+- **Non-uniform Mutation**：给每变量加随机扰动，最常见为加 **$N(0,\sigma)$ 高斯扰动**后截断到范围：
+
+$$
+x'_i = x_i + N(0,\sigma)
+$$
+
+  - 标准差 $\sigma$ 是 **mutation step size**，控制变化幅度（约 2/3 的采样落在 $[-\sigma,+\sigma]$）。
+- **Self-Adaptive Mutation（自适应变异，重要）**：把 step size $\sigma$ 也编入 genome $\langle x_1,\dots,x_n,\sigma\rangle$，让 $\sigma$ **自己参与变异与选择**、随进化协同演化（用户不手动设）。
+  - **顺序很重要**：先变 $\sigma\to\sigma'$，再用新 $\sigma'$ 变 $x\to x'=x+N(0,\sigma')$。原因：新 $\langle x',\sigma'\rangle$ 被**双重评估**——主：$x'$ 好当 $f(x')$ 好；次：$\sigma'$ 好当它产生的 $x'$ 好。反过来变则失效。
+
+- **Crossover（实值专用，重要考点）**：
+  - **Discrete**：每 allele 从一亲本取，$z_i=x_i$ 或 $y_i$（可用 n-point/uniform）。
+  - **Intermediate（= arithmetic recombination）**：$z_i=\alpha x_i+(1-\alpha)y_i$，$\alpha\in[0,1]$。$\alpha$ 可为常量（**uniform arithmetical crossover**）、随种群年龄变、或每次随机取。
+  - **Single arithmetic crossover**：随机选一个 gene $k$，子1为 $x_1,\dots,x_{k-1},\alpha y_k+(1-\alpha)x_k,x_{k+1},\dots,x_n$（子2反之）。
+  - **Simple arithmetic crossover**：随机选 gene $k$，$k$ 之前保持亲本1，$k$ 及之后混合：$\dots,\alpha y_k+(1-\alpha)x_k,\dots,\alpha y_n+(1-\alpha)x_n$。
+  - **Whole arithmetic crossover**：**最常用**，全分量混合 $z_i=\alpha x_i+(1-\alpha)y_i$（子2反之）。
+  - **Blend Crossover (BLX)**：设 $x_i<y_i$，$d_i=y_i-x_i$，$z_i\in[x_i-\alpha d_i,\, x_i+\alpha d_i]$ 均匀采样；原作者最佳结果用 $\alpha=0.5$。
+  - 几何含义（PDF Fig.28）：single/simple/whole arithmetic 落在 inner box（$\alpha=0.5$），blend crossover 落在 outer box（范围更宽）。
+- **Multi-parent recombination（多亲本重组）**：不受自然限制，mutation 用 1 亲本、传统 crossover 用 2，推广到 $n>2$ 自 1960s 起即有，仍少用但研究表明有用。两类：
+  - **Type 1（分段重组）**：diagonal crossover 对 n 个亲本选 n−1 个切点，沿"对角"拼接 n 个子代——推广 1-point crossover。
+  - **Type 2（算术组合）**：子代第 i 个 allele = n 个亲本第 i 个 allele 的平均 → 产生"质心"子代。GA 中少见，但 evolution strategies 早已使用。
+
+#### 7A.4 Permutation Representation（排列，对应 TSP / 排序类问题）
+
+n 个变量排成 n 个整数、每个恰好出现一次。两类关注点：
+- **生产调度**：关心**顺序**（谁先于谁）。
+- **TSP**：关心**邻接**（谁挨着谁）。
+- search space 极大：30 城市 ≈ $30!\approx10^{32}$ 种 tour。
+- **为何不能用普通算子？** bit-wise mutation 改一个值会重复（某值出现两次、某值消失）→ 不可行解。故须至少改两个值，并采用专用算子。
+
+**Mutation（四种）：**
+
+| 算子 | 操作 |
+|---|---|
+| **Swap mutation** | 随机选两个 allele 交换位置 |
+| **Insert mutation** | 随机选两个 allele 值，把第二个移到紧随第一个之后，其余后移——**保留大部分顺序与邻接信息** |
+| **Scramble mutation** | 随机选一个 gene 子集，打乱这些位置上的 allele 重排 |
+| **Inversion mutation** | 随机选两个 allele，反转其间子串——**保留大部分邻接**（只断两条链）**但破坏顺序** |
+
+- permutation 下 mutation 概率通常指"某算子作用于**整条串一次**"的概率，而非逐位置。
+
+**Crossover（五种，保留顺序/邻接信息）：**
+
+| 算子 | 核心思想 |
+|---|---|
+| **Order 1 crossover** | 保留元素出现的**相对顺序**：从亲本1复制一段，余下位置从切点起按**亲本2的顺序**填入（跳过已有、wrap-around），子2对调亲本角色 |
+| **Partially Mapped Crossover (PMX)** | 随机选段从 P1 复制；段内 P2 未复制的元素通过映射放回 P2 中对应位置；段外从 P2 填 |
+| **Cycle crossover** | 每 allele 连同其**位置**一起继承自一个亲本；构造 P1 的 cycle（首位置→P2 同位→P1 同值位→…回到首位），cycle 内放子1的 P1 位置，交替 cycle 放两子代 |
+| **Edge Recombination** | 构造两亲本的**邻接边表**（共同边标 +）；随机选起点，每次优先选共同边或**候选列表最短**的邻接，构造子代 tour |
+
+> 转写中老师手算的 eight-queens permutation crossover（§9.3）正是 **Order 1 crossover**：`1 3 5 | 2 6 4 7 8` + `8 7 6 5 4 3 2 1` → `1 3 5 4 2 8 7 6`（后半 4,2,8,7,6 取自 parent2 顺序，跳过已出现的 1,3,5）。
+
+#### 7A.5 Tree Representation（树，对应 Genetic Programming, GP）
+
+genotype 为非线性的树（GA/ES/EP 的 chromosome 是线性定长结构；GP 的树**可变深宽**）。可表示算术式、逻辑式、程序。
+
+- **定义 symbolic expression**：由 **terminal set T** 与 **function set F**（各 function 有其 arity）递归定义——每个 $t\in T$ 是合法表达式；$f(e_1,\dots,e_n)$ 合法当 $f\in F,\mathrm{arity}(f)=n$ 且各 $e_i$ 合法。
+- **closure property**：GP 表达式通常**无类型**，任何 $f\in F$ 可接受任何 $g\in F$ 作参数。
+- **Mutation**：随机选子树，用随机生成的新树替换（最常见）。两参数：选 mutation 的概率 $p_m$、选内部点作替换子树根的概率。$p_m$ 建议 **0**（Koza 1992）或极小如 **0.05**（Banzhaf et al. 1998）。子代可能比亲本大。
+- **Recombination**：两亲本各随机选子树**交换**。两参数：选 recombination 的概率 $p_c$、在亲本内选内部点作切点的概率。子代可能比亲本大。
+
+### 7B. 五种表示速查表
+
+| 表示 | 历史 EA | Mutation | Crossover |
+|---|---|---|---|
+| **Binary** | GA | bit-flip（逐位以 $p_m$，范围 1/pop_size–1/len；可用 gray coding） | 1-point / n-point / uniform（$p_c$≈0.6–0.9） |
+| **Integer** | — | creep（加小整数）/ random resetting | 复用 binary 的 n-point / uniform |
+| **Real-valued** | Evolution Strategies | uniform / non-uniform（Gaussian $N(0,\sigma)$）/ self-adaptive（$\sigma$ 入 genome） | discrete / intermediate（single/simple/whole arithmetic）/ blend（BLX）/ multi-parent |
+| **Permutation** | 排序/TSP | swap / insert / scramble / inversion | Order 1 / PMX / cycle / edge recombination |
+| **Tree** | Genetic Programming | 子树替换（$p_m$≈0–0.05） | 子树交换 |
 
 ### 8. Initialization & Termination
 
@@ -385,11 +504,12 @@ $$
 - **Representation**：phenotype/genotype、encoding(可多对一)/decoding(必须一对一)；术语 chromosome/gene/locus/allele。
 - **Fitness** 是问题与算法的唯一桥梁；通常 maximize；区分度越大越好。
 - **Selection**：parent 随机（roulette wheel / ranking，最差也有非零概率），survivor 确定性（fitness-based / age-based / elitism）。
-- **Variation**：arity1=mutation（可独立求解、跳局部最优），arity≥2=recombination/crossover（传 traits）。
+- **Variation**：arity1=mutation（可独立求解、跳局部最优），arity≥2=recombination/crossover（传 traits）；**mutation-only 可行，crossover-only 不可行**；crossover explorative / mutation exploitative。
 - **实例**：eight-queens（permutation 表示+对角线冲突公式+fitness=1−C/28）、SGA x²（一代后 avg fitness 293→439）。
+- **⭐ 五种表示的算子**（Lecture 2 新课件）：binary（bit-flip/1-point/n-point/uniform，注意 positional bias、可用 gray coding）、integer（creep/random resetting）、real-valued（Gaussian mutation、self-adaptive $\sigma$、arithmetic/blend crossover）、permutation（swap/insert/scramble/inversion + Order 1/PMX/cycle/edge recombination）、tree（GP，子树替换/交换）。
 - **性能观**：Goldberg(GA 稳健)>random；加 domain knowledge→curve deformation/memetic；**No Free Lunch**：跨所有问题平均所有算法相同。
 - **Quiz**：9 月 1 日 9:30–10:30，三考场，闭卷，带 ID+笔，不需计算器，禁手机。
 
 ---
 
-> **下一周预告**：Week 3 将临近 Week 4 的 Quiz（**9 月 1 日**），预计继续 EA 的算子细节与实操/调参，并进入复习；具体主题以课件为准。
+> **下一周预告**：Week 2 已系统讲完 EA 的 representation 与 variation 算子（crossover/mutation 各表示下的具体操作）。按 Week 1 给出的 EA 框架，剩余核心组件为 **selection**（parent/survivor selection）、**initialization** 与 **termination**，预计 Week 3 进入这些内容并配合实操/调参；Week 3 末临近 Week 4 的 Quiz（**9 月 1 日**），会进入复习。具体主题以课件为准。

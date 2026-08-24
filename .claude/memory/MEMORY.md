@@ -10,3 +10,4 @@
 - [note-language-english-terms](memory/note-language-english-terms.md) — 笔记中文讲解但保留英文术语原词（英文授课+英文考试，术语要能对应考题）
 - [coursework-notes-skill](memory/coursework-notes-skill.md) — "转写+课件→中文笔记"工作流已固化为 skill：.claude/skills/coursework-notes/SKILL.md
 - [past-paper-summary-workflow](memory/past-paper-summary-workflow.md) — quiz/往年题/final 逐题详解学习文档工作流与存放约定
+- [ee6406-course-info](memory/ee6406-course-info.md) — EE6406 Analytic & Ensemble ML 考核（期末60%+CA40%=三次in-class闭卷quiz，无日常考勤）与 Lin/Toh/Liu 分工及 ASR 噪声
