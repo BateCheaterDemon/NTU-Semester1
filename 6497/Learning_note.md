@@ -482,3 +482,271 @@ $$
 ---
 
 > **下一周预告**：Week 3 将进入 **Mixture Models and the EM Algorithm**（混合模型与 EM 算法）——当模型有隐变量（latent variable）、MLE 无闭式解时，用 EM（Expectation-Maximization）迭代求最优参数。
+
+---
+
+## Week 3 — Mixture Models and the EM Algorithm（混合模型与 EM 算法）
+
+> **权威来源说明**：本周官方课件为 `week3/3_Mixture_Models_and_EM.pdf`（Tay W.P.，46 页），转写 `week3/week3.txt` 噪声较多，以 PDF 为准。本周转写典型噪声：`p(y|data)` 中的 data 实为 θ（参数）；`lot/lilihod` → likelihood；`gauing/gusin/gausin/Gausia/Gusel` → Gaussian；`Cigma/Cima/cigma` → Σ（协方差）；`amphDo/amd/VDA` → AMD（股票代码）；`invidious` → previous；`art em/EM` → hard EM；`pier` → prior；`clap/your clap` → Wooclap。
+> 本周回顾上周 MLE/MAP 后进入新主题：**混合模型**（mixture model，含 latent variable）以及求解其 MLE 的 **EM 算法**（Expectation-Maximization），并以 **GMM**（Gaussian Mixture Model）为主要实例，最后给出 **K-Means 是 EM 在 GMM 上的特例**。
+
+### 1. 本周主线
+
+- 上周回顾：MLE `θ_ML=argmax p(D|θ)`，等价于最大化 log-likelihood（因 log 单调递增，optimizer 不变；且 IID 下乘积变求和，求导可交换进求和号）。MAP `θ_MAP=argmax[log likelihood + log prior]`，当 prior 均匀时退化为 MLE。
+- 本周问题：当模型含**隐变量**（latent variable，未被观测到的变量），其 MLE 直接求导无闭式解（log 与 sum 不可交换）→ 需用 **EM 算法** 迭代逼近。
+- 全周逻辑链：**为什么要 mixture** → **mixture 形式与 latent variable** → **直接 MLE 的三大困难**（singularity / unidentifiability / intractable optimization）→ **EM 基本思想**（complete data 易优化，用 expectation 替代未知的 y）→ **GMM 的 EM 闭式解** → **K-Means 是特例** → **EM for MAP**（加 prior 抑制 singularity）→ **Monotonicity**（每步 log-likelihood 只增不减）。
+
+### 2. 为什么要 Mixture Models（混合模型）
+
+- 现实数据常无法用单一分布拟合。例：
+  - **图像**中含多个不同物体（大象、斑马），其像素分布是多个分布的叠加，需多个 Gaussian 分量表示。
+  - **LiDAR / 点云**（point cloud）：用 50 个 Gaussian 分量拟合点云形状。
+  - **兔子点云**：100 个 Gaussian 分量。
+- 直觉：当总体分布是若干"子群体"分布按某种比例混合而成，单一参数模型不够 → 需 mixture。
+
+### 3. Mixture Model 形式与 Latent Variable
+
+- 设观测 $x$ 可由 $K$ 个可能 pdf 之一生成 $p(x|\eta_1),\dots,p(x|\eta_K)$，"由哪一个生成"未知/未观测。
+- 令 $z$ 为生成 pdf 的索引，建模为随机变量 $z\sim\mathrm{Cat}(z|\pi)$（categorical distribution），即 $p(z=k)=\pi(k)$。
+- 因 $z$ 未被观测，称为 **latent variable（隐变量）**。于是
+$$
+p(x|\theta)=\sum_{k=1}^{K}p(x,z=k|\theta)=\sum_{k=1}^{K}\pi(k)\,p(x|\eta_k),\quad \theta=(\pi,\{\eta_k:k=1,\dots,K\}). \tag{3.1}
+$$
+- 关键：mixture 的边缘分布 $p(x|\theta)$ 把 latent variable $z$ **求和消去**（marginalize）。
+
+#### 3.1 GMM（Gaussian Mixture Model）
+
+- 最常见的 mixture：所有分量都是 Gaussian：
+$$
+p(x|\theta)=\sum_{k=1}^{K}\pi(k)\,\mathcal{N}(x|\mu_k,\Sigma_k),\quad \theta=(\pi,\{\mu_k,\Sigma_k\}_{k=1}^{K}). \tag{3.2}
+$$
+- 课件示例：3 分量，$\pi=(0.3,0.3,0.4)^T$，均值 $\mu_1=[0,0]^T,\mu_2=[0,4]^T,\mu_3=[4,4]^T$，各自协方差不同。
+- **应用例（clustering）**：把 $K=5$ 个 Gaussian 拟合二维数据，得到 Voronoi 式分区（见 `03_kmeans_voronoi.ipynb`）。
+
+### 4. MLE 的三大算法性困难（Algorithmic Issues）
+
+给定 IID 观测 $x_1,\dots,x_n$，log-likelihood 为
+$$
+\log p(x_1,\dots,x_n|\theta)=\sum_{i=1}^{n}\log\sum_{k=1}^{K}\pi(k)\,p(x_i|\eta_k). \tag{MLE}
+$$
+
+#### 4.1 ⭐ Singularity（奇点）— 似然可发散
+
+- GMM 特例 $p(x_i|\theta)=\sum_k\pi(k)\mathcal{N}(x_i|\mu_k,\sigma_k I)$。若对某个 $k$ 取 $\mu_k=x_i$ 且 $\sigma_k\to0$（"collapsing 坍缩"），则
+$$
+\mathcal{N}(x_i|\mu_k,\sigma_k I)\propto\frac{1}{\sigma_k}\to\infty,
+$$
+似然函数出现**奇点**，可被无限放大 → MLE 无意义。
+- **heuristic 应对**：检测到某分量坍缩时，把该均值重置为随机值、协方差重置（reset）。
+- ⚠️ 此问题 EM 也**无法**解决（见 §8 MAP 用 prior 抑制）。
+
+#### 4.2 Unidentifiability（不可辨识）
+
+- **identifiable（可辨识）**：不同参数 $\theta_1\neq\theta_2$ ⇒ 不同分布 $P_{\theta_1}\neq P_{\theta_2}$，这样参数才有可解释含义。
+- mixture MLE：$p(x|\theta)=\sum_k\pi(k)p(x|\eta_k)$，对任一 $\theta_{ML}$ **置换分量标号 $k$**（permute indices）得到另一组参数给出**相同的整体 pdf**。
+- 后果：log-likelihood **没有唯一全局最优**。目标定为"找到一个 good overall likelihood"即可（不纠结标号）。
+
+#### 4.3 Optimization（不可解）
+
+- 关键困难：$\log\sum_k(\cdot)$ 中 **log 不能与 sum 交换**，目标函数一般**非凹**（not concave），难直接解。
+- 即便 $\pi$ 已知，对 $\theta'$ 求导令零需解
+$$
+\sum_{i=1}^{n}\sum_{k=1}^{K}\frac{\pi(k)}{\sum_{k'}\pi(k')p_{k'}(x_i|\theta')}\cdot\frac{\partial p_k(x_i|\theta)}{\partial\theta'}=0,
+$$
+耦合方程组，无闭式解。
+- **转折（EM 的动机）**：若额外观测到 latent variables $z_1,\dots,z_n$（complete data），则 likelihood 变得极易最大化：
+$$
+\log p((x_1,z_1),\dots,(x_n,z_n)|\theta)=\sum_{i=1}^{n}\bigl(\log\pi[z_i]+\log p(x_i|\eta_{z_i})\bigr),
+$$
+log 与 sum **可交换**，求导解耦 → 闭式 MLE。
+
+### 5. Complete vs Incomplete Data（EM 的核心设定）
+
+- 设想若知道每个 $x_i$ 来自哪个分量 $z_i$，则 GMM 的 MLE 是标准闭式：
+  - 记 $y_i=(x_i,z_i)$ 为 **complete data（完整数据）**，$x=T(y)$（这里 $T$ 取 $y$ 的第一坐标）为实际观测到的 **incomplete data（不完整数据）**。
+  - complete data log-likelihood：
+$$
+\log p(y_1,\dots,y_n|\theta)=\sum_{k=1}^{K}\sum_{i:z_i=k}\bigl(\log\pi(k)+\log\mathcal{N}(x_i|\mu_k,\Sigma_k)\bigr).
+$$
+  - 据此直接得闭式 MLE：
+$$
+\hat\mu_k=\frac{1}{n}\sum_{i:z_i=k}x_i,\qquad
+\hat\Sigma_k=\frac{1}{n}\sum_{i:z_i=k}(x_i-\hat\mu_k)(x_i-\hat\mu_k)^T.
+$$
+- 但现实中 $z_i$ 未知 → 不能直接用。EM 的思路：**既然 $y$ 未知无法算 likelihood，就取它的 expectation（期望）**。
+  - 老师比喻：给你一个未知样本来自某 Gaussian（参数已知但你不知具体取值），你对样本的最佳猜测就是用该分布的**均值**近似。同理，用对 $y$ 的期望替代未知的 $y$。
+
+### 6. ⭐ EM 算法（Expectation-Maximization）
+
+#### 6.1 基本思想（一般形式）
+
+- 设 $p(y|\theta)$ 易最大化，但观测的是 $x=T(y)$（incomplete），$\log p(x|\theta)$ 难算/难优化。
+- MLE $\theta_{ML}=\arg\max_\theta\log p(x|\theta)$ 难。
+- **思路**：用对 $y$ 的期望替代未知的 $y$，在一个"猜测" $\hat\theta$（当前估计）下取期望：
+$$
+\mathbb{E}_{p(y|x,\hat\theta)}\bigl[\log p(y|\theta)\bigr].
+$$
+
+#### 6.2 算法步骤
+
+1. 选初始猜测 $\theta^{(0)}$。
+2. **E step（第 $m+1$ 次迭代）**：计算 **Q 函数**
+$$
+Q(\theta|\theta^{(m)})=\mathbb{E}_{p(y|x,\theta^{(m)})}\bigl[\log p(y|\theta)\bigr]=\int \log p(y|\theta)\,p(y|x,\theta^{(m)})\,dy.
+$$
+   - 即：在"假设 $\theta^{(m)}$ 是真值"的假设下，对 $\log p(y|\theta)$ 求期望。注意 $\theta$ 是待优化变量，$\theta^{(m)}$ 用于构造可计算的分布。
+3. **M step**：更新
+$$
+\theta^{(m+1)}=\arg\max_{\theta\in\Theta}Q(\theta|\theta^{(m)}).
+$$
+4. 重复 E、M 直到收敛（如 log-likelihood 变化 $|L^{(m+1)}-L^{(m)}|\le\epsilon$）。
+
+- **实现说明**（老师口述）：若 mixture 模型 tractable（如 GMM），$Q$ 与 $\theta^{(m+1)}$ 都有**闭式公式**，M step 无需数值优化；否则 $Q$ 是代码里的函数，M step 需用 gradient descent 等通用优化。
+
+### 7. ⭐ EM for GMM（核心实例，必记闭式解）
+
+#### 7.1 E step — responsibility（责任度）
+
+- complete data $y=(x_i,z_i)_{i=1}^n$，$z_i\in\{1,\dots,K\}$ 指示 $x_i$ 来自哪个 Gaussian。
+- Q 函数展开：
+$$
+Q(\theta|\theta^{(m)})=\sum_{i=1}^{n}\sum_{k=1}^{K}r_{ik}^{(m)}\log\{\pi(k)\mathcal{N}(x_i|\mu_k,\Sigma_k)\}.
+$$
+- 由 Bayes' theorem，**responsibility $r_{ik}^{(m)}=p(z_i=k|x_i,\theta^{(m)})$**：
+$$
+r_{ik}^{(m)}=\frac{\pi^{(m)}(k)\,\mathcal{N}(x_i|\mu_k^{(m)},\Sigma_k^{(m)})}{\sum_{k'=1}^{K}\pi^{(m)}(k')\,\mathcal{N}(x_i|\mu_{k'}^{(m)},\Sigma_{k'}^{(m)})}. \tag{E step}
+$$
+- 直觉：$r_{ik}$ 是第 $k$ 个分量对数据点 $x_i$ 的"负责比例"，是 $[0,1]$ 上的软分配（soft assignment），$\sum_k r_{ik}=1$。
+- 记 $n_k^{(m)}=\sum_{i=1}^n r_{ik}^{(m)}$（第 $k$ 分量的有效点数）。
+
+#### 7.2 M step — 闭式更新
+
+在 $\sum_k\pi(k)=1,\,\pi(k)\ge0,\,\Sigma_k\succ0$ 约束下最大化 $Q$。
+
+- **π 的更新（Lagrangian）**：构造 $L=\sum_k n_k^{(m)}\log\pi(k)-\lambda(\sum_k\pi(k)-1)$，对 $\pi(k)$ 求偏导令零 $\Rightarrow \pi(k)=n_k^{(m)}/\lambda$；由约束 $\sum_k\pi(k)=1$ 得 $\lambda=\sum_k n_k^{(m)}=n$，故
+$$
+\boxed{\;\pi^{(m+1)}(k)=\frac{n_k^{(m)}}{n}\;}\qquad\text{（每个分量的混合权 = 其有效点占比）}.
+$$
+
+- **μ_k 的更新**：对 $\mu_k$ 求导令零（$\partial Q/\partial\mu_k=\Sigma_k^{-1}\sum_i r_{ik}^{(m)}(x_i-\mu_k)=0$）得
+$$
+\boxed{\;\mu_k^{(m+1)}=\frac{1}{n_k^{(m)}}\sum_{i=1}^{n}r_{ik}^{(m)}\,x_i\;}\qquad\text{（责任度加权均值）}.
+$$
+
+- **Σ_k 的更新**：对 $\Sigma_k$ 求导令零得
+$$
+\boxed{\;\Sigma_k^{(m+1)}=\frac{1}{n_k^{(m)}}\sum_{i=1}^{n}r_{ik}^{(m)}(x_i-\mu_k^{(m+1)})(x_i-\mu_k^{(m+1)})^T\succ0\;}.
+$$
+
+#### 7.3 EM for GMM 完整算法摘要
+
+```
+输入 π^(0), μ_k^(0), Σ_k^(0) (k=1..K)；L^(0)=初始 log-likelihood
+repeat:
+  E step: 对所有 i,k 算 responsibility r_ik^(m)（E step 公式），n_k^(m)=Σ_i r_ik^(m)
+  M step: 更新 π^(m+1)(k)=n_k^(m)/n,  μ_k^(m+1)=Σ_i r_ik^(m)x_i / n_k^(m),
+          Σ_k^(m+1)=Σ_i r_ik^(m)(x_i−μ_k^(m+1))(·)^T / n_k^(m)
+  算 L^(m+1)=Σ_i log Σ_k π^(m+1)(k) N(x_i|μ_k^(m+1),Σ_k^(m+1))
+until |L^(m+1)−L^(m)| ≤ ε
+```
+- 演示 notebook：`03_mix_gauss_demo_faithful.ipynb`（Old Faithful 数据集拟合 GMM）。
+
+### 8. ⭐ K-Means 是 EM on GMM 的特例
+
+- 设定：GMM 中令 $\Sigma_k=\sigma^2 I$（各向同性、**所有分量共享同一 $\sigma^2$**，固定已知）、$\pi(k)=1/K$（均匀、固定已知），**只推断 $\mu_k$**。
+- **E step 变为 hard EM（硬分配）**：responsibility 退化为 one-hot：
+$$
+r_{ik}^{(m)}=\begin{cases}1,&k_i=\arg\min_k\|x_i-\mu_k^{(m)}\|^2\\0,&k\ne k_i\end{cases}
+$$
+即每个 $x_i$ **全权分配给最近的聚类中心**（欧氏距离），而非软分配。
+- 此时 $Q(\theta|\theta^{(m)})=-\frac{1}{2\sigma^2}\sum_i\|x_i-\mu_{k_i}\|^2+\text{const}$，M step 是最小二乘优化：
+$$
+\mu_k^{(m+1)}=\frac{1}{N_k}\sum_{i:k_i=k}x_i,\quad N_k=\sum_i\mathbf{1}\{k_i=k\}.
+$$
+- 结论：**K-Means = hard EM 下的 GMM 特例**——E step 按最近中心硬分配，M step 取该簇点均值更新中心，循环至收敛。
+- **选 K**（老师口述）：K 未知时试不同值，看 loss 随 K 衰减曲线，在衰减明显变缓处（"elbow"）选 K（K=n 时 loss=0 但无意义）。
+- 演示：`03_kmeans_voronoi.ipynb`（K=5 迭代更新 centroid + 重分配直至 Voronoi 区域稳定）。
+
+### 9. EM for MAP（用 prior 抑制 singularity）
+
+- **动机**：EM 不解决 singularity（§4.1）。MLE of GMM 在某 $\Sigma_k\to0$ 时仍奇异；尤其**维度 $D$ 大**时参数量爆炸，优化在高维空间遇**奇异矩阵**等数值问题，失败率随 $D$ 上升趋近 1（课件图：MLE 在 $D\gtrsim50$ 几乎必失败，而 MAP 几乎为 0）。
+- **做法（Bayesian）**：对 $\theta$ 加 prior $p(\theta)$，penalize $\Sigma_k\to0$ 的取值。posterior
+$$
+p(\theta|x)=\frac{p(x|\theta)p(\theta)}{p(x)},\qquad \theta_{MAP}=\arg\max_\theta\bigl(\log p(x|\theta)+\log p(\theta)\bigr).
+$$
+- **EM for MAP**：E step 与 MLE 的 EM **完全相同**；M step 只是在最大化 $Q$ 上**多加 $\log p(\theta)$**：
+$$
+\theta^{(m+1)}=\arg\max_\theta\bigl(Q(\theta|\theta^{(m)})+\log p(\theta)\bigr).
+$$
+- 直觉（老师口述）：prior 把 $\mu_k,\Sigma_k$ **约束在良好空间**，阻止优化发散到奇异矩阵；GMM 对 $\pi,\mu_k,\Sigma_k$ 加 prior 的具体形式见 [M12]。
+- **MAP 一定优于 MLE 吗**：不一定。MLE 只要数据足够就**一致（consistent）**、收敛到真值；MAP 若 prior 选得与真数据不符，反而**不一致**。MAP 的价值在于小样本或高维下用领域知识正则化、抑制数值失败（见 §11 小结的权衡）。
+
+### 10. Practice Problems（课件末，附解答）
+
+#### P1：GMM 的均值与协方差
+
+证明 $E[x]=\sum_k\pi(k)\mu_k$，$\mathrm{cov}(x)=\sum_k\pi(k)(\Sigma_k+\mu_k\mu_k^T)-E[x]E[x]^T$。
+
+**解**：令 $z$ 为 latent variable，用 **law of total expectation** 与 **law of total covariance**：
+$$
+E[x]=E[E[x|z]]=\sum_k\pi(k)E[x|z=k]=\sum_k\pi(k)\mu_k.
+$$
+对二阶矩，$\Sigma_k=E[(x-\mu_k)(x-\mu_k)^T|z=k]=E[xx^T|z=k]-\mu_k\mu_k^T$ ⇒ $E[xx^T|z=k]=\Sigma_k+\mu_k\mu_k^T$。故
+$$
+\mathrm{cov}(x)=E[xx^T]-E[x]E[x]^T=\sum_k\pi(k)(\Sigma_k+\mu_k\mu_k^T)-E[x]E[x]^T.
+$$
+
+#### P2：读 GMM 的 EM 代码（行级解释，从 Line 13 起）
+
+- Line 13：为每个 mixture component 建一个 normal distribution 对象 $\mathcal{N}(\cdot|\mu_i,\Sigma_i)$。
+- Line 14：对每行 $i$（数据 $x_i$）算各 $k$ 的 $\pi^{(m)}(k)\mathcal{N}(x_i|\mu_k^{(m)},\Sigma_k^{(m)})$。
+- Line 15：算 responsibility $r_{ik}^{(m)}=\frac{\pi^{(m)}(k)\mathcal{N}(x_i|\mu_k^{(m)},\Sigma_k^{(m)})}{\sum_{k'}\pi^{(m)}(k')\mathcal{N}(x_i|\mu_{k'}^{(m)},\Sigma_{k'}^{(m)})}$。
+
+#### P3：行人/骑车者 mixture（latent = 出行方式）
+
+- 情境：步道上行人:骑车者 = 4:1。vulnerable（易受伤害）判定：年龄 <10、>65 或 handicapped。行人 vulnerable 概率 $\theta_0$，骑车者 $\theta_1$。Hua 调查 100 人记录 $x_i\in\{0,1\}$（是否 vulnerable）但**未记录**其是行人还是骑车者。
+- **(i)** log-likelihood：
+$$
+\log p(x_1,\dots,x_{100}|\theta_0,\theta_1)=\sum_{i=1}^{100}\log\bigl[0.8\cdot\theta_0^{x_i}(1-\theta_0)^{1-x_i}+0.2\cdot\theta_1^{x_i}(1-\theta_1)^{1-x_i}\bigr].
+$$
+  （混合权 0.8=行人占比、0.2=骑车者占比；每个分量是 Bernoulli。）
+- **(ii)** 适合算法：**EM**。因这是 mixture model，$\log\sum(\cdot)$ 中 log 与 sum 不可交换，直接求导解根困难；EM 迭代求 $\theta_0,\theta_1$ 的 MLE。
+
+### 11. ⭐ Monotonicity（EM 的单调性，补充证明）
+
+- **结论**：EM **不保证找到全局 MLE**（可能停在 local maximum）；实践中常从多个随机初值启动取最优。但**每次迭代 log-likelihood 只增不减**（monotonically non-decreasing）→ 必收敛到某 local optimum。
+- **证明骨架**（用 Jensen 不等式）：
+  - 设 $x=T(y)$ 为 incomplete、$y$ 为 complete。对任意 $\theta$，
+$$
+\log p(x|\theta)=\log\int_{T(y)=x}p(y|\theta)\,dy=\log\int_{T(y)=x}\frac{p(y|\theta)}{p(y|x,\theta^{(m)})}p(y|x,\theta^{(m)})\,dy.
+$$
+  - 对 $\log$（凹函数）用 **Jensen 不等式**（以 $p(y|x,\theta^{(m)})$ 为权重取期望）：
+$$
+\log p(x|\theta)\ge \int_{T(y)=x}\log\frac{p(y|\theta)}{p(y|x,\theta^{(m)})}p(y|x,\theta^{(m)})\,dy = Q(\theta|\theta^{(m)}) + \text{entropy term (与 $\theta$ 无关)}.
+$$
+  - 该下界在 $\theta=\theta^{(m)}$ 处与 $\log p(x|\theta)$ **相切**（取等），故最大化 $Q$（M step 使 $Q(\theta^{(m+1)}|\theta^{(m)})\ge Q(\theta^{(m)}|\theta^{(m)})$）⇒ 下界提升 ⇒ $\log p(x|\theta^{(m+1)})\ge\log p(x|\theta^{(m)})$。
+- 直觉：$Q$ 是 log-likelihood 的**紧致下界**（evidence lower bound, ELBO），EM 每步提升这个下界，因下界在当前点贴合故 log-likelihood 必不降。
+
+### 12. 真实应用：GMM 判别牛/熊市（stock market）
+
+- 老师在投行用过 GMM 这类传统模型（不止深度学习）。notebook：`GMM_Stock` + Yahoo Finance 数据。
+- 取 AMD 股票多年收盘价，算 **log return** 与 **volatility**（两维特征，便于可视化；实际投行用更多因子）。
+- 假设数据由 **2 个 Gaussian 分量**生成：分量1 = **bull market（牛市）**（低波动、高收益），分量2 = **bear market（熊市）**（高波动、低/负收益）。
+- 用历史数据经 EM 估计 $\pi_1,\pi_2,\mu_1,\Sigma_1,\mu_2,\Sigma_2$，进而聚类每天为 bull/bear。结果：低波动点归牛市、高波动点归熊市，符合直觉；熊市分量收益跨度大（含大幅负收益也有偶发大正收益）。
+- 用途：判断当天牛/熊市状态，供 portfolio optimization / 客户推荐。
+- **latent variable = 当天是牛还是熊**（不可直接观测），正是 mixture model 的典型场景。
+
+### 13. 本周要点小结
+
+- **Mixture model**：$p(x|\theta)=\sum_k\pi(k)p(x|\eta_k)$，GMM 最常用；latent variable $z$ 指示来源分量，边缘分布把 $z$ marginalize 掉。
+- **直接 MLE 三大困难**：singularity（$\sigma_k\to0$ 似然发散，EM 也无法解决）、unidentifiability（置换分量标号同 pdf，无唯一最优）、optimization intractable（$\log\sum$ 不可换，非凹）。
+- **EM 算法**：complete data 易优化但 $z$ 未知 → 取期望。E step 算 Q 函数（在当前 $\theta^{(m)}$ 下对 $\log p(y|\theta)$ 求期望）；M step 最大化 Q。迭代至 log-likelihood 收敛。
+- **GMM 闭式更新（必记）**：responsibility $r_{ik}=\pi(k)\mathcal{N}(x_i|\mu_k,\Sigma_k)/\sum_{k'}(\cdot)$；$\pi^{(m+1)}(k)=n_k/n$，$\mu_k^{(m+1)}=\sum_i r_{ik}x_i/n_k$，$\Sigma_k^{(m+1)}=\sum_i r_{ik}(x_i-\mu_k^{(m+1)})(\cdot)^T/n_k$。
+- **K-Means**：GMM 在 $\Sigma_k=\sigma^2I$、$\pi(k)=1/K$ 固定下、只学 $\mu_k$ 的特例；E step 是 hard assignment（最近中心），M step 取簇内均值。
+- **EM for MAP**：E step 不变，M step 加 $\log p(\theta)$；用 prior 抑制高维下的 singularity/数值失败（MLE 失败率随 $D$ 趋 1，MAP 几乎为 0）。MAP 不一定优于 MLE（prior 不准则不一致），价值在小样本/高维正则化。
+- **Monotonicity**：EM 每步 log-likelihood 只增不减（Jensen 不等式证 $Q$ 是 ELBO、当前点取等），故收敛到 local optimum；多随机初值缓解局部最优。
+- **应用**：GMM 判别牛/熊市（latent = 当天市场状态）。
+
+---
+
+> **下一周预告**：Week 4 预计继续概率建模/模式识别主题（Tay Wee Peng 部分），可能进入 Bayesian networks / Markov models 或进一步的概率图模型与推断；具体主题以课件为准。Week 1 进度表所列后续主题包括 Hidden Markov Models、Classification 等。
