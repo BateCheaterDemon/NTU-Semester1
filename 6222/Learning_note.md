@@ -923,4 +923,257 @@ g = T(f) = ∫₀^f p_f(t) dt        （f 的 cumulative distribution function�
 
 ---
 
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction 等）。中文用于组织句意与补充释义。
+## Week 3 — Image Enhancement 续：Linear Filtering（smoothing/sharpening）＋ Nonlinear Filtering（median/order-statistic）＋ 进入 Machine Vision（template matching / nearest neighbor）
+
+> **权威来源说明**：本周官方讲义为 `EE6222_lecturenote1to9.pdf` 第 83–113 页（Topic 3 "Image Enhancement" 续：image smoothing / sharpening / nonlinear processing / order-statistic filters），以及第 114 页起 Topic 4 machine vision 引言。转写 `week3.txt` 噪声较大，以 PDF 为准。本周典型转写噪声："fue/fequin/Finkst/fnqust/frequdj"→Fourier/frequency；"menial"→linear；"comvolution/conv"→convolution；"spoons/spoon"→response；"glen/gal/gaucin/gausin/Gusel"→Gaussian；"ck tank/k tangle/reck tangle"→rectangle；"no ps/no puss/no path/no pas/no paster/no pop"→low-pass；"hyposphea/high posphaa/high pasaor/high pasha"→high-pass；"meting/medium/medi"→median；"menial/men filter/minar"→mean/linear；"age"→edge；"st equation/Hc"→histogram equalization；"Zod/loot/zu"→root（root signal）；"tile/tole"→tolerance；"tuncate/trancate/tcate/trancated"→truncate；"equis/UC/uc/equity/ukV/UCD"→Euclidean；"euch"→Euclid；"merest/nes nestable/nes/first nestable"→nearest（nearest neighbor）；"classph/classfh/classer/clasp/classp"→classifier；"ation"→variation。
+> 本周分两大块：**Part A** 完成 Topic 3 Image Enhancement 的线性滤波（low-pass/high-pass、image smoothing/sharpening）与非线性滤波（median filter、order-statistic filters、alpha-trimmed mean、ITM）；**Part B** 进入 Topic 4 Machine Vision——从 template matching、Euclidean distance、normalization 到 nearest neighbor classifier，为后续 classification 与机器学习铺垫。
+
+### Part A：Image Enhancement 续 — 线性与非线性滤波
+
+### 1. 卷积回顾与滤波本质
+
+- 所有 linear processing 都用 **LSI 系统**描述：输出 = 输入与 impulse response 的卷积。
+$$
+g(x,y)=f(x,y)*h(x,y)=\sum_i\sum_j h(i,j)\,f(x-i,y-j)
+$$
+- 利用 Fourier transform 的 **convolution property**：spatial domain 卷积 ⇔ frequency domain 相乘 $G(u,v)=F(u,v)H(u,v)$，相乘比卷积简单，故**滤波器通常在 frequency domain 设计**，但**实现在 spatial domain**（卷积）。
+- ⭐ **卷积的物理意义（老师重点）**：output pixel = filter mask 内 input pixels 的 **weighted sum（加权求和）**，权重即 filter coefficient / impulse response，输出位于 mask 中心。理解这一点极重要——CNN、neural network、transformer 本质都在做某种 weighted summation。不必逐点死算定义，抓住"加权求和"即可快速算卷积。
+- 若 filter mask 为有限大小（如 $3\times3$），mask 外 $h(x,y)=0$，求和限自然收窄到 mask 覆盖范围。
+
+### 2. Image Smoothing（低通滤波）
+
+- **smoothing filter** 用于 blurring 与 noise reduction，又称 **averaging filter** 或 **low-pass filter**：低频通过、高频抑制。
+
+#### 2.1 Ideal low-pass filter（ILPF）
+
+$$
+H(u,v)=\begin{cases}1,&D(u,v)\le D_0\\0,&D(u,v)>D_0\end{cases},\qquad D(u,v)=\sqrt{u^2+v^2}
+$$
+- 频域中一个半径 $D_0$ 的圆内为 1、圆外为 0。digital image 的频率范围归一化到 $[-0.5,0.5]$（中心为零频），故圆心是零频，离中心越远频率越高。
+- ⚠️ **ideal filter 在实践有问题**：$H$ 从 1 到 0 有**突变**（sharp transition），含极高频率成分，其 inverse Fourier transform 是 **sinc function**，在 spatial domain 从 $-\infty$ 到 $+\infty$ 都非零。实际只能用有限窗口截断，导致：
+  - **ringing（振铃）**：对单个 impulse 输入，ILPF 不只把它"抹开成 blur"，还产生一圈圈明暗相间的环（sinc 的负瓣所致）——这些环是**输入图像里不存在的虚假结构**（artificial structure）。
+  - 真实图像经 ILPF 后会出现原图没有的条纹/结构，这是 undesirable 的。
+- 结论：**实践中不要用 ideal low-pass filter**。
+
+#### 2.2 ⭐ Gaussian low-pass filter（GLPF）
+
+$$
+H(u,v)=\frac{1}{2\pi\sigma^2}\exp\!\left(-\frac{u^2+v^2}{2D_0}\right)
+$$
+- 从最大值**平滑过渡**到 0（无突变），故 inverse Fourier transform 仍是 Gaussian（**Gaussian 的 FT 仍是 Gaussian**），无 sinc 负瓣、无 ringing，不产生 artificial structure。
+- 对 impulse 输入，GLPF 只把它平滑成一个 Gaussian blob，无环——这是 Gaussian 在图像处理中"非常 nice"的原因。**实践总是用 Gaussian low-pass，不用 ideal low-pass**。
+
+### 3. Image Sharpening（高通滤波）
+
+- **high-pass filter** 抑制低频、通过高频，提取 edge/细节。由 low-pass 反推：
+$$
+H_{hp}(u,v)=1-H_{lp}(u,v)
+$$
+- **Ideal high-pass filter**：圆内（低频）= 0、圆外（高频）= 1，与 ILPF 相反，同样有 ringing 问题。
+- **Gaussian high-pass filter（GHPF）**：$G(u,v)=1-\exp\!\bigl(-\frac{u^2+v^2}{2D_0}\bigr)$，无 artificial structure。
+- 直觉：constant region（无论亮或暗）是零频，经 high-pass 后变 0（近黑）；只有 edge 处灰度突变（高频）输出非零 → **high-pass 提取 edge pattern**。
+
+#### 3.1 High-boost filter（高频增强）
+
+- 纯 high-pass 会丢掉所有低频信息，不利于人眼观察（看不出原本是亮 constant 还是暗 constant）。**high-boost filter** = 原图放大 $A$ 倍（$A\ge1$）减去 low-pass 输出：
+$$
+f_{hb}(x,y)=A\,f(x,y)-f_{lp}(x,y)=(A-1)f(x,y)+\underbrace{[f(x,y)-f_{lp}(x,y)]}_{f_{hp}(x,y)}
+$$
+- 即"原图 + edge"：edge 被增强，其余信息保留。可再配合 histogram equalization 进一步增强对比度。
+
+### 4. 为什么需要非线性滤波（linear filter 的局限）
+
+- **所有 linear filter 输出都是输入像素的 weighted average**（加权平均）。average 有固有缺陷：
+  1. **blurs the image**（模糊图像、丢失 sharpness/细节）；
+  2. **难以抑制强噪声**：若噪声值极大，average 后该强值仍残留，无法完全去除，还会把噪声**扩散**到更多像素。
+- 老师举例：一幅被强噪声污染的图像——噪声**幅度极大**（能把最暗像素变最亮、反之亦然），但**空间上稀疏**（spatially sparse，多数像素未被污染）。low-pass 只能降低噪声幅度、并把它扩散开，无法彻底清除。
+- 由此引出**基于 order statistic（排序统计）的非线性滤波**。
+
+### 5. ⭐ Median Filter（中值滤波，本周核心）
+
+#### 5.1 定义
+
+$$
+\hat f(x,y)=\operatorname*{median}_{(s,t)\in S_{xy}} f(s,t)
+$$
+- 把 filter window 内所有像素灰度**排序**（升/降序），取**中间位置**的值作为输出。例：$\{10,15,20,20,20,20,20,25,100\}$，median = 20（15 被替换为 20）。
+
+#### 5.2 ⭐⭐ Mean vs Median 对比（老师详讲，重点考点）
+
+| 情形 | Mean filter（均值/线性） | Median filter（中值/非线性） |
+|---|---|---|
+| **图像细节（pulse/细线）** | **blurs** detail（2 像素脉冲被抹成 4 像素、幅值减半） | **preserves** detail（window 内多数是背景时，median = 背景值，输出不变） |
+| **edge（阶跃）** | **blurs** sharp step edge → ramp edge（均值拉平两侧） | **preserves** step edge（两侧 median 分别等于各自灰度） |
+| **impulsive/salt-and-pepper noise（强幅度、稀疏）** | 只能**降低**幅度且**扩散**噪声，无法完全去除 | **完全去除**（只要窗口内噪声像素数 < 非噪声像素数，median 取多数值）|
+| **Gaussian dense noise（小幅、密集）** | **最优**（mean 是 Gaussian noise 下最小平方估计） | 能抑制但**不如 mean filter**（dense 噪声下 median 略逊） |
+
+- ⭐ **median 的稳健性直觉**：无论异常值多大（哪怕 1 百万），median 不受影响（一组数里加个极大值，中位数几乎不动）；mean 则被拉偏。这是 median filter 能完全去除强 impulsive noise 的根本原因。
+- ⚠️ **median filter 的代价**：会**丢失小细节**（corner、细线/曲线等少数像素构成的结构），因为 corner 处窗口内多数是背景，corner 被当成噪声抹掉。这是 median 的主要缺点，引出 image detail-preserving filter 研究。
+
+#### 5.3 Median Filter 的性质
+
+- **root signal（根信号）**：对 median filter **不变**的信号（再施加 median filter 输出仍不变）。反复施加 median filter，信号最终收敛到某个 root signal。
+  - constant（常数）信号、monotonically increasing/decreasing（单调）信号是任意窗口 median 的 root signal。
+  - PDF 示例：长度 3 的 median 反复作用于 `0001212121000` → `0001121211000` → `0001112111000` → `0001111111000`（root）。
+- ⚠️ median filter **是非线性**的，难以像 linear filter 那样在 frequency domain 做理论分析（没有成熟的频域理论工具），这是其理论难点。
+
+### 6. 其他 Order-Statistic Filters
+
+| Filter | 定义 |
+|---|---|
+| **Max filter** | $\hat f=\max_{(s,t)\in S_{xy}} f(s,t)$（取窗口最大值） |
+| **Min filter** | $\hat f=\min_{(s,t)\in S_{xy}} f(s,t)$（取窗口最小值） |
+| **Midpoint filter** | $\hat f=\tfrac12[\max f+\min f]$（最大+最小的平均） |
+
+- Max pooling 在神经网络中类似 max filter。
+
+### 7. ⭐ Alpha-Trimmed Mean Filter（α 修正均值滤波，教材必出现）
+
+- **结合 mean 与 median 思想**：先排序，去掉 $d$ 个极端值（最大 $d/2$ 个、最小 $d/2$ 个），对剩下 $n-d$ 个像素求平均：
+$$
+\hat f=\frac{1}{n-d}\sum_{(s,t)\in S_{xy}^{\text{trimmed}}} f(s,t)
+$$
+- 两个极端：
+  - $d=0$：不修剪，退化为 **mean filter**；
+  - $d=n-1$：只留中位数，退化为 **median filter**。
+- 介于二者之间即"mean 与 median 的折中"。
+- ⚠️ 局限（老师指出，思考题）：
+  1. **如何选 $d$**？太大趋近 median，太小趋近 mean，无定论。
+  2. 实现上即便叫"mean"，仍需**排序**才能去掉极端值——排序与加减乘除是不同操作，CPU 实现麻烦，大规模/多级处理成本高。
+  3. 完全"去掉"极端值可能不稳定；老师的研究改用 **truncate（截断而非删除）**——把极端值 clamp 到某个 bound，而非丢弃。
+
+### 8. ⭐ Mean 与 Median 的数学本质（老师的研究延伸，理解性内容）
+
+- **mean** = 最小化**平方距离**的值：$\bar x=\arg\min_c\sum_i(x_i-c)^2$，即 **L2 norm** minimization（有闭式解 $\bar x=\frac1n\sum x_i$）。
+- **median** = 最小化**绝对距离**的值：$\text{med}=\arg\min_c\sum_i|x_i-c|$，即 **L1 norm** minimization（一般无闭式解，需迭代逼近）。
+- 二者关系：mean 和 median 之差**有上界**，老师证明该差小于三种统计量（标准差、绝对偏差、两半均值差之半），其中"两半均值差之半"（将数据按 mean 分成大小两组各求均值，差的一半）是**最紧的上界**。
+
+#### 8.1 Iterative Truncated Mean（ITM）算法
+
+- 利用上述紧上界 $T$，迭代地用**算术运算逼近 median**，避免昂贵的排序：
+  1. 算 mean；
+  2. 以 mean ± $T$ 为界，把超出范围的值 **truncate（截断/clamp）**到边界；
+  3. 对截断后的数据重新算 mean；
+  4. 重复，truncated mean 会**逐步逼近 median**。
+- 数学保证：对任何数据集，总有至少一个值在界外（保证每步都改变数据、bound 持续缩小），且 mean 与 median 始终在 bound 内 → truncated mean 收敛到 median。
+- 实践只需 2–3 次迭代即非常接近 median；甚至不必收敛到 median，停在中间状态可能**比 mean 和 median 都好**。
+- **Olympic average（奥林匹克平均）**类比：评分时去掉最高/最低再平均——介于 mean 与 median 之间，兼顾二者优点。这正是 alpha-trimmed mean 的思想。
+
+### Part B：进入 Machine Vision — Template Matching 与 Nearest Neighbor
+
+### 9. 从 Human Vision 到 Machine Vision
+
+- 之前的技术（contrast enhancement、noise removal）面向**人眼**；接下来面向**机器**：让机器自动识别视觉信息。但传统方法（convolution、Fourier transform）在 machine vision 也很有用。
+
+### 10. ⭐ Template Matching（模板匹配）
+
+#### 10.1 机器如何识别物体
+
+- 机器**不能"理解"输入**，只能**比较**：系统有 gallery/database $\{g_1,\dots,g_G\}$，对未知输入 $A$，逐一比较、找最接近的 gallery 样本，判定 $A$ 属于该样本代表的物体。
+
+#### 10.2 比较的数学：difference → norm → argmin
+
+- 两图像比较：先做 difference $A-g$，再把差异（可能上百万个像素值）压缩成**一个数**——**norm（范数）**。
+- 识别 = 最小化该 norm：
+$$
+k^*=\arg\min_k \lVert A-g_k\rVert
+$$
+- 结果取 **argument（argmin，使函数取最小的自变量值 $k$）**，而非最小值本身——即"哪个 gallery 样本最像"。
+- 这种"找最相似（最小差异）"的方法叫 **template matching**：$g_k$ 是物体的 template。
+
+#### 10.3 Euclidean Distance 与向量化
+
+- 取 **2-norm**（平方差求和）即 **Euclidean distance**：
+$$
+d(A,g)=\lVert A-g\rVert_2=\sqrt{\sum_x\sum_y(A(x,y)-g(x,y))^2}
+$$
+- 把图像（矩阵）按行展开成 **column vector**（列向量）$\mathbf{a},\mathbf{g}\in\mathbb{R}^{n}$（$n=pq$），则距离可写成向量内积：
+$$
+d(\mathbf{a},\mathbf{g})=\lVert\mathbf{a}-\mathbf{g}\rVert_2=\sqrt{(\mathbf{a}-\mathbf{g})^T(\mathbf{a}-\mathbf{g})}
+$$
+- 向量 = $n$ 维空间中一个点；Euclidean distance = 两点的几何距离，直观可视。
+
+### 11. ⭐ Normalization（归一化，核心概念）
+
+#### 11.1 为什么 Euclidean distance 不够
+
+- 老师反例：两幅内容**完全相同**的 triangle pattern 图，仅 brightness/contrast 不同 → Euclidean distance 巨大，但实为同一物体。直接用 Euclidean distance 会误判。
+- 解决：先对每幅图像做 **normalization**，再做 template matching。
+
+#### 11.2 零均值单位方差归一化
+
+- 把图像每个像素减去其 mean、再除以 standard deviation（或向量长度）：
+$$
+\tilde f=\frac{f-\mu_f}{\sigma_f}\quad(\text{zero mean, unit variance})\qquad\text{或}\qquad \tilde f=\frac{f-\mu_f}{\lVert f-\mu_f\rVert}\quad(\text{unit length})
+$$
+- 归一化后，仅 brightness/contrast 不同的同一内容图像 → Euclidean distance = 0，正确判为相同物体。
+- ⭐ **normalization 是 recognition/machine learning 的核心概念**：识别之所以难，是因为同一物体有巨大 **variation**（brightness、scale、position、rotation 等）；recognition 的本质就是**消除这些 variation**，把不同表现的同一物体映射到同一表示。AI/deep learning 中大量 normalization 都为此。
+
+#### 11.3 Correlation Coefficient（相关系数）
+
+- 不必显式归一化，直接用 **correlation coefficient**：
+$$
+\rho=\frac{(f-\mu_f)^T(g-\mu_g)}{\lVert f-\mu_f\rVert\,\lVert g-\mu_g\rVert}
+$$
+- 其定义**已内含归一化**（减均值、除长度）。相似 → $|\rho|\to1$；不相似 → $|\rho|$ 小。
+- 用 correlation 取**最大**，等价于用归一化后 Euclidean distance 取**最小**（二者互为反面：distance 最小 = similarity 最大）。
+
+### 12. ⭐ 从 Matching 到 Classification（Nearest Neighbor Classifier）
+
+#### 12.1 一物多模板 → class
+
+- 一个物体（如 car）在 gallery 中应有**多个 template**（正面/侧面、不同 size/contrast…），单个 template 无法代表。于是**一个 object 对应一组 samples = 一个 class**。
+- 识别"未知输入是 car 还是 bicycle"变成：把它**分类**到某个 class——从 matching 升级为 **classification**。
+
+#### 12.2 Nearest Neighbor Classifier（1-NN）
+
+$$
+k^*=\arg\min_i\Bigl(\min_{g\in\text{class}\,\omega_i}\lVert A-g\rVert\Bigr)
+$$
+- 对所有 class 的所有 sample 算距离，取最小者所属 class 为结果（外层 argmin 取 class 索引 $i$，内层 min 找该 class 中最近 sample）。
+- 这是最经典的 classifier 之一，deep learning 前广泛使用。
+
+#### 12.3 K-Nearest Neighbor（K-NN）
+
+- 取 $K$ 个最近训练样本，在这 $K$ 个里**多数投票**（majority vote）决定 class。如 5-NN：取最近 5 个，看哪 class 占多数。
+- 1-NN 的自然推广。
+
+#### 12.4 Nearest Neighbor 的问题（引向后续）
+
+1. **计算量大**：每个未知输入都要与全部训练样本算距离（detection 问题中尤其严重）。
+2. **overfit / 性能受限**：决策只依赖离未知最近的少数几个训练样本，其余大量训练数据未被利用 → 易 overfit。
+- → 下周将从 probability theory 出发，**理论推导**出最优 classifier（揭示 nearest neighbor 的理论根源）。
+
+### 13. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| 卷积本质 | weighted sum，输出在 mask 中心；频率域设计、空间域实现 |
+| Ideal vs Gaussian low-pass | ideal 有 ringing（sinc 负瓣）→ 实践用 Gaussian，无 ringing |
+| High-pass = 1 − low-pass | 提取 edge；high-boost = (A−1)f + high-pass，保留低频 |
+| Linear filter 局限 | average 必模糊、强噪声无法彻底去除且会扩散 |
+| ⭐⭐ Mean vs Median | median 保 edge/细节、完全去除 impulsive noise；mean 适合 Gaussian dense noise 但模糊 edge |
+| median 完全去噪条件 | 窗口内噪声像素数 < 非噪声像素数 |
+| median 缺点 | 丢失 corner/细线等小细节 |
+| Alpha-trimmed mean | 去极端值再求平均；$d=0$→mean，$d=n-1$→median；需排序、$d$ 难选 |
+| mean = L2 min，median = L1 min | mean 闭式解、median 需迭代 |
+| template matching | argmin‖A−g‖，取 argument（类索引）非最小值 |
+| normalization 核心 | 消除 brightness/contrast 等 variation；同一物体不同表现归一后距离=0 |
+| correlation coefficient | 内含归一化，取最大；等价归一化 Euclidean distance 取最小 |
+| Nearest Neighbor | 1-NN 取最近样本所属 class；K-NN 多数投票；问题：计算量大、overfit |
+
+### 14. 本周要点小结
+
+- **线性滤波**：low-pass（smoothing/blurring）与 high-pass（sharpening/edge）互为 1−H；ideal filter 有 ringing，实践用 Gaussian（FT 仍 Gaussian，无 ringing）；high-boost 保留低频同时增强 edge。
+- **非线性滤波**：linear = average，必然模糊且难去强噪声。median filter 基于 order statistic，**保 edge、完全去除稀疏强 impulsive noise**，但难做频域理论分析、会丢小细节。Gaussian dense noise 下 mean filter 最优。
+- **alpha-trimmed mean** 介于 mean 与 median 之间（$d=0$→mean，$d=n-1$→median），需排序、$d$ 难定；ITM 用算术迭代逼近 median，Olympic average 同理。
+- **machine vision 入口**：机器只能比较 → template matching = argmin‖A−g‖；Euclidean distance（向量化、内积）直观但受 brightness/contrast 干扰 → **normalization 消除 variation**（recognition 的本质）；可用归一化 Euclidean distance 或 correlation coefficient。
+- **classification**：一物多模板 → class；1-NN 取最近样本所属 class，K-NN 多数投票；问题：计算量大、overfit → 下周理论推导最优 classifier。
+
+---
+
+> **下一周（Week 4）预告**：老师明确预告将从 **probability theory 出发理论推导 optimal classifier**，揭示 nearest neighbor classifier 的理论根源（"how this nearest neighbor classifier comes from the theoretic study, from the probability theory to get the optimal classifier"）。预计涉及 Bayes decision rule / MAP decision / classification 的概率论推导。本周已引出 nearest neighbor 的两大问题（计算量大、overfit），下周给出最优解法。
+
+---
+
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal 等）。中文用于组织句意与补充释义。
