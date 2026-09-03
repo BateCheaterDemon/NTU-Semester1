@@ -1176,4 +1176,259 @@ $$
 
 ---
 
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal 等）。中文用于组织句意与补充释义。
+## Week 4 — Topic 5：MAP Decision and Classifiers（从概率论推导最优分类器）
+
+> **权威来源说明**：本周官方讲义为 `EE6222_lecturenote1to9.pdf` 第 152–170 页（Topic 5 "MAP Decision and Classifiers"），转写 `week4.txt` 噪声极大，以 PDF 为准。本周典型 ASR 错拼修正：
+> - "a postal / apo / apostrop / post probability" → **a posteriori probability / posterior probability**
+> - "prior / pyro / P or mega / P omega" → **prior probability** $p(\omega_i)$
+> - "cha / chain / chain rule" → **chain rule**（联合概率分解 $p(A,B)=p(A)p(B|A)=p(B)p(A|B)$）
+> - "null of the total probability" → **law of total probability**
+> - "equity / equiv / QD / euclid distance" → **Euclidean distance**
+> - "Mov / Mab / homo base / man distance" → **Mahalanobis distance**
+> - "cons / conse / co metric / cosmetics / nsmetri" → **covariance matrix**
+> - "g / gal / galcan / gusin / gaucin / guan / sulfin" → **Gaussian**
+> - "dit / discreminant / disc / decriminal / decree man" → **discriminant function**
+> - "atic / aquatic / crotic / roogic" → **quadratic**
+> - "mimiar / meniar / aia" → **linear**
+> - "tris / choice / trigo / twice" → **threshold**（决策阈值/边界点）
+> - "Chinese sample" → **training sample**（训练样本）
+> - "school of the trouble E / trouble E" → **school of EEE**
+> - "higher / nuns of the higher" → **hair**（头发长度，第二特征示例）
+
+### 1. 本周主线
+
+上周结束于 nearest neighbor classifier 的两大问题（计算量大、overfit）。本周回答一个更根本的问题：**在不确定下如何做最优决策？** 老师从一个直观例子（在 EEE 学院猜学生性别）出发，从 common sense 一步步抽象出 **MAP decision rule**，再用 chain rule 与 law of total probability 把 posterior 拆成 prior × likelihood，最终在 Gaussian 假设下推出 **discriminant function = quadratic function of x**，其核心项正是 **Mahalanobis distance**。这就从概率论给出了 optimal classifier 的理论根源，并解释了上周 Mahalanobis distance 为何出现。
+
+### 2. 从 common sense 到 MAP decision rule
+
+#### 2.1 直觉例子：在 EEE 学院看一个学生
+
+- 在 EEE 学院，男生 70%、女生 30% → 看到一个模糊身影，**最佳决策是判 male**，因为 $p(\omega_1)=0.7>p(\omega_2)=0.3$。
+- 换到会计学院（male 30% / female 70%）→ 决策反过来。
+- 这就是 **maximum probability decision**：选 $p(\omega_i)$ 最大的类。
+- 决策不一定对，但**没有更好的决策**：error rate = 0.3 是最小的。
+
+#### 2.2 引入观测值：posterior probability
+
+- 若已知身高 $x=1.75$ m，最佳决策**仍是比较两类概率**，只是现在概率变成 **posterior probability** $p(\omega_i|x)$。
+- **prior probability** $p(\omega_i)$：未观测 $x$ 前的概率；**posterior probability** $p(\omega_i|x)$：观测到 $x$ 后的概率。
+- 老师强调：posterior 本质就是 **conditional probability**，所有概率本质上都是 conditional，只是研究 scope 不同。不必被术语吓到。
+
+#### 2.3 ⭐ MAP decision rule
+
+$$
+\text{Decide } \omega_k = \arg\max_{\omega_i} p(\omega_i|x)
+$$
+
+- 选 posterior 最大的类。
+- 由于选了最大的 $p(\omega_k|x)$，错误概率 $p(e_k|x)=1-p(\omega_k|x)$ 同时被**最小化**。
+
+$$
+\text{Decide } \omega_k = \arg\max_{\omega_i} p(\omega_i|x) = \arg\min_{\omega_i} p(e_i|x)
+$$
+
+> ⭐ **MAP decision rule 最小化 decision error probability**——这是其"最优"的含义。
+
+### 3. 从 posterior 到 prior × likelihood：Bayes 公式
+
+#### 3.1 chain rule
+
+$$
+p(x,\omega_i)=p(x)\,p(\omega_i|x)=p(\omega_i)\,p(x|\omega_i)
+$$
+
+由此得 Bayes 公式：
+
+$$
+p(\omega_i|x)=\frac{p(\omega_i)\,p(x|\omega_i)}{p(x)}
+$$
+
+- $p(\omega_i)$：**prior probability**（先验）。
+- $p(x|\omega_i)$：**class-conditional probability / likelihood**（类条件概率）。
+- $p(x)$：**mixture PDF/PMF**，由 **law of total probability** 给出：
+
+$$
+p(x)=\sum_{i=1}^{c} p(x|\omega_i)\,p(\omega_i)
+$$
+
+#### 3.2 ⭐ 去掉 $p(x)$：决策只需比较
+
+- $p(x)$ 对所有类**相同**，在 argmax 中可**移除**。决策实际只用：
+
+$$
+\omega_k = \arg\max_{\omega_i} p(\omega_i)\,p(x|\omega_i)
+$$
+
+> 这是本周关键简化之一：**不必精确算出 posterior 的值，只需比较哪个类最大**。
+
+#### 3.3 自动化系统需要整条 PDF
+
+- 手动判断一个 $x=1.75$ 只需该点的概率；但**自动系统要对所有 $x$ 都能判**，故需整条 class-conditional PDF $p(x|\omega_i)$。
+- PDF/PMF 须归一化：$\int p(x|\omega_i)\,dx=1$（continuous）或 $\sum p(x|\omega_i)=1$（discrete）。
+- 离线用训练数据估计这两条曲线 → 预先算出 **class boundary（决策阈值）** → 在线只需比较 $x$ 与阈值，极快。
+
+### 4. 系统性能：error rate 的计算与可视化
+
+#### 4.1 特定 $x$ 的 error rate
+
+$$
+p(e_k|x)=1-p(\omega_k|x)=\sum_{i\neq k} p(\omega_i|x)
+$$
+
+#### 4.2 ⭐ 全系统 error rate：概率加权平均
+
+- $x$ 是 random variable，不同 $x$ 出现概率不同 → 不能简单求和除以个数，要按 $p(x)$ **加权**：
+
+$$
+p(e)=\int_{-\infty}^{\infty} p(e_k|x)\,p(x)\,dx \quad (\text{continuous}),\qquad p(e)=\sum_x p(e_k|x)\,p(x)\ (\text{discrete})
+$$
+
+> 老师强调：common sense 的"平均"只是 uniform 分布下 probability-weighted average 的特例。
+
+#### 4.3 推导到 decision region
+
+- 不同 $x$ 区域决策的 $\omega_k$ 不同 → 把整个空间划分为 $c$ 个 **decision region** $\Re_i$：
+
+$$
+p(e)=1-\sum_{i=1}^{c} p(\omega_i)\int_{\Re_i} p(x|\omega_i)\,dx,\qquad p(\text{correct})=\sum_{i=1}^{c} p(\omega_i)\int_{\Re_i} p(x|\omega_i)\,dx
+$$
+
+#### 4.4 ⭐ 两类问题的 error rate 可视化（PDF p.161–162）
+
+两类的 $p(\omega_i)p(x|\omega_i)$ 曲线画在一起，total error rate 是两块**阴影面积**之和：
+- 类1的 PDF 在 $\Re_2$ 区域的积分（被错分到类2的类1样本）
+- 类2的 PDF 在 $\Re_1$ 区域的积分（被错分到类1的类2样本）
+
+**决策边界放在两条曲线的交点处时，阴影面积最小** → 这正是 MAP 决策（选 posterior 大者）的几何含义。
+
+#### 4.5 ⭐ 增加特征维度降低 error rate
+
+- 1D 用身高 $x_1$ → 2D 加头发长度 $x_2$，向量 $\mathbf{x}=[x_1,x_2]^T$。
+- 原则上**无区别**，只是 scalar $x$ → vector $\mathbf{x}$，PDF 从曲线 → surface，阈值从点 → 曲线/直线。
+- 老师给示例：两类在单一维度上严重重叠（error rate 大），但联合两维用一条斜线可几乎完美分开（error rate ≈ 0）。
+- **增加信息/维度一般降低 error rate**——这是引入更多特征的动机。
+
+### 5. ⭐ Discriminant Function（判别函数）
+
+#### 5.1 定义
+
+- 不必精确算 posterior，只要一个与 posterior **成比例**（monotonic）的函数即可比较：
+
+$$
+g_i(\mathbf{x}) = \ln p(\mathbf{x}|\omega_i) + \ln p(\omega_i)
+$$
+
+- 取 **natural logarithm ln**：单调递增不影响比较，且把乘法变加法、把指数变线性，简化计算。
+- 决策：选 $g_i(\mathbf{x})$ 最大的类。
+
+#### 5.2 Gaussian 假设下的 discriminant function（PDF p.165–166）
+
+设 $p(\mathbf{x}|\omega_i)=\mathcal{N}(\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i)$：
+
+$$
+p(\mathbf{x}|\omega_i)=\frac{1}{(2\pi)^{d/2}|\boldsymbol{\Sigma}_i|^{1/2}}\exp\!\left[-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu}_i)^T\boldsymbol{\Sigma}_i^{-1}(\mathbf{x}-\boldsymbol{\mu}_i)\right]
+$$
+
+代入取 ln：
+
+$$
+g_i(\mathbf{x}) = -\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu}_i)^T\boldsymbol{\Sigma}_i^{-1}(\mathbf{x}-\boldsymbol{\mu}_i) + \ln p(\omega_i) - \tfrac{1}{2}\ln|\boldsymbol{\Sigma}_i| - \tfrac{d}{2}\ln 2\pi
+$$
+
+- 末项 $-\tfrac{d}{2}\ln 2\pi$ 对所有类相同 → **移除**。
+- 记 $b_i = \ln p(\omega_i) - \tfrac{1}{2}\ln|\boldsymbol{\Sigma}_i|$，则：
+
+$$
+g_i(\mathbf{x}) = -\tfrac{1}{2}d_{\Sigma_i}(\mathbf{x},\boldsymbol{\mu}_i) + b_i
+$$
+
+其中
+
+$$
+d_{\Sigma_i}(\mathbf{x},\boldsymbol{\mu}_i) = (\mathbf{x}-\boldsymbol{\mu}_i)^T\boldsymbol{\Sigma}_i^{-1}(\mathbf{x}-\boldsymbol{\mu}_i)
+$$
+
+就是 **(squared) Mahalanobis distance**。
+
+### 6. ⭐ Mahalanobis distance vs Euclidean distance
+
+| | Mahalanobis | Euclidean |
+|---|---|---|
+| 公式 | $d_{\Sigma}=(\mathbf{x}-\boldsymbol{\mu})^T\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})$ | $d_{Eu}=(\mathbf{x}-\boldsymbol{\mu})^T(\mathbf{x}-\boldsymbol{\mu})$ |
+| 1D | $(x-\mu)^2/\sigma^2$ | $(x-\mu)^2$ |
+| 几何 | 椭圆等距线（contour of Gaussian PDF） | 圆等距线 |
+| 含义 | Euclidean distance 被 covariance **归一化** | 无归一化 |
+
+- ⭐ **Minimum Mahalanobis distance classifier 在各类服从 Gaussian PDF 时即为 optimal classifier**（与上周 §11 的伏笔呼应）。
+- Gaussian 的 **mean 决定位置**，**covariance matrix 决定形状（contour/ellipse）**。
+- 椭圆上所有点到中心 Mahalanobis distance 相同但 Euclidean distance 不同。
+
+### 7. ⭐ Quadratic Classifier（一般情形）
+
+- Gaussian 假设下 $g_i(\mathbf{x})$ 是 $\mathbf{x}$ 的 **quadratic function（二次函数）**。
+- decision boundary $g_i(\mathbf{x})=g_j(\mathbf{x})$ 是 **quadratic curve/surface**（二次曲线/曲面）。
+- 2D 两类、不同 $\boldsymbol{\Sigma}$ → 边界可为 ellipse / hyperbola / 抛物线，**即使两类的 mean 相同**也可形成圆/椭圆。
+- 高维或多类时 quadratic boundary 可很复杂。
+
+### 8. ⭐ 特例：共享 covariance matrix → Linear Classifier
+
+#### 8.1 推导
+
+若所有类 $\boldsymbol{\Sigma}_i = \boldsymbol{\Sigma}$（相同 covariance，不同 mean）：
+
+$$
+g_i(\mathbf{x}) = -\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu}_i)^T\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu}_i) + \ln p(\omega_i) - \tfrac{1}{2}\ln|\boldsymbol{\Sigma}|
+$$
+
+展开后，**二次项 $\mathbf{x}^T\boldsymbol{\Sigma}^{-1}\mathbf{x}$ 对所有类相同 → 移除**，只剩 $\mathbf{x}$ 的一次项 → **linear function of $\mathbf{x}$**：
+
+$$
+g_i(\mathbf{x}) = \mathbf{w}_i^T \mathbf{x} + w_{i0},\qquad \mathbf{w}_i = \boldsymbol{\Sigma}^{-1}\boldsymbol{\mu}_i
+$$
+
+- decision boundary 为 **hyperplane**（高维）/ **straight line**（2D）/ **plane**（3D）。
+
+#### 8.2 ⭐⚠️ 关键易错点（老师重点强调）
+
+- **共享 $\boldsymbol{\Sigma}$ ≠ covariance matrix 无用！** common $\boldsymbol{\Sigma}$ 仍**参与决定**最优边界方向与位置。
+- **decision boundary 不一定经过两 class mean 的连线**——边界方向由 $\boldsymbol{\Sigma}^{-1}(\boldsymbol{\mu}_i-\boldsymbol{\mu}_j)$ 决定，而非单纯由 mean 差决定。
+- 老师点名批评 **Direct LDA** 方法：它把数据投影到"类中心差所张成的子空间"并声称其余维度无用——这与上述理论**矛盾**，因为 class-conditional covariance（within-class variation）仍影响最优分类。
+- 记忆：**分类不只取决于 class mean 的差异，within-class covariance 同样关键**。
+
+### 9. 老师的考试哲学（重要提示）
+
+- 转写明确："I never require you to memorize any formula. Any formula without clear physical meaning, you don't need to memorize it."
+- 应记的是**有物理意义的公式**：Mahalanobis distance $d_\Sigma=(\mathbf{x}-\boldsymbol{\mu})^T\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})$（= Euclidean distance 被 covariance 归一化）、MAP rule、discriminant function 与 posterior 的比例关系。
+- 不必死记 discriminant function 的展开常数项——要知道它是 **Mahalanobis distance 的函数**，由 Gaussian PDF 的 shape 决定。
+
+### 10. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **MAP decision rule** | $\omega_k=\arg\max_i p(\omega_i\|x)$，最小化 error probability |
+| **prior / posterior / likelihood** | posterior = prior × likelihood / $p(x)$；$p(x)$ 可移除 |
+| **error rate** | $p(e)=\int p(e_k\|x)p(x)dx$；两类 = 两块阴影面积之和；边界在曲线交点处最小 |
+| **discriminant function** | $g_i(\mathbf{x})=\ln p(\mathbf{x}\|\omega_i)+\ln p(\omega_i)$，与 posterior 单调成比例 |
+| **Gaussian → quadratic** | $g_i=-\tfrac{1}{2}d_{\Sigma_i}+b_i$，二次函数，边界为二次曲线 |
+| **Mahalanobis distance** | $d_\Sigma=(\mathbf{x}-\boldsymbol{\mu})^T\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})$，Gaussian 下 optimal |
+| **共享 $\Sigma$ → linear** | 二次项抵消，边界为 hyperplane，**但不一定过两 mean 连线** |
+| **维度↑ → error↓** | 更多特征一般降低 error rate |
+| **共享 $\Sigma$ ≠ covariance 无用** | within-class covariance 仍决定边界（反 Direct LDA） |
+
+### 11. 本周要点小结
+
+- **最优决策的直觉**：在不确定下，选当前信息下概率最大的类——这就是 common sense，数学化即 MAP。
+- **posterior 难算** → Bayes 公式拆成 prior × likelihood，再移除对所有类相同的 $p(x)$。
+- **判别函数**：取 ln、移除公共项，得到与 posterior 成比例的函数；Gaussian 下核心项是 **Mahalanobis distance**。
+- **Mahalanobis distance = 归一化的 Euclidean distance**，Gaussian 假设下 minimum Mahalanobis classifier 即 optimal。
+- **一般 Gaussian**：quadratic classifier；**共享 $\Sigma$**：linear classifier，但 covariance 仍关键、边界不一定过 mean 连线。
+- **性能评估**：error rate = probability-weighted average，两类可视化为两曲线交点处的阴影面积。
+- **考试**：不死记无物理意义的公式，重点理解 Mahalanobis distance 的含义与 MAP 的最优性。
+
+---
+
+> **下一周（Week 5）预告**：老师末尾说 "we haven't completed all content… next week we study further special cases"。预计继续 Topic 5 的 special case（如 $\boldsymbol{\Sigma}_i=\sigma^2\mathbf{I}$ 的 nearest mean / Euclidean classifier、Naive Bayes 独立假设等），并可能进入 Topic 6（Statistical Estimation and Machine Learning）——如何从 training data 估计 prior 与 class-conditional PDF 的参数。具体以课件为准。
+
+---
+
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal, prior probability, posterior probability, class-conditional probability, likelihood, chain rule, law of total probability, mixture PDF/PMF, MAP decision rule, Bayes rule, decision region, decision boundary/threshold, error rate, discriminant function, Mahalanobis distance, covariance matrix, Gaussian/multivariate Gaussian, quadratic classifier, linear classifier, hyperplane, within-class scatter, Direct LDA 等）。中文用于组织句意与补充释义。

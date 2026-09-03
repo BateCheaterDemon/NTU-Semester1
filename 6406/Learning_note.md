@@ -678,3 +678,321 @@ $$
 > **下周（Week 3）预告**：由 **Toh Kar-Ann** 接手，进入 **Lecture 3 — Linear Parametric Models**（Part 1 Analytic Learning 主体起点）。将用本周复习的线性代数与 least-squares 工具，从 closed-form 视角建立线性参数模型。本周数学补充是直接前置知识，建议先消化 gradient、matrix inverse、Lagrangian 三块。
 >
 > **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine learning, supervised/unsupervised/semi-supervised/reinforcement learning, analytic learning, ensemble learning, closed-form solution, iterative optimization, gradient descent, SGD, Adam, hyperparameter, learning rate, bagging, boosting, random forest, Adaboost, gradient boosting, XGBoost, LightGBM, bias, variance, diversity, voting, averaging, regularization, least-squares, kernel ridge regression, matrix inversion, overfitting, interpretability, generalization, continual learning, hybrid learning, lockdown browser, pattern recognition pipeline, feature extraction/selection, dimension reduction, PCA, ICA, SIFT, nominal/ordinal/interval/ratio data, one-hot encoding, rank encoding, Hamming/Spearman/Chebyshev/Minkowski distance, metric/metric space, triangle inequality, L1/L2/Lp-norm, cleansing, completeness/consistency/uniformity/validity, alignment, min-max scaling, standardization, z-score, median absolute deviation (MAD), data leakage, log/exp/sigmoid/tanh transform, vector/matrix, transpose, inner/dot product, determinant, cofactor, adjugate, identity matrix, invertible/nonsingular, linearly dependent/independent, set, domain/codomain/range, linear/affine function, offset/bias, local/global minimum, max/argmax, gradient, Jacobian, Lagrangian, Lagrange multiplier, constrained optimization 等）。中文用于组织句意与补充释义。
+
+---
+
+## Week 4 — Lecture 4：Learning Score Functions（损失函数 / 分类评估 / ROC-AUC）
+
+> **权威来源说明**：本周无录播转写，基于官方课件 `week4/EE6406-Lecture4-TKA-v2.pdf`（Toh Kar-Ann，62 页，标题 *Learning Score Functions*）整理。无口述补充，所有内容以 PDF 为准。本周承接 Week 3 的 Linear Parametric Models，把学习模型 $g(x,w)$ 嵌入到 score/loss metric 中构造 learning objective function，分 regression accuracy / classification accuracy / ranking & operating characteristics 三条主线。
+
+### 1. 本周主线
+
+Week 3 建立了线性参数模型 $g(x,w)=w^\top x$（及多项式 / linear parametric 形式）。本周回答"如何**度量**模型好坏"——用 **loss function（损失函数）** 单样本计罚、求和成 **learning cost function / objective function** $J(w)$，再用 Week 2 的矩阵代数求解 $\arg\min_w J(w)$。
+
+三大 cost function 对应三类学习任务：
+
+| 任务 | accuracy 类型 | 核心 loss | cost function |
+|---|---|---|---|
+| **Regression** | 距离型 | squared error loss | MSE / SSE |
+| **Classification** | 计数型 | 0-1 loss（及 surrogate） | misclassification error / TER |
+| **Ranking** | 排序型 | pair-wise ranking | ROC / AUC |
+
+### 2. 基本概念：error function vs loss function
+
+- **Error function（误差函数）**：量化预测值与真实值的**偏离**（deviation）。
+- **Loss function（损失函数）**：评估该误差的**不良后果**，按误差大小赋予 penalty。
+  - regression 中常为 squared error；classification 中评估 misclassification 数量。
+- 二者常互换使用，但有 subtle difference：error 量偏差、loss 量代价。
+
+### 3. ⭐ Learning Cost Function 的一般形式
+
+$$
+\arg\min_w J(w)=\arg\min_w\sum_{i=1}^{m}L\bigl(g(x_i,w),y_i\bigr)+\lambda R(w)
+$$
+
+| 符号 | 含义 |
+|---|---|
+| $J(w)$ | **Learning cost function**（optimization criterion） |
+| $L(\cdot)$ | **Loss function**（aka **Score function**） |
+| $g(x_i,w)$ | Learning model |
+| $x_i$ | Learning model input vector |
+| $w$ | Learning parameter vector |
+| $y_i$ | Learning target |
+| $m$ | Sample size |
+| $R(w)$ | **Regularization function** |
+| $\lambda$ | **Regularization factor** |
+
+**Building blocks of learning algorithms（四大构件）**：
+1. Learning model $g$ —— 对 $x_i\to y_i$ 关系的 belief。
+2. Loss function $L$ —— 预测 $g_w(x_i)$ 而真值为 $y_i$ 时的 penalty。
+3. Regularization $R$ —— 鼓励更简模型（less complex）。
+4. Cost function $J$ —— 最终 optimization criterion；外加 optimization routine 求 $w$。
+
+### 4. 为何需要不同 loss function（Motivation）
+
+- Regression：连续 target → squared error（距离）。
+- Classification：离散 label → 需 discrete counting loss，如 $\frac12\sum\bigl[1-\operatorname{sgn}(y_i g(x_i,w))\bigr]$。
+- 课件 1D/2D 例子对比：
+  - **error-distance loss**（squared）：对 outlier 极敏感（outlier 在 (1000,1000) 把 8th-order 多项式拉偏）。
+  - **error-counting loss**（discrete）：对 outlier 鲁棒（只计对错，不看距离大小）。
+- ⇒ 不同 loss 适合不同任务/数据特性，这是本周核心动机。
+
+### 5. 常见 Loss Functions（六种，必背）
+
+| Loss | 公式 | 用途 |
+|---|---|---|
+| **Squared error**（quadratic loss） | $L(e)=e^2=(g(x,w)-y)^2$ | regression |
+| **Binary / 0-1 loss** | $L=\frac{1+\operatorname{sgn}(-y\,g(x,w))}{2},\ y\in\{-1,+1\}$ | classification counting |
+| **Logistic loss** | $L=\frac{1}{1+e^{y\,g(x,w)}}$ | classification（LogitBoost） |
+| **Hinge loss** | $L=\max(0,-y\,g(x,w))$ | classification（**SVM**） |
+| **Exponential loss** | $L=e^{-y\,g(x,w)}$ | classification（**AdaBoost**） |
+| **Cross-entropy loss** | $L=-y\log p-(1-y)\log(1-p)$ | classification（logistic regression / NN） |
+
+### 6. Regression Accuracy
+
+#### 6.1 MSE 与 SSE
+
+$$
+\text{MSE:}\ J(w)=\frac{1}{m}\sum_{i=1}^{m}\bigl[g(x_i,w)-y_i\bigr]^2 \tag{4.1}
+$$
+
+$$
+\text{SSE:}\ J(w)=\sum_{i=1}^{m}\bigl[g(x_i,w)-y_i\bigr]^2 \tag{4.2}
+$$
+
+- loss = squared error distance $[g(x_i,w)-y_i]^2$。
+- 求 minimizer 时系数 $1/m$ **immaterial**（不影响最优解位置），故 SSE 与 MSE 等价用于优化。
+
+#### 6.2 Example 4.1：矩阵-向量形式
+
+含 intercept/bias 的样本矩阵（每行 $\begin{bmatrix}1 & x_{i,1} & \cdots & x_{i,d}\end{bmatrix}$）：
+
+$$
+X=\begin{bmatrix}1 & x_{1,1} & \cdots & x_{1,d}\\ \vdots & \vdots & & \vdots\\ 1 & x_{m,1} & \cdots & x_{m,d}\end{bmatrix},\quad y=\begin{bmatrix}y_1\\\vdots\\y_m\end{bmatrix}
+$$
+
+- 线性模型 $g=w^\top x$：$J(w)=(Xw-y)^\top(Xw-y)$。
+- 一般 linear parametric 形式（特征变换 $p(x_i)$ 堆叠成 $P$）：$J(w)=(Pw-y)^\top(Pw-y)$。
+- ⭐ 矩阵-向量形式允许用 **matrix algebra** 求 closed-form 解（回到 Week 3 的 normal equations / pseudo-inverse）。
+
+### 7. Classification Accuracy
+
+#### 7.1 Confusion Matrix（混淆矩阵，二分类）
+
+四种分类结果：class-0 正确为 0、class-1 正确为 1、0 误判为 1、1 误判为 0。
+
+| | 预测 P | 预测 N |
+|---|---|---|
+| **真实 P** | **TP**（true positive） | **FN**（false negative，type II error） |
+| **真实 N** | **FP**（false positive，type I error） | **TN**（true negative） |
+
+衍生指标：
+- **Sensitivity / Recall / TPR** = $\frac{TP}{TP+FN}=\frac{TP}{n^+}$
+- **Specificity / TNR** = $\frac{TN}{FP+TN}=\frac{TN}{n^-}$
+- **Precision / PPV** = $\frac{TP}{TP+FP}$
+- **NPV** = $\frac{TN}{FN+TN}$
+- **Accuracy** = $\frac{TP+TN}{TP+TN+FP+FN}$
+
+#### 7.2 四个 rate 及其冗余
+
+$$
+TPR=\frac{TP}{n^+},\quad TNR=\frac{TN}{n^-},\quad FPR=\frac{FP}{n^-},\quad FNR=\frac{FN}{n^+}
+$$
+
+$$
+TPR+FNR=1,\quad TNR+FPR=1 \tag{4.12-4.13}
+$$
+
+⇒ **只需两个 rate（每式各一）即可完整描述**分类器性能，如 $\{TPR,TNR\}$ 即可推出 $\{FNR,FPR\}$。
+
+#### 7.3 多类 Confusion Matrix
+
+$c$ 类，$P_i$ 为第 $i$ 类样本数，$P_{i,\hat j}$ 为真实类 $i$ 被预测为类 $j$ 的数量。对角线 = 正确预测：
+
+$$
+P_{i,\hat i}=P_{\hat i}-\sum_{i}P_{i,\hat j}\quad(\text{列补}),\qquad P_{i,\hat i}=P_i-\sum_{j}P_{i,\hat j}\quad(\text{行补}) \tag{4.14-4.15}
+$$
+
+#### 7.4 Accuracy / Precision / F-measure（含 skewing factor $s=n^-/n^+$）
+
+| 指标 | 定义（$s=n^-/n^+$） |
+|---|---|
+| Accuracy | $\frac{TPR+s\cdot TNR}{1+s}=\frac{TP+TN}{n^++n^-}$ |
+| Precision | $\frac{TPR}{TPR+s\cdot FPR}=\frac{TP}{TP+FP}$ |
+| **F-measure** | $\frac{2TPR}{TPR+s\cdot FPR+1}=\frac{2TP}{TP+FP+n^+}$ |
+
+- $s$ 为 skewing factor，常取 $s=n^-/n^+$ 以平衡类别不平衡。
+
+#### 7.5 Misclassification Error 与 Total Error Rate
+
+$$
+err(g,y)=\mathbf{1}_{(g\ne y)},\qquad \text{err}=\frac{FP+FN}{n}=1-\text{Accuracy}\big|_{s=n^-/n^+} \tag{4.17-4.18}
+$$
+
+$$
+\text{TER}=FPR+FNR \tag{4.19}
+$$
+
+- **HTER（half total error rate）**$=\frac{FPR+FNR}{2}=\frac{1}{2}(2-TER)=1-\text{Accuracy}\big|_{s=1}$。
+- 多类 misclassification error = confusion matrix 所有 **off-diagonal** 之和。
+
+### 8. Equal Error Rate（EER）
+
+- 二分类 predictor 输出归一化到 $[0,1]$，变动 threshold $\tau\in[0,1]$ → 得一系列 FPR/FNR。
+- **FPR 随 $\tau$ 递减、FNR 随 $\tau$ 递增**；两曲线交点 = **Equal Error Rate (EER)**。
+- EER 是 threshold 选取的自然平衡点（FPR=FNR）。
+
+### 9. Loss Functions（margin 视角，分类统一表达）
+
+定义 **margin** $\mu_i=y_i g(x_i)$（$y_i\in\{-1,+1\}$）：
+- $\mu>0$ ⇒ 同号 ⇒ 分类正确。
+- $\mu<0$ ⇒ 异号 ⇒ 分类错误。
+- 隐含零阈值分隔正负。
+
+| Loss | margin 形式 | 备注 |
+|---|---|---|
+| **0-1 loss** | $L_{01}(\mu)=0$ if $\mu>0$, else $1$ | 离散；**梯度零或未定义，很少直接用于训练** |
+| **Squared loss** | $\sum(g(x_i)-y_i)^2$ | 回归用 |
+| **Hinge loss** | $L_{\text{hinge}}(\mu)=\max(0,1-\mu)$ | **SVM** |
+| **Logistic loss** | $L_{\text{logistic}}(\mu)=\log(1+e^{-\mu})$（或归一化 $(\log2)^{-1}\log(1+e^{-\mu})$） | **LogitBoost** |
+| **Exponential loss** | $L_{\exp}(\mu)=e^{-\mu}$ | **AdaBoost** |
+
+⭐ **关键 remarks**：0-1 step loss 因梯度零或未定义，**很少直接用于训练**；改用 **smooth continuous surrogate**（logistic / hinge / exponential）以利优化。
+
+### 10. Logistic Regression 与 Cross-Entropy
+
+#### 10.1 Log-odds 与 sigmoid
+
+拟合线性模型 $g(x)=\alpha_0+\alpha^\top x$ 到 **log-odds**：
+
+$$
+\log\frac{p}{1-p}=g(x)\quad\Rightarrow\quad p=\sigma(g(x))=\frac{1}{1+e^{-g(x)}}=\frac{e^{g(x)}}{1+e^{g(x)}} \tag{4.30-4.31}
+$$
+
+- $\sigma(\cdot)=\frac{1}{1+e^{-\cdot}}$ 为 **logistic function / sigmoid function**。
+
+#### 10.2 Log-likelihood 与 Cross-Entropy（对偶）
+
+$$
+L_{\text{log-likelihood}}(p)=y\log p+(1-y)\log(1-p)\quad(\text{maximize}) \tag{4.32}
+$$
+
+$$
+L_{\text{cross-entropy}}(p)=-y\log p-(1-y)\log(1-p)\quad(\text{minimize}) \tag{4.33}
+$$
+
+多类 cross-entropy：
+
+$$
+L_{\text{cross-entropy}}(p)=-\sum_{i=1}^{c}y_i\log(p_i) \tag{4.34}
+$$
+
+- $y_i$ = 第 $i$ 类 target label，$p_i$ = 第 $i$ 类预测概率。
+- ⭐ cross-entropy 是 log-likelihood 的**负值**（对偶：maximize likelihood ⇔ minimize cross-entropy）。
+
+### 11. Regularization Term
+
+cost function 含两个 loss 组件 $L$ 与 $R$：
+
+$$
+J(w)=\sum_{i=1}^{m}L\bigl(\mu_i(w)\bigr)+\lambda R(w) \tag{4.35}
+$$
+
+正则化家族 $R_q=\frac{1}{q}\bigl(\sum_i|w_i|^q+\epsilon\bigr)^{1/q}$（PDF 公式 4.36）：
+
+| 正则 | 形式 | 名称 | 作用 |
+|---|---|---|---|
+| $R_0$ | $\|\{i:w_i\ne0\}|$ | **subset selection** | 计非零参数个数 |
+| $R_1$ | $\sum_i|w_i|$ | **lasso** | L1，稀疏解 |
+| $R_2$ | $\frac{1}{2}\|w\|_2^2$ | **ridge regression** | L2，缩缩解 |
+| $R_q$ | 一般 $q$ | general family | $q\to$ 大趋近 max-norm |
+
+- $\lambda$ 是 scalar regularization weighting factor，平衡 data fit 与 model complexity。
+- Week 2 已建立的 bias-variance / overfitting 在此落地：$R$ 抑制过参化。
+
+### 12. Ranking & Operating Characteristics
+
+#### 12.1 ROC Curve（受试者工作特征曲线）
+
+- 变动 threshold $\tau$，画 $FNR(\tau)$ vs $FPR(\tau)$（或 $TPR(\tau)$ vs $FPR(\tau)$）得单一曲线 = **ROC curve**。
+- 曲线**越弯向原点**（或 TPR-FPR 版本越弯向左上角）→ 分类器越好。
+- 对角线 = 随机分类器（AUC=0.5）。
+
+#### 12.2 ⭐ AUC（Area Under ROC Curve）
+
+$$
+\text{AUC}=\frac{1}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}u(\xi_{ij}),\quad \xi_{ij}=g(x_i^+)-g(x_j^-) \tag{4.38}
+$$
+
+$$
+u(\xi)=\begin{cases}1,&\xi>0\\0.5,&\xi=0\\0,&\xi<0\end{cases}
+$$
+
+- AUC = **正负样本对中被正确排序的比例**（probability that positive score > negative score）。
+- ⭐ **AUC 只看 score order，不看 score value**（ranking-based，threshold-free）。
+
+#### 12.3 Lorenz Curve 与 Gini Coefficient
+
+- **Gini coefficient** = $2\times\text{AUC}-1$（AUC 的线性重标）。
+- $G=A/(A+B)$，$(A+B)=0.5$ ⇒ $A=\text{AUC}-0.5$。
+- Gini=0（AUC=0.5）⇒ 无判别力（non-discriminative classifier）；Gini=1（AUC=1）⇒ 完美分类。
+
+### 13. ⭐ LSE / MCE / TER / AUC 四种 cost function 对比
+
+$$
+\text{MSE:}\ J(w)=\frac{1}{m}\sum(g(x_i,w)-y_i)^2\quad\text{(regression)} \tag{4.39}
+$$
+
+$$
+\text{MCE:}\ J(w)=\frac{1}{m}\sum\bigl(u(y_i g(x_i,w))-1\bigr)^2\quad\text{(classification)} \tag{4.40}
+$$
+
+$$
+\text{TER:}\ J(w)=\frac{1}{m^-}\sum u\bigl(y_i^- - g(x_i^-,w)\bigr)+\frac{1}{m^+}\sum u\bigl(g(x_i^+,w)-y_i^+\bigr)\quad\text{(classification)} \tag{4.41}
+$$
+
+$$
+\text{AUC:}\ J(w)=\frac{1}{m^+m^-}\sum\sum u\bigl(g(x_i^+,w)-g(x_j^-,w)\bigr)\quad\text{(ranking order)} \tag{4.42}
+$$
+
+| cost | 度量性质 | 任务 | 关键 |
+|---|---|---|---|
+| **MSE/LSE** | 距离 | regression | squared error |
+| **MCE** | 计数 | classification | 0-1 型 |
+| **TER** | 加权计数 | classification | FPR+FNR |
+| **AUC** | 排序 | ranking | 正负对排序，与 threshold 无关 |
+
+### 14. 考点速查表
+
+| 考点 | 要点 |
+|---|---|
+| error vs loss | error 量偏差、loss 量代价 |
+| cost function 三要素 | $L$（loss）+ $R$（regularization）+ $\lambda$ |
+| 六种 loss | squared / 0-1 / logistic / hinge / exponential / cross-entropy |
+| 0-1 loss 不直接训练 | 梯度零/未定义 → 用 surrogate（hinge/logistic/exponential） |
+| SVM 用 hinge | AdaBoost 用 exponential，LogitBoost 用 logistic |
+| confusion matrix | TP/FP/FN/TN；type I=FP，type II=FN |
+| rate 冗余 | $TPR+FNR=1$，$TNR+FPR=1$，只需两个 |
+| F-measure | $\frac{2TP}{TP+FP+n^+}$，含 skewing factor |
+| TER / HTER | $TER=FPR+FNR$，$HTER=TER/2$ |
+| EER | FPR=FNR 交点 |
+| cross-entropy = −log-likelihood | maximize likelihood ⇔ minimize cross-entropy |
+| 正则化 | $R_1$=lasso（稀疏），$R_2$=ridge（缩缩） |
+| AUC | 正负对正确排序比例，只看 order 不看 value |
+| Gini | $2\cdot\text{AUC}-1$ |
+
+### 15. 本周要点小结
+
+- **Learning cost function** 一般形式 $\arg\min_w\sum L(g(x_i,w),y_i)+\lambda R(w)$；四大构件 model/loss/regularization/optimization。
+- **Regression** 用 squared error → MSE/SSE；矩阵形式 $(Xw-y)^\top(Xw-y)$ 回到 Week 3 closed-form。
+- **Classification** 用 0-1 counting loss；confusion matrix 衍生 TP/FP/FN/TN → TPR/TNR/FPR/FNR（两两冗余）→ Accuracy/Precision/F-measure/TER/HTER/EER。
+- **Loss 统一 margin 视角** $\mu=yg(x)$：0-1 / hinge（SVM）/ logistic（LogitBoost）/ exponential（AdaBoost）；0-1 不直接训练，用 smooth surrogate。
+- **Logistic regression**：sigmoid + cross-entropy（= −log-likelihood）。
+- **Regularization** $R_q$ 家族：$R_1$=lasso、$R_2$=ridge，平衡 data fit 与 complexity。
+- **Ranking**：ROC curve（TPR vs FPR）→ AUC（正负对排序比例，threshold-free）→ Gini = 2·AUC−1。
+- **四种 cost 对比**：MSE（距离/regression）、MCE（计数）、TER（加权计数）、AUC（排序）。
+
+---
+
+> **下周（Week 5）预告**：本周建立了 loss/cost function 框架。按 Toh 的 Analytic Learning 主线，预计 Week 5 进入 **具体学习算法的 cost function 求解**——可能是 logistic regression 的迭代优化（gradient descent / IRLS）、SVM 的 hinge + regularization 求解，或 ridge/lasso 的 closed-form 与 sparse 解。本周的 cost function 公式（4.39–4.42）与正则化（4.36）是直接前置。具体以 Lecture 5 课件为准。
+

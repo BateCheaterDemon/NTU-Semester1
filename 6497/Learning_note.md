@@ -750,3 +750,374 @@ $$
 ---
 
 > **下一周预告**：Week 4 预计继续概率建模/模式识别主题（Tay Wee Peng 部分），可能进入 Bayesian networks / Markov models 或进一步的概率图模型与推断；具体主题以课件为准。Week 1 进度表所列后续主题包括 Hidden Markov Models、Classification 等。
+
+---
+
+## Week 4 — Markov Models and HMM
+
+> **权威来源说明**：本周无录播转写，基于官方材料整理。来源为 `week4/4_Markov_Models_and_HMM.pdf`（官方课件，作者 Tay W.P.，51 页）与 `week4/Week 4.pdf`（标注讲义）。无老师口述补充，仅据课件结构整理。本周主题承接 Week 3 的 mixture model / EM：当 latent variable 带上**时间结构**，就得到 Markov chain 与 HMM，Baum-Welch 即 EM 在 HMM 上的具体实例。
+
+### 1. 主线与动机
+
+- Week 3 的 mixture model 把每个样本独立地归入一个 latent 分量；Week 4 引入**时间序列**——latent variable $z[t]$ 随时间演化、彼此相关。
+- 动机（PDF p2）：speech recognition（根据部分句子推断上一个词）、text generation（预测下一字符/词）——本质都是"基于当前 state 预测下一 state"，即 **Markov chain**。
+
+### 2. Markov Chains（马尔可夫链）
+
+#### 2.1 Markov property 与 transition matrix
+
+- 离散时间随机变量序列 $x[0],x[1],\ldots$，每个 $x[t]\in\{1,\ldots,M\}$（状态空间，state space）。
+- **Markov property（马尔可夫性质）**：
+
+$$
+p(x[t]\mid x[1],\ldots,x[t-1])=p(x[t]\mid x[t-1])
+$$
+
+- 直觉："The future is independent of the past, given the present."（给定现在，未来与过去独立。）
+- **Transition probability（转移概率）**：
+
+$$
+T(i,j)=P(x[t]=j\mid x[t-1]=i)
+$$
+
+- 本课只考虑 **homogeneous MC（齐次马尔可夫链）**——$T$ 不随时间 $t$ 变。
+- **Transition matrix（转移矩阵）** $T=[T(i,j)]_{i,j=1}^M$，每行求和为 1（**row stochastic matrix**，行随机矩阵）。
+
+#### 2.2 状态分布的演化
+
+- 设 $x[0]$ 的分布为行向量 $p_0=[p_0(1),\ldots,p_0(M)]$，则
+
+$$
+p_1(i)=\sum_{j=1}^M p(x[1]=i\mid x[0]=j)\,p_0(j)=\sum_{j=1}^M T(j,i)\,p_0(j)=(p_0T)(i)
+$$
+
+- 一般地 $p_t=p_{t-1}T=p_0T^t$。
+
+#### 2.3 例子（PDF p7）
+
+$T=\begin{bmatrix}0.2&0.8\\0.7&0.3\end{bmatrix}$，$p_0=[0.5,0.5]$：
+
+$$
+p_1=p_0T=[0.45,0.55],\quad p_2=p_1T=[0.475,0.525]
+$$
+
+- **序列概率**：$p(x[0]=1,x[1]=2,x[2]=1)=p_0(1)\,T(1,2)\,T(2,1)=0.5\times0.8\times0.7$。
+
+#### 2.4 应用：Language Modeling（语言建模）
+
+- **Statistical language model**：学习词序列的概率分布。应用：sentence completion（句子补全）、data compression（数据压缩，高频串用短码字）、text classification（文本分类）。
+- **Unigram model**：$p(x[t]=x)$——词的边际概率。
+- **Bigram model**：$p(x[t]\mid x[t-1])$——依赖前一个词（一阶 Markov）。
+- **n-gram model**：$p(x[t]\mid x[t-1],\ldots,x[t-n+1])$——依赖前 $n-1$ 个词（$(n-1)$ 阶 Markov）。
+
+#### 2.5 应用：PageRank
+
+- 网站 $i$ 的权威分 $\pi_i$：被其他权威网站链接则更权威。
+
+$$
+\pi_i=\sum_j T(j,i)\,\pi_j
+$$
+
+- 用户访问构成 Markov chain；$T(j,i)$ 为从 $j$ 跳到 $i$ 的概率（无链接则 $T(j,i)=0$）。
+
+### 3. Markov Chain 的 MLE
+
+#### 3.1 完整数据的 likelihood
+
+观测 $n$ 条序列 $D=\{x^1[0:t_1],\ldots,x^n[0:t_n]\}$，参数 $\theta=(\pi,T)$：
+
+$$
+p(x[0],\ldots,x[t]\mid\pi,T)=\pi(x[0])\,T(x[0],x[1])\,T(x[1],x[2])\cdots T(x[t-1],x[t])
+$$
+
+$$
+\log p(D\mid\pi,T)=\sum_{x=1}^M N_x\log\pi(x)+\sum_{x=1}^M\sum_{y=1}^M N_{xy}\log T(x,y)
+$$
+
+- $N_x=\sum_{i=1}^n\mathbf{1}\{x^i[0]=x\}$（状态 $x$ 作为**起始状态**的次数）。
+- $N_{xy}=\sum_{i=1}^n\sum_{t=1}^{t_i}\mathbf{1}\{x^i[t-1]=x,x^i[t]=y\}$（从 $x$ 转到 $y$ 的次数）。
+
+#### 3.2 MLE 闭式解
+
+对 $\log\pi(x)$、$\log T(x,y)$ 求偏导并解根（含约束 $\sum_x\pi(x)=1$、$\sum_y T(x,y)=1$）：
+
+$$
+\hat\pi(x)=\frac{N_x}{n},\qquad \hat T(x,y)=\frac{N_{xy}}{\sum_{z=1}^M N_{xz}}
+$$
+
+- 直觉：$\hat\pi(x)$ = 状态 $x$ 作为起点的频率；$\hat T(x,y)$ = 从 $x$ 出发转到 $y$ 的频率。
+- **零计数问题**：若某状态对在训练数据中计数为 0，模型会预测该串概率为 0（overfitting）。例 50,000 词的 bigram 有 25 亿参数，必有无覆盖词对 → 需 smoothing。
+
+#### 3.3 数值例子（PDF p15）
+
+状态空间 $\{1,2\}$，$D=\{x^1[0{:}2],x^2[0{:}1],x^3[0{:}3]\}$：
+
+| 序列 | 内容 |
+|---|---|
+| $x^1[0{:}2]$ | $(1,2,1)$ |
+| $x^2[0{:}1]$ | $(2,2)$ |
+| $x^3[0{:}3]$ | $(1,1,2,1)$ |
+
+- $N_1=2$（$x^1,x^3$ 起点为 1），$N_2=1$（$x^2$ 起点为 2）$\Rightarrow\hat\pi(1)=2/3,\hat\pi(2)=1/3$。
+- $N_{11}=1,N_{12}=2,N_{21}=2,N_{22}=1$ $\Rightarrow\hat T=\begin{bmatrix}1/3&2/3\\2/3&1/3\end{bmatrix}$。
+
+### 4. Hidden Markov Models（HMM，隐马尔可夫模型）
+
+#### 4.1 定义
+
+HMM 由两部分构成：
+1. **隐状态的 Markov chain**：$z[t]\in\{1,\ldots,M\}$（hidden states / latent variables），初始分布 $\pi$、转移矩阵 $T$。
+2. **Observation model（观测模型）**：emission probability（发射概率）$p(x[t]\mid z[t])=p(x[t]\mid\phi_{z[t]})$，参数 $\phi=(\phi_1,\ldots,\phi_M)$。
+
+- 结构：$z[0]\to z[1]\to\cdots$（隐状态 Markov 链），每个 $z[t]$ 独立发射观测 $x[t]$。
+- 关键：**观测 $x[0],x[1],\ldots$ 不假设 Markov 性**；长程依赖通过 latent variables $z[t]$ 捕捉。
+
+#### 4.2 应用
+
+- **Speech recognition**：$x[t]$ = 语音特征向量，$z[t]$ = 正在说的词；$p(z[t]\mid z[t-1])$ = language model，$p(x[t]\mid z[t])$ = acoustic model。
+- **Activity recognition**：$x[t]$ = 图像/视频帧特征，$z[t]$ = 活动类型。
+- **Gene finding**：$x[t]$ = DNA nucleotide（A,C,G,T），$z[t]$ = 是否在 gene-coding region。
+- **Emission 例子**：$z[t]=k\Rightarrow x[t]\sim p(x[t]\mid\phi_k)=\mathcal{N}(x[t]\mid\mu_k,\Sigma_k)$。
+
+#### 4.3 骰子 Toy Example（PDF p19–20）
+
+- 两个骰子：fair die（均匀 $\phi_1=(1/6,\ldots,1/6)$）与 loaded die（$\phi_2=(1/10,\ldots,1/10,5/10)$，6 占一半）。
+- $z[t]\in\{1,2\}$ 指示用哪个骰子；观测 $x[t]\in\{1,\ldots,6\}$。
+- 参数：初始 $\pi$（起始用哪个骰子）、转移 $T$（换骰子概率，一般很小）、emission $\phi_1,\phi_2$。
+
+### 5. HMM 的三大问题
+
+| 问题 | 名称 | 公式 | 算法 |
+|---|---|---|---|
+| **Evaluation** | 给参数算观测序列概率 | $p(x[0{:}T]\mid\theta)$ | Forward algorithm |
+| **Decoding** | 给观测找最可能隐状态序列 | $z^*[0{:}T]=\arg\max_{z}p(z[0{:}T]\mid x[0{:}T])$ | **Viterbi algorithm** |
+| **Learning** | 从观测学参数 | $\hat\theta=\arg\max_\theta\log p(D\mid\theta)$ | **Baum-Welch**（EM） |
+
+#### 5.1 推断任务细分（PDF p32–33）
+
+- **Filtering（滤波）**：$p(z[t]\mid x[0{:}t])$——用至当前时刻的观测推断当前隐状态（online）。Forward algorithm。
+- **Smoothing（平滑）**：$p(z[t]\mid x[0{:}T])$——离线，用过去+未来观测。Forward-Backward algorithm。
+- **Fixed lag smoothing**：$p(z[t-l]\mid x[0{:}t])$——延迟 $l$ 步的 online 推断。Forward-Backward。
+- **Prediction（预测）**：$p(z[t+h]\mid x[0{:}t])=\sum_{z[t:\cdot]}\big(\prod_{i=1}^h p(z[t+i]\mid z[t+i-1])\big)p(z[t]\mid x[0{:}t])$，horizon $h>0$。也可 $p(x[t+h]\mid x[0{:}t])=\sum_{z[t+h]}p(x[t+h]\mid z[t+h])\,p(z[t+h]\mid x[0{:}t])$。
+- **MAP sequence**：$z^*[0{:}T]=\arg\max_z p(z[0{:}T]\mid x[0{:}T])$ → Viterbi。
+
+### 6. Baum-Welch Algorithm（EM for HMM）
+
+#### 6.1 从 vanilla MLE 到 EM
+
+- 若隐状态 $z^i$ 可观测，likelihood 为（Exercise）：
+
+$$
+\log p(D\mid\theta)=\sum_{i=1}^n\log\pi(z^i[0])+\sum_{i=1}^n\sum_{t=1}^{t_i}\log T(z^i[t-1],z^i[t])+\sum_{i=1}^n\sum_{t=0}^{t_i}\log p(x^i[t]\mid\phi_{z^i[t]})
+$$
+
+- 但 $z^i[t]$ 未知 → **Baum-Welch（EM 实例）**。
+
+#### 6.2 E step：Q 函数与两个后验
+
+$$
+Q(\theta\mid\theta^{(m)})=\sum_{i=1}^M\gamma_{i,0}(z)\log\pi(z)+\sum_{i,t}\sum_{z,z'}\xi_{i,t}(z,z')\log T(z,z')+\sum_{i,t}\sum_z\gamma_{i,t}(z)\log p(x^i[t]\mid\phi_z)
+$$
+
+两个关键后验（由 forward-backward 计算）：
+
+$$
+\gamma_{i,t}(z)=p(z^i[t]=z\mid x^i[0{:}t_i],\theta^{(m)})
+$$
+
+$$
+\xi_{i,t}(z,z')=p(z^i[t-1]=z,z^i[t]=z'\mid x^i[0{:}t_i],\theta^{(m)})
+$$
+
+- $\gamma$ = 单时刻的 marginal posterior；$\xi$ = 相邻两时刻的 joint posterior。
+
+#### 6.3 M step：参数更新（式 4.1–4.4）
+
+$$
+\hat\pi(z)=\frac{\sum_{i=1}^n\gamma_{i,0}(z)}{n}
+$$
+
+$$
+\hat T(z,z')=\frac{\sum_{i=1}^n\sum_{t=1}^{t_i}\xi_{i,t}(z,z')}{\sum_{i=1}^n\sum_{t=1}^{t_i}\sum_{u}\xi_{i,t}(z,u)}
+$$
+
+- Gaussian emission 下：
+
+$$
+\hat\mu_z=\frac{\sum_{i,t}\gamma_{i,t}(z)\,x^i[t]}{\sum_{i,t}\gamma_{i,t}(z)}
+$$
+
+$$
+\hat\Sigma_z=\frac{\sum_{i,t}\gamma_{i,t}(z)\,(x^i[t]-\hat\mu_z)(x^i[t]-\hat\mu_z)^\top}{\sum_{i,t}\gamma_{i,t}(z)}
+$$
+
+- 直觉：把"硬"计数 $N_x,N_{xy}$ 换成"软"后验期望 $\gamma,\xi$——正是 Week 3 EM 的 responsibility 思想在时间序列上的推广。
+
+### 7. Forward-Backward Algorithm（求 $\gamma,\xi$）
+
+#### 7.1 分解思想（式 4.5）
+
+$$
+\gamma_{i,t}(z)=p(z^i[t]=z\mid x^i[0{:}t_i])\propto p(z^i[t]=z\mid x^i[0{:}t])\,p(x^i[t+1{:}t_i]\mid z^i[t]=z)
+$$
+
+- 由 Markov property，给定 $z[t]$，未来观测 $x[t+1{:}t_i]$ 与过去 $x[0{:}t]$ 独立。
+- **Forward variable**：$\alpha_t(z)=p(z[t]=z\mid x[0{:}t])$。
+- **Backward variable**：$\beta_t(z)=p(x[t+1{:}T]\mid z[t]=z)$。
+- 归一化：
+
+$$
+\gamma_{i,t}(z)=\frac{\alpha_t(z)\,\beta_t(z)}{\sum_{z'}\alpha_t(z')\,\beta_t(z')}
+$$
+
+#### 7.2 Forward 递推
+
+- **Predict**：
+
+$$
+p(z[t]=z\mid x[0{:}t-1])=\sum_{z'} T(z',z)\,\alpha_{t-1}(z')
+$$
+
+- **Update**（加入 $x[t]$）：
+
+$$
+\alpha_t(z)=\frac{p(x[t]\mid z[t]=z)\,\sum_{z'}T(z',z)\,\alpha_{t-1}(z')}{Z_t}
+$$
+
+- $Z_t=p(x[t]\mid x[0{:}t-1])=\sum_z p(x[t]\mid z[t]=z)\,p(z[t]=z\mid x[0{:}t-1])$ 为归一化常数。
+- **初始化**：$\alpha_0(z)=\frac{1}{Z_0}p(x[0]\mid z[0]=z)\,\pi(z)$，$Z_0=\sum_z p(x[0]\mid z[0]=z)\,\pi(z)$。
+
+#### 7.3 Backward 递推
+
+$$
+\beta_t(z)=\sum_{z'} T(z,z')\,p(x[t+1]\mid z[t+1]=z')\,\beta_{t+1}(z')
+$$
+
+- **初始化**：$\beta_T(z)=1$（因为 $\beta_T(z)=p(x[T+1{:}T]\mid z[T]=z)$ 为空序列概率 = 1）。
+
+#### 7.4 求 $\xi$（式 4.5 推导）
+
+$$
+\xi_{i,t}(z,z')\propto \alpha_{t-1}(z)\,p(x[t]\mid z[t]=z')\,\beta_t(z')\,T(z,z')
+$$
+
+- 即 "past $\alpha$ × emission × transition × future $\beta$"。
+
+### 8. Viterbi Algorithm（Decoding，求 MAP 路径）
+
+#### 8.1 目标
+
+$$
+z^*[0{:}T]=\arg\max_{z[0:T]} p(z[0{:}T]\mid x[0{:}T])=\arg\max_{z[0:T]} \log p(z[0{:}T],x[0{:}T])
+$$
+
+$$
+\log p(z[0{:}T],x[0{:}T])=\log\pi(z[0])+\log p(x[0]\mid z[0])+\sum_{t=1}^T\big(\log T(z[t-1],z[t])+\log p(x[t]\mid z[t])\big)
+$$
+
+#### 8.2 动态规划递推
+
+- $\delta_t(z)=\max_{z[0:t-1]}\log p(z[0:t-1],z[t]=z,x[0:t])$——到时刻 $t$ 止于状态 $z$ 的**最优路径** log 概率。
+- **最优子结构**：若最优路径在 $t$ 时刻经 $z$，则其前缀必是到 $t-1$ 时刻某状态 $z'$ 的最优路径。
+- 递推：
+
+$$
+\delta_t(z)=\max_{z'}\big\{\delta_{t-1}(z')+\log T(z',z)\big\}+\log p(x[t]\mid z[t]=z)
+$$
+
+- **回溯指针**：
+
+$$
+a_t(z)=\arg\max_{z'}\big\{\delta_{t-1}(z')+\log T(z',z)\big\}
+$$
+
+- **初始化**：$\delta_0(z)=\log\pi(z)+\log p(x[0]\mid z[0]=z)$。
+- **终止**：$z^*[T]=\arg\max_z\delta_T(z)$。
+- **回溯**：$z^*[t]=a_{t+1}(z^*[t+1])$，$t=T-1,\ldots,0$。
+
+#### 8.3 Viterbi 例子（PDF p37–38）
+
+$z\in\{S_1,S_2,S_3\}$，$x\in\{C_1,\ldots,C_7\}$，$\pi(z)=1/3$，观测 $x[0{:}3]=(C_1,C_3,C_4,C_6)$。
+
+- $\delta_0(S_1)=-\log 3+\log 0.5$；$\delta_0(S_2)=\delta_0(S_3)=-\infty$（因 $p(C_1\mid S_2)=p(C_1\mid S_3)=0$）。
+- $\delta_1(S_1)=\delta_0(S_1)+\log 0.3+\log 0.3=-\log 3+\log 0.045$（$S_1\to S_1$，$T=0.3$，emission $p(C_3\mid S_1)=0.3$）。
+- $\delta_1(S_2)=\delta_0(S_1)+\log 0.7+\log 0.2=-\log 3+\log 0.07$（$S_1\to S_2$，$T=0.7$，emission $p(C_3\mid S_2)=0.2$）。
+- 其余 $S_3$ 各步由 Exercise 自行验证。
+
+### 9. Finance 应用（notebook `04_finance_hmm.ipynb`）
+
+- 用 **3 状态 HMM** 建模股票价格 regime；观测为日 **log return** 与 **volatility**。
+- 对应 Week 3 的牛/熊市思路，但状态数扩展到 3，且状态间有 Markov 转移（不再是独立的 mixture）。
+
+### 10. Practice Problems（PDF p42–44，考点）
+
+**戒指传感器题**：可穿戴戒指追踪手指运动，状态 $z\in\{S,U,D\}$（still / moving up / moving down），IMU 测三维加速度 $x=(x_1,x_2,x_3)$。
+
+a) **GMM 表示**：
+
+$$
+p(x)=\sum_{z\in\{S,U,D\}}\pi(z)\,p(x\mid z)=\sum_{z\in\{S,U,D\}}\pi(z)\,\mathcal{N}(x\mid\mu_z,\Sigma_z)
+$$
+
+b) **用 HMM 还是 Markov chain？** 用 **HMM**——因为传感器状态在处理端**不可直接观测**（latent），只能通过 IMU 测量间接推断。
+
+c) **转移图**：$S$ 可长期停留（$T(S,S)$ 大），可转 $U$ 或 $D$；但 $U$ 只能转 $D$（$T(U,D)=1$），$D$ 只能转 $U$（$T(D,U)=1$）。即 $U\leftrightarrow D$ 互转，$S$ 自环 + 出边到 $U,D$。
+
+d) **Baum-Welch 估计的参数**：$\pi(z)$（初始）、$p(z'\mid z)$（转移）、以及每状态的 emission 参数 $\mu_z,\Sigma_z$（Gaussian）。
+
+e) **求最可能状态序列**：用 **Viterbi algorithm**。
+
+### 11. MLE Derivation（补充，PDF p46–51）
+
+#### 11.1 完整观测时的 MLE
+
+当 $z$ 可观测，对 $\log p(D\mid\theta)$ 建 Lagrangian：
+- 对 $\pi(z)$：$\hat\pi(z)=N_z^0/n$，$N_z^0=\sum_i\mathbf{1}\{z^i[0]=z\}$。
+- 对 $T(z,z')$：$\hat T(z,z')=N_{zz'}/\sum_u N_{zu}$，$N_{zu}=\sum_i\sum_t\mathbf{1}\{z^i[t-1]=z,z^i[t]=u\}$。
+- 对 Gaussian emission（$p(x\mid\phi_z)=\mathcal{N}(x\mid\mu_z,\Sigma_z)$）：
+
+$$
+\hat\mu_z=\frac{\sum_{i,t}\mathbf{1}\{z^i[t]=z\}\,x^i[t]}{\sum_{i,t}\mathbf{1}\{z^i[t]=z\}}=\frac{\bar x_z}{N_z}
+$$
+
+$$
+\hat\Sigma_z=\frac{\sum_{i,t}\mathbf{1}\{z^i[t]=z\}(x^i[t]-\hat\mu_z)(x^i[t]-\hat\mu_z)^\top}{\sum_{i,t}\mathbf{1}\{z^i[t]=z\}}
+$$
+
+#### 11.2 Baum-Welch 的对应
+
+Baum-Welch 只是把完整观测 MLE 中的**硬计数 $\mathbf{1}\{\cdot\}$** 换成**软后验 $\gamma,\xi$**：
+- $\hat\pi(z)=\frac{\sum_i\gamma_{i,0}(z)}{n}$（对应 $N_z^0/n$）。
+- $\hat T(z,z')=\frac{\sum_{i,t}\xi_{i,t}(z,z')}{\sum_{i,t,u}\xi_{i,t}(z,u)}$（对应 $N_{zz'}/\sum_u N_{zu}$）。
+- $\hat\mu_z,\hat\Sigma_z$ 同理把 $\mathbf{1}\{z^i[t]=z\}$ 换成 $\gamma_{i,t}(z)$。
+
+### 12. 考点速查表
+
+| 概念 | 要点 |
+|---|---|
+| **Markov property** | $p(x[t]\mid x[1{:}t-1])=p(x[t]\mid x[t-1])$ |
+| **Transition matrix** | 行随机；$p_t=p_0T^t$ |
+| **MC MLE** | $\hat\pi(x)=N_x/n$，$\hat T(x,y)=N_{xy}/\sum_z N_{xz}$ |
+| **HMM 三要素** | hidden states $z$ + transition $T$ + emission $p(x\mid\phi_z)$ |
+| **三大问题** | Evaluation / Decoding / Learning → Forward / Viterbi / Baum-Welch |
+| **Filtering/Smoothing** | $p(z[t]\mid x[0{:}t])$（Forward） / $p(z[t]\mid x[0{:}T])$（Forward-Backward） |
+| **$\gamma,\xi$** | 单时刻后验 / 相邻两时刻联合后验 |
+| **Forward $\alpha$** | $\alpha_t(z)\propto p(x[t]\mid z)\sum_{z'}T(z',z)\alpha_{t-1}(z')$ |
+| **Backward $\beta$** | $\beta_t(z)=\sum_{z'}T(z,z')p(x[t+1]\mid z')\beta_{t+1}(z')$；$\beta_T=1$ |
+| **Baum-Welch M** | $\hat\pi,\hat T$ 用 $\gamma,\xi$ 替换硬计数；Gaussian emission 用 $\hat\mu_z,\hat\Sigma_z$ |
+| **Viterbi** | $\delta_t(z)=\max_{z'}\{\delta_{t-1}(z')+\log T(z',z)\}+\log p(x[t]\mid z)$；回溯 $a_t(z)$ |
+
+### 13. 本周要点小结
+
+- **Markov chain** = 带时间结构的 latent 模型；Markov property 使序列概率可分解为 $\pi(x[0])\prod_t T(x[t-1],x[t])$；状态分布演化 $p_t=p_0T^t$。
+- **MC 的 MLE**：起始频率 $\hat\pi(x)=N_x/n$，转移频率 $\hat T(x,y)=N_{xy}/\sum_z N_{xz}$；零计数导致 overfitting，需 smoothing。
+- **HMM** = 隐状态 Markov chain + emission model；观测不满足 Markov 性，长程依赖经 latent 捕捉。三要素 $\theta=(\pi,T,\phi)$。
+- **三大问题**：Evaluation（Forward）/ Decoding（Viterbi）/ Learning（Baum-Welch = EM for HMM）。
+- **Baum-Welch**：E step 用 forward-backward 算 $\gamma$（单时刻后验）与 $\xi$（相邻联合后验）；M step 把完整观测 MLE 的硬计数换成 $\gamma,\xi$ 的软期望。GMM 的 responsibility 推广到时间序列。
+- **Forward-Backward**：$\gamma\propto\alpha\beta$；$\alpha$ 正向 predict-update 递推，$\beta$ 反向递推（$\beta_T=1$）；$\xi\propto\alpha\cdot\text{emission}\cdot\text{transition}\cdot\beta$。
+- **Viterbi**：动态规划求 MAP 路径；$\delta_t(z)=\max_{z'}\{\delta_{t-1}(z')+\log T(z',z)\}+\log p(x[t]\mid z)$，回溯指针 $a_t(z)$。
+- **应用**：language modeling（n-gram）、PageRank、speech/activity/gene、finance regime（3 状态 HMM）。
+
+---
+
+> **下一周预告**：Week 5 预计进入 Bayesian networks / 概率图模型或 classification 主题（Week 1 进度表后续）；HMM 的 forward-backward 与 Viterbi 是后续 graph model 推断的基础。具体主题以课件为准。

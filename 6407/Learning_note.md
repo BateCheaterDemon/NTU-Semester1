@@ -513,3 +513,172 @@ $$
 ---
 
 > **下一周预告**：Week 2 已系统讲完 EA 的 representation 与 variation 算子（crossover/mutation 各表示下的具体操作）。按 Week 1 给出的 EA 框架，剩余核心组件为 **selection**（parent/survivor selection）、**initialization** 与 **termination**，预计 Week 3 进入这些内容并配合实操/调参；Week 3 末临近 Week 4 的 Quiz（**9 月 1 日**），会进入复习。具体主题以课件为准。
+
+---
+
+## Week 4 — Quiz 1 复习周 + 历年真题精讲（无新内容，划定考试范围）
+
+> **权威来源说明**：本周无新课件 PDF，官方课件仍为 `week3/L2(2-1).pdf`（Lecture 2，29 页，slides 1–58 在 Week 2/3 已讲完）。本周录播 `week4/59451 - 0_j0xo2ru3 - PID 117.txt` 为 **Quiz 1 前的复习课**，老师明确说"不覆盖任何新内容"，仅做 recap + 讲解历年真题。转写噪声以课堂口语为主，无术语 PDF 可对照，按语义修正：
+> - "Lure / L week" → Lecture（本周 lecture）；"egg birth" → at birth（"假设每个人出生时…")
+> - "eight / eight" → 80（resting heartbeat 80 次/分）；"fifty / 50" → 50（g(x) 在 x→1 时趋近 50）
+> - "one minus absolute f x -50, y -50 … divided by 70" → fitness $F=1-|f(x)-50|/70$
+> - "Anne Queens / Anne / n Qin / en Qin" → **N-Queens**（general n 皇后）
+> - "veal value coded" → **real-valued coded**；"aromatic crossover" → **arithmetic crossover**
+> - "flexible Alpha / flexible alfa" → **flexible $\alpha$ approach**
+> - "apportionment" → apportionment（按比例分配给两亲本）
+> - "C n two / C n 2" → $\binom{n}{2}=n(n-1)/2$（最大冲突数）
+> - "EE 6227 / 66227" → **EE6227**（本课旧代号，library archive 里的历年真题仍用此号，与 EE6407 等价）
+> - "big number three / big three" → Lecture 2/3 的"representation 三讲"收尾点
+
+### 1. 本周性质：复习周，不考新内容
+
+- 老师开篇即明确："I won't cover anything new… whatever you're responsible for is up to what we have covered up to（Lecture 2/3 的 representation 部分）。"
+- ⭐ **考试范围红线**：**slide 60 及以后不考**（老师原话："beyond slide 60 and after I won't set any questions on it… slide 60-74 you can put it aside when you study for exam"）。
+  - 即：Lecture 2 课件 **slide 1–58 已覆盖**（五种 representation 的算子），**slide 60–74 不考**。
+  - 不考的内容（仅作兴趣提及）：fitness rescaling、ranking-based selection 细节、population management 的 distributed/island model 等。
+- 本周后半段进行 **Quiz 1**（9:30 开始，闭卷，无计算器，带 photo ID + 笔，三考场，隔座就坐，禁手机/智能设备，违者拍照取证交学校调查）。
+
+### 2. 五种 Representation 的总 recap（老师口述版）
+
+老师用三段 recap 把前三周串起来，强调"每种 representation 有自己独特的 crossover 与 mutation"：
+
+| Representation | 要点回顾 |
+|---|---|
+| **Binary** | GA 最早的表示，scalable、simple（只有 0/1，变异即翻转）；很多早期 GA 全用 binary |
+| **Real-valued** | 现实问题多为连续值，binary 编码会牺牲精度（连续→离散）；mutation/crossover 用 **apportionment parameter $\alpha$**（$\alpha$ 给亲本1，$1-\alpha$ 给亲本2），$\alpha$ 可 fixed / random / adaptive（self-adaptive 把 step size 编入串中） |
+| **Integer** | 有限离散值集（如 3 类→{1,2,3}、灰度 1–256、graph coloring 的 4 色）；bin packing 等也用整数 |
+| **Permutation** | sequence/ordering 重要的问题（scheduling、TSP、N-Queens）；要求结果**仍是 permutation**——可用专用算子（cycle crossover、edge recombination、PMX、Order 1），也可先做普通算子再 **repair** 修复成 permutation |
+| **Tree (GP)** | 进化程序/过程/finite state machines；每个 **subtree 也是 tree**（递归性质）；mutation = 把某 subtree 换成新树，recombination = 两亲本交换 subtree |
+
+> 老师补充：binary 之所以让 GA 流行，是因为"算法要 popular 必须 scalable 且 simple——参数不能太多"；他审稿时见过"听着 elegant 但要调一堆参数"的算法，认为那不是好算法。
+
+### 3. 不考但提及的进阶话题（slide 60+，了解即可）
+
+老师明确这些**不考**，但点出来帮助理解"为什么 GA 还有更多可挖"：
+
+#### 3.1 Fitness 分布与 selection pressure 的关系（启发式思考）
+
+- **早期世代**：fitness 分布**较宽**（个体差异大）→ fitness proportional selection（如 roulette wheel）有效，selection pressure 能区分优劣。
+- **后期世代**：fitness 分布**变紧**（质量趋同）→ fitness 差异很小 → roulette wheel 近乎随机选择，**selection pressure 失效**。
+- ⚠️ 这正是 Week 2 §10.3 讲的"fitness proportional selection 早晚期的毛病"——本周老师从"fitness 分布宽窄"角度再讲一遍：**fitness 越紧，selection 越不有效**。
+- 对策（不考）：**fitness rescaling**（缩放 fitness 拉开差距）、**ranking selection**（只按排名做 preferential selection，忽略绝对差）。
+
+#### 3.2 Population management（不考）
+
+- **Distributed / island model**：把 population 分成若干子群（islands），各 island 独立进化，偶尔交换信息（migration）。
+- 属"如何管理 population"的进阶课题。
+
+### 4. ⭐ 历年真题精讲（本场重点）
+
+老师讲了两套 past-year exam questions（均在 library archive，旧代号 **EE6227**），演示"题面长但求解直接"的风格。
+
+#### 4.1 Sem 2 2022 — Q1：Heartbeat Optimization（单变量优化建模）
+
+**题面（长故事）**：假设人出生时心跳总数固定，用完即生命结束。未锻炼者静息心率 80 次/分，锻炼时 120 次/分。设锻炼时间占比为 $x$，则平均心率：
+
+$$f(x) = 120x + (1-x)\,g(x)$$
+
+其中 $g(x)$ 为锻炼占比 $x$ 时的静息心率，要求：$x$ 很小时 $g(x)\to 80$；$x\to 1$ 时 $g(x)\to 50$（锻炼使静息心率下降）。
+
+**Part 1 — 造表求近似最优 $x$**：
+- 任选 20 个 $x\in(0,1)$（如 0.01, 0.02, 0.03, 0.04, …），计算 $g(x)$、$f(x)$。
+- 找 $f(x)$ 最小者（目标是低静息心率 → 长寿）：表中 $x=0.04$ 时 $f(x)\approx 53.327$ 最小；更精细可取 $x\approx 0.037$–$0.038$。
+- 换算成每日锻炼分钟数：$0.04\times 24\times 60 \approx$ **58 分钟/天**。
+- 老师点评：这是**单变量 convex landscape**，易解，"not difficult"。
+
+**Part 2 — 写合适的 fitness function**：
+- 直接用 $f(x)$ 作 fitness 的问题：心率取值范围很窄（约 50–71），区分度不够，selection 效率低。
+- 改进：利用模型下界 $f(x)\ge 50$，定义
+
+$$F(x) = 1 - \frac{|f(x)-50|}{70}$$
+
+- 分母 70（或 75、80，"只要合理都可接受"）用于把 fitness 拉到 $[0,1]$ 并放大差异。
+- ⭐ 这体现了 Week 2 §4 的原则：**fitness 区分度越大越好**——当原始值挤在窄区间时，要 rescale 拉开差距。
+
+#### 4.2 Sem 2 2022 — Q1 Part B：问题分类四例
+
+按 black box 的 input-output model 给四个场景分类（Week 1 §3 内容）：
+
+| 场景 | 分类 | 理由 |
+|---|---|---|
+| 基于 IBM 历史股价预测未来股价（for trading） | **Modelling** | 已知历史 input-output 对，拟合预测模型使预测误差最小化 |
+| 把不同尺寸箱子装进卡车 | **Optimization** | 卡车容积固定，目标 = 最小化未填充空间（unfilled space） |
+| 国家经济政策制定 | **Simulation** | 给定政策（input）+ 模型，模拟 what-if 结果，看政策是否有 desired effect |
+| 保安排班（rostering） | **Optimization**（也可 Simulation） | 适当分配时间/资源；若研究动态环境下的表现则可为 simulation |
+
+> 老师强调："不管选哪个，要给 explanation。"rostering 那题 optimization 与 simulation 都可接受，关键是有合理依据。
+
+#### 4.3 Sem 2 2024 — N-Queens 冲突计数与通用 fitness
+
+**题面**：给定 N-Queens 的 permutation 编码 $Q=(Q_1,\dots,Q_n)$，$Q_i$ 为第 $i$ 个 gene 的 allele（列位置）。伪代码两层嵌套循环计算冲突数：$d_1=|Q_i-Q_j|$，$d_2=|i-j|$，若 $d_1=d_2$ 则 count++。
+
+**(a) 写冲突数方程**（把伪代码翻成数学式）：
+
+$$C(Q)=\sum_{i=1}^{n-1}\sum_{j=i+1}^{n}\delta_{ij},\qquad \delta_{ij}=\begin{cases}1,& |Q_i-Q_j|=|i-j|\ (\text{同对角线})\\0,&\text{otherwise}\end{cases}$$
+
+> 这与 Week 2 §9.2 的八皇后公式完全一致——两层嵌套循环 ↔ 两个 $\Sigma$。
+
+**(b) 对 $Q=\langle 2,7,8,4,6,1,3,5\rangle$ 算 $C(Q)$**：
+- 不必画棋盘，直接按方程逐对查：如 gene1=2 与 gene5=6，$d_1=|2-6|=4$，$d_2=|1-5|=4$ ⇒ 冲突。
+- 老师示范逐对检查，得 $C(Q)=3$。
+- 提示：画棋盘也不扣分，但理解方程后即使 $n=50$ 也能快速算（不用画）。
+
+**(c) 写 general N-Queens 的 fitness function**（多数人卡在这）：
+- 关键：分母是**最大可能冲突数**。对 $n$ 皇后，每两后最多冲突一次，共 $\binom{n}{2}=\frac{n(n-1)}{2}$ 对。
+- Week 2 八皇后用 28 $=\binom{8}{2}$ 归一化；推广到 general $n$：
+
+$$\boxed{\,F(Q) = 1 - \frac{2\,C(Q)}{n(n-1)}\,}$$
+
+- $C(Q)=0$ ⇒ $F=1$（解）；$C(Q)=\binom{n}{2}$ ⇒ $F=0$（最差）。
+- ⭐ **考点**：要从"八皇后分母 28"推广到"general n 分母 $n(n-1)/2$"——会 $C(n,2)$ 这个组合数即可。
+
+#### 4.4 Sem 2 2024 — Real-valued GA 与 flexible $\alpha$ crossover
+
+**题面**：$n=5$ 维函数 $F(x)=\sum_{i=1}^{n}x_i - \sum_{i=1}^{n}x_i^2$，用 real-valued coded GA 优化。两亲本 $A$、$B$（各 5 个分量），用 **flexible $\alpha$ approach** 做 arithmetic crossover：
+
+$$\alpha = \frac{|f(A)-f(B)|}{f(A)+f(B)}$$
+
+（即用两亲本 fitness 的归一化差作 $\alpha$，而非固定 0.5）。求 $F(A), F(B), F(A'), F(B')$（$A',B'$ 为 offspring）。
+
+**Part 1 — 计算**：
+- 由 Excel 算得 $f(A)=0.98$，$f(B)=0.67$ ⇒ $\alpha=|0.98-0.67|/(0.98+0.67)$。
+- 用 $\alpha$ 做 whole arithmetic crossover：$A'_i=\alpha A_i+(1-\alpha)B_i$（$B'$ 反之），再算 $F(A'),F(B')$。
+- 老师点评：计算本身简单，"用计算器即可"，考的是**对 real-valued crossover 的理解**。
+
+**Part 2 — 论证 for / against 这种 crossover（开放式说理题）**：
+
+- **Against（不支持）**：
+  - 要算 $\alpha$ 需先算 $f(A),f(B)$，对 **hyper-dimensional** 问题（$n=500$–$1000$）这是显著的额外计算开销（overhead）。
+  - GA 要跑很多代、population 很多个体，累积开销大；相比固定 $\alpha=0.5$，额外计算量 manifold 增加。
+  - 而性能是否提升**未知**（solution landscape 未知），开销/收益不划算。
+- **For（支持）**：
+  - 若算法性能对 $\alpha$ 敏感，则按 fitness 自适应 $\alpha$ 可能值得这点开销。
+  - 每次 crossover 产生两个 offspring，补满 population 所需 crossover 次数较少。
+  - 问题 landscape 未知 ⇒ 可能存在某些问题恰好从这种 adaptive 方案受益。
+
+> ⭐ **考点**：开放论证题要**给出具体理由**，不能只说"no good"或"good"。老师反复强调："you must have somewhat of a view or explanations why."两条思路都成立，关键是 justification。
+
+### 5. 本周考点速查表
+
+| 考点 | 来源 | 要点 |
+|---|---|---|
+| **考试范围** | 老师口头 | **slide 60 及以后不考**；只考 Lecture 1 + Lecture 2 slide 1–58（五种 representation + 算子）+ Week 1 问题分类 |
+| **fitness rescale** | 真题 Q1 | 原始值挤在窄区间时用 $F=1-|f-下界|/常数$ 拉开区分度 |
+| **问题分类四例** | 真题 Q1B | 股价预测=modelling、装箱=optimization、政策=simulation、排班=optimization/simulation，**须给 explanation** |
+| **N-Queens 通用 fitness** | 真题 Q3 | 最大冲突数 $=\binom{n}{2}=n(n-1)/2$ ⇒ $F=1-2C(Q)/(n(n-1))$ |
+| **flexible $\alpha$** | 真题 Q4 | $\alpha=|f(A)-f(B)|/(f(A)+f(B))$ + whole arithmetic crossover；会算 + 会论证 for/against |
+| **selection pressure 与 fitness 分布** | recap | fitness 越紧 → selection pressure 越失效（后期） → 需 rescaling/ranking（不考） |
+| **permutation repair** | recap | 可用专用算子或"普通算子+repair"恢复 permutation 结构 |
+
+### 6. 本周要点小结
+
+- **本周性质**：复习周，无新内容；老师明确 **slide 60+ 不考**，考试范围 = Week 1 问题分类 + Week 2/3 五种 representation 及其算子 + 两个手算实例（eight-queens、SGA）。
+- **进阶话题（不考）**：fitness rescaling、ranking selection、island/distributed population model——只需知道"fitness 越紧 selection 越失效"这层直觉。
+- **历年真题风格**：题面故事长但求解直接；必含 (1) 一个建模/手算题、(2) 一个问题分类题、(3) 一个对算子的理解/计算题、(4) 一个开放论证题（for/against）。
+- **N-Queens 推广**：分母从 28 推广到 $\binom{n}{2}=n(n-1)/2$，fitness $F=1-2C(Q)/(n(n-1))$。
+- **flexible $\alpha$**：按 fitness 归一化差定 $\alpha$，会算 offspring + 会从计算开销与 landscape 未知两方面论证。
+- **Quiz 1 已于本周（9/1）进行**，后续进入 ML 部分。
+
+---
+
+> **下一周预告**：Week 4 是 A/P LIM 部分的最后一周（Quiz 1 已结束）。Week 5 起课程**由另一位教授接手**，进入 **Machine Learning** 部分（CA Part 2，占 30%）。预计从 supervised learning 基础、classification/regression 等主题开始；具体内容以 Week 5 课件为准。LIM 部分的历年真题（EE6227 archive）仍是 Final Exam（60%，覆盖全课程）的复习材料。

@@ -261,3 +261,242 @@
 > **笔记约定**：本课英文授课、英文考试，核心术语保留英文（NLP, tokenization, stemming, lemmatization, lemma/stem, POS tagging, stop word, OOV, n-gram, unigram/bigram/trigram, Bag-of-Words, RegEx, metacharacter, special sequence, set, cosine similarity, Markov assumption, chain rule, NLTK, CountVectorizer, IRA/TRA, lockdown browser 等）。中文用于组织句意与补充释义。
 >
 > **说明**：本周无录播转写，以上为基于课件/notebook/MCQ/公告整理。若后续补录播，可补充老师口述要点与课堂补充。
+
+---
+
+## Week 4 — Traditional ML Methods and NLP Applications（传统机器学习方法与 NLP 应用）
+
+> **权威来源说明**：本周**无录播转写**（`week4/` 内无 txt）。基于官方材料整理：
+> - `EE6405_W4_Traditional ML and NLP Applications_For Students.pdf`（Week 4 主课件，Dr. S. Supraja，48 页）
+> - `Week 4.ipynb`（六大分类/聚类模型实战 notebook，含 sklearn 调用与输出）
+> - `Week4MCQ.md`（5 题 MCQ，全部为 sklearn 代码改写题——本周考点信号）
+> - `Week 4 tasks.pdf`（课堂任务）
+>
+> 本周对应公告 Lesson plan：**Week 4 — Classification and Clustering, Evaluation Metrics, Word Embeddings + IRA/TRA #1**。课件实际聚焦传统 ML 分类器与聚类算法，Evaluation Metrics 与 Word Embeddings 预计在课堂短讲/下周展开。无转写故不含老师口述补充。
+
+### 1. 本周主线
+
+Week 1–2 完成 preprocessing 与 linguistic feature extraction 后，本周回答"**如何用传统 ML 做文本分类与聚类**"。主线：
+1. 把文本转成数值向量（**TF-IDF vectorization**）→ 2. 套用传统 ML 分类器（Naïve Bayes / SVM / ELM / Gaussian Process / Linear Regression）→ 3. 无监督聚类（K-Means / Hierarchical / Fuzzy）。
+
+> ⭐ **本周 IRA/TRA #1（Theory Quiz，20%，闭卷 lockdown browser）**考当周(Week 4)+前一周(Week 3)内容 + 课上短讲。Week4MCQ 的 5 道代码题是本周考点核心信号。
+
+### 2. Text Classification（文本分类）概述
+
+- **Text classification**：给文档 $d$ 分配预定义类别 $c \in C = \{c_1, c_2, \dots, c_j\}$。
+- **应用**（四类）：
+  - **Topic Modelling**：按内容分主题。
+  - **Sentiment Analysis**：分析对公司/人/产品的情感（市场研究、声誉管理）。
+  - **Language Identification**：识别语言（搜索引擎查询处理）。
+  - **Authorship Attribution**：作者识别（取证、网络安全）。
+- **两类方法**：
+  - **Rule-based classifiers**：基于人工规则。
+  - **ML models**：Naïve-Bayes、SVM、ELM、Gaussian Processes、Linear Regression。
+
+### 3. ⭐ Naïve Bayes（朴素贝叶斯）— BOW + Bayes Theorem
+
+#### 3.1 推导（课件重点）
+
+对文档 $d$ 与类别 $c$，由 **Bayes Theorem**：
+
+$$P(c|d)=\frac{P(d|c)P(c)}{P(d)}$$
+
+- 最可能类别：$\hat{c}=\arg\max P(c|d)=\arg\max P(d|c)P(c)$（**去掉分母** $P(d)$，因对所有类别相同）。
+- 把文档表示为特征 $x_1,\dots,x_n$（BOW 词频）：$\hat{c}=\arg\max P(x_1,x_2,\dots,x_n|c)P(c)$。
+- **"Naïve" assumption（朴素假设）**：词之间条件独立 → $P(x_1,\dots,x_n|c)=\prod_j P(x_j|c)$。
+- 最终：$\hat{c}=\arg\max \prod_j P(x_j|c)P(c)$。
+
+#### 3.2 训练（MLE）
+
+- **Class Prior**：$P(c)=\frac{\text{count}(documents\in class\ c)}{\text{count}(total\ documents)}$。
+- **Conditional Probability**：$P(w_i|c)=\frac{\text{count}(word\ w_i\in class\ c)}{\text{count}(documents\in class\ c)}$。
+
+#### 3.3 ⭐ Zero Probability Problem + Laplace Smoothing
+
+- **问题**：若测试词在训练集某类中未出现（如 "excellent" 仅出现在 review1 的 positive 类），则 $P(w_i|c)=0$ → 整个乘积为 0，无法分类（"zero probabilities cannot be conditioned away no matter the evidence"）。
+- **解决 — Laplace (Add-One) Smoothing**：
+
+$$P(w_i|c)=\frac{\text{count}(w_i,c)+1}{\sum_{w\in V}\text{count}(w,c)+|V|}$$
+
+其中 $V$ = vocabulary size（词表大小）。
+
+#### 3.4 ⭐ Worked Example（课件手算，必考）
+
+| Doc | Words | Class |
+|---|---|---|
+| 1 | Hive, Arc, Hive | NTU |
+| 2 | Hive, Hive, Spine | NTU |
+| 3 | Hive, Tamarind | NTU |
+| 4 | Eusoff, Temasek, Hive | NUS |
+| 5 | Hive, Hive, Hive, Eusoff, Temasek | ? (test) |
+
+- **Class Prior**：$P(NTU)=3/4$，$P(NUS)=1/4$。
+- 词表 $V=\{$Hive, Arc, Spine, Tamarind, Eusoff, Temasek$\}$，$|V|=6$。
+- 用 Laplace smoothing 算 test doc（Hive×3, Eusoff, Temasek）对各类的条件概率：
+  - $P(NTU|d) \approx \frac{3}{4}\cdot\left(\frac{5+1}{8+6}\right)^3\cdot\frac{0+1}{8+6}\cdot\frac{0+1}{8+6} \approx 0.0005$（据课件数值）
+  - $P(NUS|d) \approx \frac{1}{4}\cdot\left(\frac{1+1}{3+6}\right)^3\cdot\frac{1+1}{3+6}\cdot\frac{1+1}{3+6} \approx 0.0014$
+- ⇒ 判 **NUS**（因 NTU 类中 Eusoff/Temasek 计数为 0，被 Laplace 拉平后 NUS 更高）。
+
+> 课件最终数值：$P(NTU|d)\approx0.0053$，$P(NUS|d)\approx0.0056$（精确分数见 PDF 第 10 页），NUS 略高 ⇒ 判 NUS。
+
+#### 3.5 notebook 实现
+
+```python
+from sklearn.naive_bayes import MultinomialNB, GaussianNB, CategoricalNB
+nb = MultinomialNB()
+nb.fit(X_train, y_train)
+predictions = nb.predict(X_test)  # 本例输出 [1 1 1]，标签 [0 0 1]
+```
+
+- **MultinomialNB**：适合词频/TF-IDF（离散计数）。
+- **GaussianNB**：假设特征连续高斯，适合实值特征。
+- **CategoricalNB**：类别特征。
+
+### 4. ⭐ Support Vector Machines (SVM)
+
+#### 4.1 原理
+
+- **目标**：在高维空间找 **hyperplane**（超平面）最好地分隔不同类别的数据点。
+- **Hyperplane 方程**：$w\cdot x + b = 0$。
+- **点到超平面距离**：$\frac{w\cdot x+b}{\|w\|_2}$。
+- **SVM 最大化 margin**（超平面到最近数据点的距离）⇔ **最小化 $\|w\|_2$**（primal problem）。
+
+#### 4.2 Hinge Loss + Regularization
+
+$$c(x,y,f(x))=\begin{cases}0,& y\cdot f(x)\ge 1\\1-y\cdot f(x),&\text{otherwise}\end{cases}$$
+
+- 预测值与真实值同号且 margin 足够 ⇒ loss = 0；否则算 loss。
+- 加正则项 $C\cdot\|w\|_2$ 防止 **overfitting**。**C 越大正则越弱**（对训练数据拟合越紧）。
+
+#### 4.3 ⭐ Kernel Trick（核技巧）
+
+- **问题**：文本数据常**线性不可分**（linearly inseparable）。
+- **Kernel trick**：把数据映射到更高维 feature space 使其线性可分；**不显式计算高维坐标**，只计算高维空间中的点积。
+- **常用核**：
+
+| 核 | 公式 | 说明 |
+|---|---|---|
+| **RBF / Radial Basis Function** | $K(x_1,x_2)=\exp\left(-\frac{\|x_1-x_2\|^2}{2\sigma^2}\right)$ | $\sigma$ 为核宽度 |
+| **Linear** | $K(x_1,x_2)=x_1^T x_2$ | 两类学习 |
+| **Polynomial** | $K(x_1,x_2)=(x_1^T x_2+1)^\rho$ | $\rho$ 为多项式阶数 |
+| **Sigmoid** | $K(x_1,x_2)=\tanh(\beta_0 x_1^T x_2+\beta_1)$ | 仅特定 $\beta_0,\beta_1$ 为 Mercer 核 |
+
+#### 4.4 notebook 实现
+
+```python
+from sklearn import svm
+svm = svm.SVC(kernel='linear')
+svm.fit(X_train, y_train)  # 输出 [1 1 1]，标签 [0 0 1]
+```
+
+### 5. Extreme Learning Machines (ELM)
+
+- **浅层前馈神经网络**，**单隐藏层**，**无 backpropagation**。
+- **输入→隐藏层权重随机初始化且训练中不更新**；只训练隐藏层→输出层的 $\beta$ 矩阵。
+- 输出：$f_L(x)=\sum_{i=1}^L \beta_i g_i(x)=\sum_{i=1}^L \beta_i g(w_i\cdot x_j+b_i)$。
+- 训练 = 解线性方程组 $H\beta=y$；因 $H$ 通常非方阵，用 **Moore-Penrose Pseudoinverse**（伪逆，可用 SVD 算）：$\beta=H^+ y$。
+- notebook 用 `hpelm.ELM`，10 个 sigmoid 神经元，输出 `[0 1 1]`，标签 `[0 0 1]`。
+
+### 6. Gaussian Processes (GP)
+
+- **概率模型**，定义**函数上的分布**（distribution over functions），而非固定参数。
+- 由 **mean function** $\mu(x)$ 与 **covariance function (kernel)** $k(x_i,x_j)$ 刻画。
+- **Gram matrix** $K_x$：$K_x$ 必须正半定（positive semidefinite）。
+- **RBF kernel**：$K_{RBF}(x_i,x_j)=\sigma^2\exp\left(-\frac{\|x_i-x_j\|^2}{2l^2}\right)$。
+  - **$l^2$ = length scale**（核宽度）：小 → 函数波动大（wiggly）；大 → 函数更平滑。
+- notebook：`GaussianProcessClassifier(kernel=RBF())`，输出 `[1 0 1]`，标签 `[0 0 1]`。
+
+### 7. Linear Regression（线性回归）
+
+- 假设输入与输出线性关系：$y=mx+c$。
+- **Loss**（squared error）：$L(y,t)=\frac{1}{2}(y-t)^2$。
+- **Cost**（均方误差）：$J(w,b)=\frac{1}{2N}\sum_{i=1}^N(wx_i+b-t_i)^2$。
+- **优化 — Gradient Descent**：
+  - $\frac{\partial J}{\partial w_j}>0$ ⇒ 增 $w_j$ 会增 $J$；$<0$ ⇒ 增 $w_j$ 减 $J$。
+  - 更新：$w_j \leftarrow w_j - \alpha\frac{\partial J}{\partial w_j}$，$\alpha$ = **learning rate**。
+- notebook：`LinearRegression().fit(X_train,y_train)`，输出连续值 `[0.667, 0.524, 0.667]`（回归任务，与分类标签 `[0 0 1]` 不同维度）。
+
+### 8. Clustering（聚类，无监督）
+
+- **无监督** ML，用 **distance/similarity metric** 把数据分组，发现隐藏结构，无需预先标注。
+
+#### 8.1 K-Means
+
+- 假设 k 个 cluster，每点属于最近的 cluster center（均值）。
+- **算法**：
+  1. **Initialization**：随机初始化 k 个 centroid。
+  2. 迭代交替：
+     - **Assignment**：每点分配到最近 cluster。
+     - **Refitting**：centroid 移到新 cluster 的中心。
+- notebook：`KMeans(n_clusters=2, random_state=42)`。
+
+#### 8.2 Hierarchical Clustering（层次聚类）
+
+- 用 **dendrogram**（树状图）表示，**无需预设 cluster 数**，在适当高度切割即可。
+- **两种方法**：
+  - **Agglomerative**（自底向上）：每点自成一簇，逐步合并。
+  - **Divisive**（自顶向下）：全部成一簇，逐步分裂。
+- **Linkage 方法**（衡量簇间距离）：
+  - **Min Linkage**（单链）：最近点距离。
+  - **Max Linkage**（全链）：最远点距离。
+  - **Centroid Linkage**：簇中心距离。
+  - **Average Linkage**：平均距离。
+  - **Ward Linkage**：算簇间**方差**而非直接距离；**对噪声和 outlier 更鲁棒**。
+
+#### 8.3 Fuzzy Clustering（模糊聚类）
+
+- 与 K-Means 唯一关键区别：每点**不唯一属于一个 cluster**，而是对每个 cluster 有一个**归属系数**（degree of belonging）。
+- centroid = 所有点按归属度加权的均值。
+
+### 9. NLP Applications 小结（课件末页）
+
+- 传统 ML 算法需要**结构化数值输入** → 文本须经 **TF-IDF vectorization** 等转为数值。
+- **分类**应用：sentiment analysis、intent classification、authorship attribution。
+- **聚类**应用：document clustering、spam detection。
+
+### 10. ⭐ Week4MCQ 考点信号（5 道代码改写题）
+
+本周 MCQ **全部为 sklearn 代码改写**——预示 IRA/TRA #1 会考**代码层面的模型选择与参数调优**。逐题分析：
+
+| 题 | 考点 | 答案 | 为什么 |
+|---|---|---|---|
+| **Q1** 改 `MultinomialNB`→`GaussianNB` | NB 模型切换需改 import + 实例化 | **Line 1 and 2** | `from sklearn.naive_bayes import GaussianNB`（Line1）+ `nb = GaussianNB()`（Line2）；`.fit/.predict` 接口通用 |
+| **Q2** 调 SVM 正则强度 | SVM 的正则参数 = **C** | **`C=0.5`** | `degree` 属 polynomial 核；`gamma` 属 RBF；`coef0` 属 poly/sigmoid；`probability` 仅开关概率输出 |
+| **Q3** 调 RBF 核 length scale | `length_scale` 是 **RBF() 构造器参数** | **`RBF(length_scale=1.5)`** | length_scale 必须传入 `RBF()` 内部，而非 classifier 层；`length_scale_bounds` 仅用于优化边界 |
+| **Q4** LinearRegression 拟合方法 | sklearn 通用训练接口 = **`.fit()`** | **`lr.fit(X_train, y_train)`** | `.score` 返回 R²；`.transform` 属预处理；`.predict` 是推理；`.compile` 是 Keras 接口 |
+| **Q5** 改 KMeans cluster 数 | cluster 数参数 = **`n_clusters`** | **`n_clusters=2`** | `n_init` 是初始化次数；`max_iter` 是迭代上限 |
+
+> **出题规律**：给一段 sklearn 代码 + 5 个改写选项，要求选出**正确修改某参数/模型**的那行。复习时要熟悉每个模型的**关键参数名**与**构造器 vs 分类器层参数的归属**。
+
+### 11. 考点速查表
+
+| 模型 | 关键参数/概念 | sklearn 接口 |
+|---|---|---|
+| **Naïve Bayes** | MultinomialNB（词频）/ GaussianNB（连续）/ CategoricalNB；Laplace smoothing `alpha` | `naive_bayes.MultinomialNB()` |
+| **SVM** | `kernel`（linear/rbf/poly/sigmoid）；正则参数 `C`（越大正则越弱）；`gamma`（RBF 宽度） | `svm.SVC(kernel='linear', C=...)` |
+| **ELM** | 随机输入权重 + 训练 $\beta$ via Moore-Penrose pseudoinverse | `hpelm.ELM` |
+| **Gaussian Process** | `kernel=RBF(length_scale=...)`；length scale 小→wiggly，大→smooth | `GaussianProcessClassifier(kernel=RBF())` |
+| **Linear Regression** | squared error loss；gradient descent；learning rate $\alpha$ | `LinearRegression().fit(X,y)` |
+| **K-Means** | `n_clusters`（簇数）；`n_init`（初始化次数）；`max_iter` | `KMeans(n_clusters=2)` |
+| **Hierarchical** | Agglomerative vs Divisive；Ward 对噪声鲁棒 | — |
+| **Fuzzy** | 每点对每簇有归属系数 | — |
+
+### 12. 本周要点小结
+
+- **Text Classification** = 文档 $d$ → 类别 $c$；四大应用（topic/sentiment/language/authorship）。
+- **Naïve Bayes**：Bayes + 朴素条件独立 + BOW；**Laplace smoothing** 解 zero probability；手算 prior/conditional + add-one。
+- **SVM**：最大化 margin ⇔ 最小化 $\|w\|$；hinge loss + 正则 **C**；**kernel trick** 解线性不可分（RBF/Linear/Poly/Sigmoid）。
+- **ELM**：单隐藏层、随机输入权重、无 backprop、训练 $\beta$ 用伪逆。
+- **Gaussian Process**：函数上的分布；mean + covariance(kernel)；RBF 的 **length scale** 控平滑度。
+- **Linear Regression**：squared error + gradient descent；learning rate $\alpha$。
+- **Clustering**：K-Means（assignment+refitting）、Hierarchical（agglomerative/divisive，5 种 linkage，Ward 鲁棒）、Fuzzy（归属系数）。
+- **NLP 应用**：文本须先 TF-IDF vectorization 再套 ML；分类用于 sentiment/intent/authorship，聚类用于 document grouping/spam detection。
+- **MCQ 出题规律**：sklearn 代码改写——选正确参数名与归属层（构造器 vs 分类器）。
+
+---
+
+> **下周（Week 5）预告**：进入 **Neural models (RNN, LSTM, GRU) and Hyperparameter Tuning**，并有 **Coding quiz #2**（15 分钟，5 题单选，负分制）。本周传统 ML 收尾，下周转入深度学习序列模型。具体以课件为准。
+>
+> **笔记约定补充**：本周新增保留英文术语（text classification, sentiment analysis, topic modelling, language identification, authorship attribution, Naïve Bayes, Bayes Theorem, class prior, conditional probability, Laplace smoothing / Add-One, zero probability problem, BOW, SVM, hyperplane, margin, hinge loss, regularization, kernel trick, RBF, length scale, ELM, Moore-Penrose pseudoinverse, SVD, Gaussian Process, mean/covariance function, gram matrix, positive semidefinite, Linear Regression, squared error, gradient descent, learning rate, K-Means, centroid, assignment, refitting, hierarchical clustering, dendrogram, agglomerative, divisive, linkage, ward, fuzzy clustering, TF-IDF vectorization, MultinomialNB, GaussianNB, CategoricalNB, n_clusters, n_init 等）。中文用于组织句意与补充释义。
+>
+> **说明**：本周无录播转写，以上为基于课件/notebook/MCQ 整理。若后续补录播，可补充老师口述要点。

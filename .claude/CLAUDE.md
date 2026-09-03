@@ -39,6 +39,7 @@ Semester1/
 ## 可用 skill
 
 - **`coursework-notes`**（`.claude/skills/coursework-notes/SKILL.md`）：把某课程每周的录播转写 `weekN.txt` + 官方课件 PDF 整理成 `Learning_note.md` 的详细教学版中文笔记（英文术语保留原词），含 ASR 转写噪声按 PDF 修正、Week 1 优先行政/考核信息、公式推导、Wooclap 例题、下一周预告等完整流程与检查清单。处理"按之前方式总结 / 完成 XXXX 课程 / 第 N 周内容"类请求时使用。
+- **`quiz-predict-6405`**（`.claude/skills/quiz-predict-6405/SKILL.md`）：专门针对 EE6405（Dr. S. Supraja）的 quiz 复习与预测。基于已归档的每周 quiz 截图（`weekN/quiz/1.png..5.png`）+ MCQ.md + notebook + 课件，逆向归纳老师出题逻辑（题型分布、干扰项设计、跨周知识滚动），为下一周 quiz 生成"考点预测 + 复习清单"md 文档放到 `6405/quiz1/Week{N}_Quiz_Prep.md`。处理"6405 第 N 周 quiz 预测 / 下周 6405 quiz 复习 / 总结 6405 出题习惯"类请求时使用。与 `coursework-notes` 互补：前者整理知识点，本 skill 专注 quiz 出题逻辑。
 
 ## .gitignore
 
