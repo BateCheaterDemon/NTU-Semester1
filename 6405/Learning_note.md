@@ -500,3 +500,109 @@ svm.fit(X_train, y_train)  # 输出 [1 1 1]，标签 [0 0 1]
 > **笔记约定补充**：本周新增保留英文术语（text classification, sentiment analysis, topic modelling, language identification, authorship attribution, Naïve Bayes, Bayes Theorem, class prior, conditional probability, Laplace smoothing / Add-One, zero probability problem, BOW, SVM, hyperplane, margin, hinge loss, regularization, kernel trick, RBF, length scale, ELM, Moore-Penrose pseudoinverse, SVD, Gaussian Process, mean/covariance function, gram matrix, positive semidefinite, Linear Regression, squared error, gradient descent, learning rate, K-Means, centroid, assignment, refitting, hierarchical clustering, dendrogram, agglomerative, divisive, linkage, ward, fuzzy clustering, TF-IDF vectorization, MultinomialNB, GaussianNB, CategoricalNB, n_clusters, n_init 等）。中文用于组织句意与补充释义。
 >
 > **说明**：本周无录播转写，以上为基于课件/notebook/MCQ 整理。若后续补录播，可补充老师口述要点。
+
+---
+
+## Week 5 — Neural Language Models + Hyperparameter Tuning（神经语言模型与超参数调优）
+
+> **权威来源说明**：本周**无录播转写**（`week5/` 内无 txt）。基于官方材料整理：
+> - `EE6405_W4_NM_For Students.pdf`（Neural Language Models 课件，Dr. Simon Liu）— RNN/LSTM/GRU/BiRNN
+> - `EE6405_W5_HPT_For Students.pdf`（HyperParameter Tuning 课件，Dr. S. Supraja）
+> - `Week 6.ipynb`（RNNModel/LSTMModel/GRUModel/BiRNNModel + 训练循环）
+> - `Week 8(1).ipynb`（GridSearchCV + KFold + LSTMClassifier + gradient clipping）
+> - `Week6MCQ.md` / `Week8MCQ.md`（各 5 题代码题——本周考点信号）
+>
+> ⚠️ 文件命名：`week5/` 内 notebook 叫 `Week 6.ipynb`/`Week 8(1).ipynb`，但对应 Week 5 两堂课；`Week 5.ipynb`（Evaluation Metrics + Word Embeddings）在 `week4/` 文件夹，属 Week 4 延续。完整 Week 5 知识点见 `week5/Week5_Notes.md`。
+
+### 1. 本周主线
+
+Week 4 传统 ML 收尾后，本周转入**深度学习序列模型**：让神经网络处理有顺序的文本。主线：Sequential data 局限 → RNN → LSTM（解 vanishing gradient）→ GRU（简化）→ Bi-RNN（双向）→ Hyperparameter Tuning 调优。
+
+> ⭐ **本周有 Coding Quiz #2**（15 分钟，5 题单选，负分制，覆盖 Week 4 + Week 5）。
+
+### 2. Sequential Data 与传统模型三大局限
+
+- **Sequential data**：按顺序组织的数据，顺序对意义至关重要；文本是典型。
+- 传统 feedforward 网络三大局限：**Lack of Memory**（无记忆）、**Order Insensitivity**（对顺序不敏感）、**Variable-Length Limitation**（变长限制）。
+- → 需 RNN / LSTM / GRU / Bi-RNN / Transformer。
+
+### 3. RNN（Recurrent Neural Network）
+
+- **核心**：hidden state $h_t = g(x_t, h_{t-1})$ 记忆历史；参数跨时间步**共享**（tied parameters）→ 处理变长序列。
+- **Vanilla RNN**：$h_t = \tanh(Ux_t + Wh_{t-1} + b)$，$y_t = \mathrm{softmax}(Vh_t)$。
+- **三种架构**：Sequence-to-One（sentiment）、One-to-Sequence（image caption）、Sequence-to-Sequence（POS/NER）。
+- **Activation**：Sigmoid（gate/分类输出）、Tanh（hidden state，零中心、收敛快）。
+- **局限**：**Vanishing Gradient**（长序列梯度太小）、**Exploding Gradient**（梯度太大不稳定）→ LSTM 解之。
+
+### 4. LSTM（Long Short-Term Memory）
+
+- **Cell state** = long-term memory，由三道 gate 调控：
+  - **Forget gate** $f_t = \sigma(W_f h_{t-1} + x_t + b_f)$：保留多少旧信息。
+  - **Input gate** $i_t = \sigma(...)$ + 候选 $\tilde{c}_t = \tanh(...)$：加什么新信息。
+  - **Cell update** $c_t = f_t c_{t-1} + i_t \tilde{c}_t$。
+  - **Output gate** $o_t = \sigma(...)$，$h_t = o_t \tanh(c_t)$。
+- 解 vanishing gradient，捕捉 long-term dependency。
+
+### 5. GRU（Gated Recurrent Unit）
+
+- LSTM 简化版（2014）：**无 cell state**，合并 hidden + cell。
+- 两道 gate：**Reset gate** $r_t$（忘多少旧）、**Update gate** $z_t$（保留多少 + 加多少新）。
+- 参数更少、更省算力，效果常接近 LSTM。
+
+### 6. Bi-RNN（Bi-Directional RNN）
+
+- 正向 + 反向两个 RNN，同时看过去和未来上下文。
+- 适合 NER / POS tagging（词标签常由前后词决定）。
+- 代码两处改动：`bidirectional=True` + `fc = nn.Linear(hidden_dim * 2, output_size)`。
+
+### 7. Hyperparameter Tuning
+
+| 超参 | 要点 |
+|---|---|
+| **K-Fold CV** | 评估模型设计（非某次训练）；k=10 常用；`GridSearchCV(clf, param_grid, cv=5)` + `cross_val_score` |
+| **Optimizer** | Gradient Descent / SGD（batch）/ Adam（自适应 + momentum）/ RMSprop |
+| **Loss** | BCE（二分类）/ CCE（多分类，配 softmax）；PyTorch `CrossEntropyLoss` 内含 softmax |
+| **Batch size** | 大→快但可能精度低；小→更准但慢 |
+| **Learning rate** | 0.1~0.0001；过高 overshoot，过低慢 |
+| **Epochs** | 太少 underfit，太多 overfit；**Early stopping** 防过拟合 |
+| **Gradient clipping** | 防 exploding gradient；`clip_grad_value_(params, clip_value=0.5)`（clipping by value/norm） |
+
+### 8. 训练循环（PyTorch）
+
+```
+model.train() → optimizer.zero_grad() → output=model(x) → loss=criterion(output,target) → loss.backward() → optimizer.step()
+```
+- `zero_grad()`：清梯度（backward 前必须）。
+- `step()`：按 optimizer 规则更新权重。
+- `model.train()`/`model.eval()` 切训练/评估模式。
+
+### 9. ⭐ Week 5 MCQ 考点信号
+
+| 题 | 考点 | 答案 |
+|---|---|---|
+| **W6 Q1** `self.embedding` 作用 | indices → dense vector | To convert input sequences of indices into dense vector representations |
+| **W6 Q2** RNN→Bi-RNN | `bidirectional=True` + `fc=hidden_dim*2` | 同时改两处 |
+| **W6 Q3** RNN→LSTM | `nn.RNN`→`nn.LSTM` | 只换类名 |
+| **W6 Q4** `optimizer.zero_grad()` | 清梯度 | clears gradients before backward |
+| **W6 Q5** 调 Adam lr | `lr=1e-2`/`1e-3` | `eps=` 不是 lr |
+| **W8 Q1** 不用 5-fold | 看 `cv=5` 显式与否 | GridSearchCV/cross_val_score 的 cv |
+| **W8 Q2** KFold missing code | `X[train_index], X[val_index]` | 行列不混搭 |
+| **W8 Q3** 维度定义作用 | 初始化 NN 结构 | 不只算 feature 长度 |
+| **W8 Q4** tensor+DataLoader | 转 tensor+Loader+初始化 | 不含 normalize/train |
+| **W8 Q5** gradient clipping | `clip_grad_value_(model.parameters(), clip_value=0.5)` | clip_value 是 float |
+
+### 10. 本周要点小结
+
+- **RNN** 用 hidden state 记忆历史、参数共享，但 vanishing/exploding gradient 是软肋。
+- **LSTM** 用 cell state + forget/input/output 三 gate 解 vanishing gradient；**GRU** 简化为 reset/update 两 gate，更省算力。
+- **Bi-RNN** 正反向，`bidirectional=True` + `fc` 输入 `hidden_dim*2`。
+- **Hyperparameter Tuning**：K-Fold CV 评模型设计；GridSearchCV 网格搜索；optimizer/loss/batch/lr/epochs/early stopping/gradient clipping 均可调。
+- **PyTorch API**：`nn.Embedding/RNN/LSTM/GRU`（接口一致）；`optim.Adam(lr=...)`；`zero_grad()`→`backward()`→`step()`；`clip_grad_value_(params, clip_value)`。
+
+---
+
+> **下周（Week 6）预告**：进入 **Transformer 与 Attention 机制**，从 RNN/LSTM 转向 self-attention 架构；并有 **IRA/TRA #2**（20 分钟，多选多答，扣分制，覆盖 Week 5 + Week 6）。
+>
+> **笔记约定补充**：本周新增保留英文术语（sequential data, RNN, hidden state, vanilla RNN, parameter sharing, sequence-to-one/one-to-sequence/sequence-to-sequence, sigmoid, tanh, vanishing gradient, exploding gradient, LSTM, cell state, forget gate, input gate, output gate, GRU, reset gate, update gate, Bi-RNN, bidirectional, hyperparameter, K-fold cross-validation, GridSearchCV, cross_val_score, optimizer, Gradient Descent, SGD, Adam, RMSprop, momentum, bias correction, Binary Cross Entropy, Categorical Cross Entropy, softmax, batch size, learning rate, epoch, early stopping, gradient clipping, clipping by value / by norm, nn.Embedding, nn.RNN, nn.LSTM, nn.GRU, optimizer.zero_grad, optimizer.step, model.train/eval 等）。
+>
+> **说明**：本周无录播转写，基于课件/notebook/MCQ/tasks 整理。Neural Language Models 课件署名 Dr. Simon Liu，HPT 课件署名 Dr. S. Supraja。完整知识点见 `week5/Week5_Notes.md`。
