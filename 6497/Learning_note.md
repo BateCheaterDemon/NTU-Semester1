@@ -1121,3 +1121,269 @@ Baum-Welch 只是把完整观测 MLE 中的**硬计数 $\mathbf{1}\{\cdot\}$** �
 ---
 
 > **下一周预告**：Week 5 预计进入 Bayesian networks / 概率图模型或 classification 主题（Week 1 进度表后续）；HMM 的 forward-backward 与 Viterbi 是后续 graph model 推断的基础。具体主题以课件为准。
+
+## Week 5 — Sampling（采样方法：标准分布 / Rejection / Importance Sampling）
+
+> **权威来源说明**：本节先由 `week5/week5.txt` 录播转写整理，再以 `week5/5_Sampling.pdf`（官方课件，Tay W.P.，44 页）核对修正。转写噪声（"pyro"→prior、"livelihood"→likelihood、"gaucin"→Gaussian、"dozing/goal"→Gaussian、"bona wash/long watch"→Baum-Welch、"concrete ys"→conjugate prior、"combo of volume"→Kolmogorov、"strong or large numbers"→Strong Law of Large Numbers (SLLN)、"sling/sent/seclin/cyta"→sampling、"Miz/Miz/biz/piz/Maze"→mock quiz、"lure/LP"→LT（lecture theater）、"tarn is/NTN Cis"→NTULearn、"responders/Dog dow"→Respondus lockdown browser、"trig ac"→matric card 等），均以 PDF 为准修正。
+
+### 0. ⭐ 行政公告（开课先讲）
+
+老师开场给出 Quiz 1 与 review session 安排：
+
+| 事项 | 安排 |
+|---|---|
+| **Quiz 1** | **Week 7 周一**，在 LT 现场进行，**60 分钟**，覆盖 **Week 1–4**（不含本周 Week 5 与下周 Week 6） |
+| 形式 | NTULearn + **Respondus lockdown browser**；**fill-in-the-blank** 填空题（不是选择题） |
+| 准备 | 课前务必先**安装并测试 lockdown browser**；有 mock quiz 可练手（熟悉填空格式，避免输入方式被判错） |
+| **Reference sheet** | 可带 **1 张 A4 size reference sheet**（手写一切），**不允许 sticky notes** |
+| 考勤 | Quiz 当场**点名 + 出示 photo ID**（passport 或 matric card） |
+| **Review session** | **9 月 16 日（周一）10:00 AM**，线上 Teams，会录像；带问题来澄清 |
+
+> ⚠️ Homework 1 在本周（Week 5）提交（按 Week 1 进度表）。本周起进入"如何求模型参数"的两周 sampling 专题。
+
+### 1. 为什么需要 Sampling（动机）
+
+前几周讲**如何建模数据**（standard distribution → mixture model → Markov/HMM），并用 MLE/MAP/EM 估参数。但仍有缺口：
+
+- **Bayesian inference** 中 posterior 的闭式解通常只对 **conjugate prior** 或 exponential family likelihood 才有——这**限制了建模选择**。
+- **高维分布**（如 image denoising 的 posterior $p(z|y)$）无法解析处理。
+
+**图像去噪例子**（贯穿全章的动机）：每个像素 $z_j \in \{-1, 1\}$ 是干净图像的隐值，观测 $y$ 是加噪版本。
+
+- **Likelihood**：$p(y|z)=\prod_j \mathcal{N}(y_j | z_j, \sigma^2)$——每个像素**独立**被 Gaussian noise 腐蚀。
+- **Prior** $p(z)$：相邻像素高度相关（黑像素邻居多为黑），需建模邻域关系 → 不能分解成独立乘积 → **高维分布**。
+- **Posterior**：
+  $$p(z|y)=\frac{p(y|z)p(z)}{p(y)}$$
+  因 $p(z)$ 含邻域耦合，$p(z|y)$ 无解析形式，$p(y)$ 是高维积分难算。
+- **解决思路**：**即使写不出分布的解析式，只要能从中采样，就能近似它**——用样本估期望、找 MAP 等。
+
+> 老师强调：sampling 与 MCMC 让你"几乎可以处理任何分布/模型"，不再受"能否解析推导"的限制。本周讲基础 sampling，**下周讲 MCMC**（高维分布的主力）。
+
+### 2. 用样本估期望 — Strong Law of Large Numbers
+
+对任意可测函数 $f$，若能生成 i.i.d. 样本 $x_1, x_2, \dots \sim p(x|\theta)$，则由 **SLLN（Strong Law of Large Numbers，强大数律）**：
+
+$$\mathbb{E}[f(x)|\theta] = \int f(x)p(x|\theta)\,dx \approx \frac{1}{n}\sum_{i=1}^n f(x_i)$$
+
+- 样本足够多时，经验平均渐近真实期望（Kolmogorov 证明）。
+- **不要求事先知道期望的解析值**——抽样本、取平均即可。
+
+**采样过程有效的判据**：一个 procedure 是否合法采样，看**多次抽样后直方图是否逼近目标 PDF**。单次或少量样本无法验证；最可靠的方式是**数学证明**该 procedure 有效（PDF 给出各方法的证明）。
+
+### 3. Standard Distributions — CDF Inverse Method（逆 CDF 采样）
+
+#### 3.1 原理
+
+设 $X$ 的 CDF 为 $F(x)=P(X\le x)$。令 $U \sim \text{Unif}([0,1])$，取 $X = F^{-1}(U)$，则：
+
+$$P(X \le x) = P(F^{-1}(U) \le x) = P(U \le F(x)) = F(x)$$
+
+故 $X$ 服从 $F$。**采样步骤**：① 从 uniform 采样 $U$；② 施加 $F^{-1}(U)$ 得到 $F$ 的样本。
+
+- Python：`random.random()` 或 `random.uniform(a,b)` 生成 uniform（底层是 pseudo-random number generator，统计上逼近真随机）。
+- 该方法是其他复杂方法的**子程序**（subroutine）。
+
+#### 3.2 Pseudo-inverse（补充，CDF 非双射时）
+
+$F$ 未必双射。对 $u \in [0,1]$，定义 pseudo-inverse：
+
+$$F^{-1}(u) = \inf\{x : u \le F(x)\}$$
+
+性质：$u \le F(x) \iff F^{-1}(u) \le x$。
+
+#### 3.3 例：Exponential（精确逆）
+
+$X \sim \text{Exp}(\lambda)$，$F(x) = 1 - e^{-\lambda x}$，可解析求逆：
+
+$$X = -\frac{1}{\lambda}\log(1-U), \quad U \sim \text{Unif}(0,1)$$
+
+#### 3.4 例：Bernoulli（分段）
+
+$X \sim \text{Bern}(\theta)$：若 $U \in [0, 1-\theta]$ 取 $X=0$；否则取 $X=1$。
+
+### 4. Transformations（变量变换法）
+
+若 $Y = f(X)$，则对每个 $y$：
+
+$$p_Y(y) = \sum_{k=1}^K \frac{p_X(x_k)}{|f'(x_k)|}$$
+
+其中 $x_1, \dots, x_K$ 是 $f(x)=y$ 的所有解。需知道 $f(x)=y$ 的解析解与 $f'$。
+
+**例**：
+- $Y = aX + b$：$p_Y(y) = \frac{1}{|a|} p_X\!\left(\frac{y-b}{a}\right)$。若 $p_X = \text{Unif}(0,1)$，则 $p_Y$ 也是 uniform（缩放平移）。
+- $Y = X^2$：解 $x_1 = \sqrt{y}, x_2 = -\sqrt{y}$，$f'(x)=2x$：
+
+  $$p_Y(y) = \frac{1}{2\sqrt{y}}\bigl(p_X(\sqrt{y}) + p_X(-\sqrt{y})\bigr)$$
+
+### 5. 复杂分布的分解
+
+能分解成简单分布就分解。
+
+**例：Gamma($a$, $b$)，$a$ 为正整数**。若 $Y \sim \text{Gamma}(y|a,b) = \frac{b^a}{\Gamma(a)} y^{a-1} e^{-by}$，则 $Y = \sum_{i=1}^a X_i$，其中 $X_1, \dots, X_a \overset{\text{iid}}{\sim} \text{Exp}(b)$。
+
+- 采样：用变换法生成 $a$ 个 $\text{Exp}(b)$ 样本，求和得 $Y$ 的样本。
+- **但 $a$ 非整数时此法失效** → 用 rejection sampling。
+
+### 6. ⭐ Rejection Sampling（拒绝采样）
+
+#### 6.1 设定
+
+只能算 $p(z)$ 到一个**乘性常数**：
+
+$$p(z) = \frac{1}{M}\tilde{p}(z), \quad M \text{ 未知}$$
+
+（回忆 posterior $p(\theta|D) = \frac{p(D|\theta)p(\theta)}{p(D)}$，$p(D)$ 难算——正是此情形。）
+
+选一个**易采样的 proposal pdf** $q(z)$ 与常数 $k$，使：
+
+$$k q(z) \ge \tilde{p}(z), \quad \forall z$$
+
+且 $\text{supp}\, p \subseteq \text{supp}\, q$（$q$ 的支撑要覆盖 $p$）。
+
+#### 6.2 算法
+
+1. 从 $q(\cdot)$ 采 $z$。
+2. 从 $\text{Unif}[0, kq(z)]$ 采 $u$。
+3. 若 $u \le \tilde{p}(z)$ 则**接受** $z$；否则**拒绝**，重复。
+
+> 几何直觉（转写老师强调）：等价于在 $\tilde{p}(z)$ 曲线下方均匀撒点，被接受的 $z$ 服从 $p(z)$。
+
+#### 6.3 接受概率
+
+$$P(z\text{ accepted}) = \int P(\text{acc}|z)q(z)\,dz = \int \frac{\tilde{p}(z)}{kq(z)}q(z)\,dz = \frac{M}{k}$$
+
+- 平均需 **$O(k)$ 次**尝试才得到一个 $p(z)$ 样本。
+- **要 $k$ 尽可能小**，但仍满足 $kq(z) \ge \tilde{p}(z)$。
+
+#### 6.4 正确性证明
+
+证明被接受样本的 CDF 恰为 $p(z)$ 的 CDF：
+
+$$P(z \le z_0 | z\text{ accepted}) = \frac{\int_{z\le z_0} \tilde{p}(z)\,dz / k}{M/k} = \frac{1}{M}\int_{z \le z_0} \tilde{p}(z)\,dz = \int_{z\le z_0} p(z)\,dz$$
+
+#### 6.5 例：Gamma（$a$ 非整数）
+
+- 用 $q(z) = \text{Gamma}(z | c, b-1)$，$c = \lfloor a \rfloor$。比值 $\frac{p(z)}{q(z)} = \frac{\Gamma(c)b^a}{\Gamma(a)(b-1)^c} z^{a-c} e^{-z}$ 在 $z = a-c$ 处取最大 → 取该最大值为 $k$。
+- 更好的 proposal：**Cauchy distribution** $q(z) = \frac{1}{\pi\gamma(1+(z-c)^2/\gamma^2)}$，$c=(a-1)/b$，$\gamma^2=(2a-1)/b^2$，最小 $k = \frac{\pi(a-1)^{a-1}\sqrt{2a-1}\,e^{1-a}}{\Gamma(a)}$。
+
+#### 6.6 Rejection Sampling for Bayesian Inference
+
+posterior $p(\theta|D) = \frac{p(D|\theta)p(\theta)}{p(D)}$，对 $\tilde{p}(\theta) = p(D|\theta)p(\theta)$ 做 rejection sampling。
+
+- 若选 $q(\theta) = p(\theta)$（prior 作 proposal）：
+
+  $$k = \max_\theta \frac{\tilde{p}(\theta)}{q(\theta)} = \max_\theta p(D|\theta)$$
+
+  即 $\theta$ 的 **MLE**。直觉：prior 作 proposal 时，包络常数就是 likelihood 的最大值。
+
+### 7. ⭐ Importance Sampling（重要性采样）
+
+#### 7.1 动机
+
+需算期望 $\mathbb{E}_p[f(z)] = \int f(z)p(z)\,dz$（如 EM 的 E step）。
+
+- 直接从 $p$ 采样可能低效：若 $f(z)p(z)$ 在某些区域大，应**多采那些区域**。
+- 例：$f(z) = \mathbf{1}\{z \in E\}$，$E$ 是**稀有事件（rare event）**。直接从 $p$ 采可能要等很久才碰到 $E$ 中的样本。
+
+#### 7.2 算法
+
+$p$ 难采样、$q$ 易采样时：
+
+$$\mathbb{E}_p[f(z)] = \int f(z)\frac{p(z)}{q(z)}q(z)\,dz = \int f(z)w(z)q(z)\,dz \approx \frac{1}{n}\sum_{i=1}^n w(z_i)f(z_i)$$
+
+其中 **importance weights** $w(z) = \frac{p(z)}{q(z)}$，样本 $z_1, \dots, z_n \overset{\text{iid}}{\sim} q$。
+
+#### 7.3 与 rejection sampling 的区别（老师强调）
+
+| | Rejection sampling | Importance sampling |
+|---|---|---|
+| 拒绝样本 | **有**，接受率 $M/k$ | **无**，所有样本都用 |
+| $q \ge p$ 要求 | 需 $kq \ge \tilde{p}$（全局包络） | **不需要** $q \ge p$；权重随 $z$ 变化 $w(z)$ |
+| 支撑要求 | $\text{supp}\, p \subseteq \text{supp}\, q$ | $\text{supp}\, f \cdot p \subseteq \text{supp}\, q$（$f=0$ 处可不管） |
+| 收敛 | 取决于 $k$（高维时 $k$ 爆炸） | 取决于 $q$ 与 $\|f\|p$ 的匹配程度 |
+
+#### 7.4 例：Tail Probability（稀有尾部事件）
+
+估 $P(X > a)$（$a$ 大，稀有事件）。直接从 $p(x)$ 采要很多样本才碰到 $X > a$。
+
+- 选 proposal $q(z)$ 支撑为 $(a, \infty)$（如 shifted exponential），所有样本都 $> a$。
+- $P(X > a) \approx \frac{1}{n}\sum_i w(z_i)$，$w(z) = p(z)/q(z)$。
+
+#### 7.5 实例：S&P 500 ETF（SPY）黑天鹅
+
+`05_importance_sampling_SPY.ipynb`：估 SPY 日 log return 跌破大负阈值 $P(X < a)$ 的概率（rare event，直接采样要 $10^{14}$ 次才平均碰到一次）。用 shifted Gaussian 作 proposal + importance weights 估计。这是金融 risk management 的 **variance-reduction technique**。
+
+#### 7.6 Unnormalized Version（只知常数倍）
+
+若 $p, q$ 都只知到 normalizing constant（$p(z) = \tilde{p}(z)/M_p$，$q(z) = \tilde{q}(z)/M_q$），用**归一化权重**：
+
+$$\bar{w}_n(z_i) = \frac{w(z_i)}{\sum_j w(z_j)}, \quad \mathbb{E}_p[f(z)] \approx \sum_{i=1}^n \bar{w}_n(z_i) f(z_i)$$
+
+- 因 $\mathbb{E}_q w(z) = \int \frac{p(z)}{q(z)} q(z)\,dz = \int p = 1$，故 $\sum w \to n$，归一化后只用**未归一化的 $p, q$** 即可。
+- 后验推断中极有用：$p(\theta|D) \propto p(D|\theta)p(\theta)$，$p(D)$ 不必算。
+
+### 8. Sampling Importance Resampling（SIR）
+
+Importance sampling 给出**加权样本**。若要**不加权样本**（from $p$）：
+
+1. 从 $q$ 采 $z_1, \dots, z_n$。
+2. 算归一化权重 $\bar{w}_n(z_1), \dots, \bar{w}_n(z_n)$。
+3. 按 $\bar{w}_n$ **有放回重采样**得 $\tilde{z}$。
+
+**为何有效**：$\tilde{z}$ 服从 $\{z_i\}$ 上的 multinomial，$P(\tilde{z} \le a | z_1, \dots, z_n) \to \int_{z \le a} p(z)\,dz$（$n \to \infty$，almost surely）。实践中取 $n \gg m$（重采样 $m$ 个则原样本 $n$ 要远大）。
+
+#### SIR for Bayesian Inference
+
+取 $\tilde{p}(\theta) = p(D|\theta)p(\theta)$，$q(\theta) = p(\theta)$（prior 作 proposal）：
+
+$$\bar{w}_n(\theta_i) = \frac{p(D|\theta_i)}{\sum_j p(D|\theta_j)}$$
+
+按此权重重采样 → 得 posterior $p(\theta|D)$ 的样本。
+
+### 9. Sampling for EM
+
+EM 的 E step 需算 $Q(\theta|\theta^{(m)}) = \int p(z|x,\theta^{(m)}) \log p(x,z|\theta)\,dz$。若该期望难解析，可从 $p(z|x,\theta^{(m)})$ 采样 $z_1, \dots, z_n$ 近似：
+
+$$Q(\theta|\theta^{(m)}) \approx \frac{1}{n}\sum_{i=1}^n \log p(x, z_i | \theta)$$
+
+> ⚠️ **rejection 与 importance sampling 在高维下收敛慢，不适合高维分布** → 引出 MCMC（下周，先复习 Markov chain）。
+
+### 10. Practice Problems（课件末 5 题，含解答）
+
+1. **$Y = -3X$，求 $p_Y$ 与 $p_X$ 关系**：$p_Y(y) = \frac{1}{3} p_X(-y/3)$（变换法 $|a|=3$）。
+2. **只知 $\tilde{p}(z)$（$p=\tilde{p}/M$，$M$ 未知），证明用 $\tilde{p}/q$ 算 $\bar{w}_n$ 与用 $p/q$ 相同**：
+   $$\frac{\tilde{p}(z_i)/q(z_i)}{\sum_j \tilde{p}(z_j)/q(z_j)} = \frac{Mp(z_i)/q(z_i)}{\sum_j Mp(z_j)/q(z_j)} = \frac{p(z_i)/q(z_i)}{\sum_j p(z_j)/q(z_j)} = \bar{w}_n(z_i)$$
+   $M$ 在分子分母约掉。
+3. **$p(x) = \text{Unif}(0,1)$，$q(x) = \text{Unif}(0, 1/2)$，$f(x) = x^2$，$\mathbb{E}_q[\frac{f p}{q}] = \mathbb{E}_p[f]$？** **否**：$\text{supp}\, p \not\subseteq \text{supp}\, q$（$p$ 在 $(1/2,1)$ 有质量，$q$ 没有），$\int_0^{1/2} f p\,dx \neq \int_0^1 f p\,dx$。支撑不覆盖会漏掉区间。
+4. **代码题（解释每行，识别方法与分布）**：rejection sampling of $p'(x) \propto e^{-x^2}\mathbf{1}\{x \ge 0\}$（half-Gaussian），proposal $q = \mathcal{N}(50, 30)$。Line 14 循环；Line 15 采 $\mathcal{N}(50,30)$ 的 $z$；Line 16 采 $\text{Unif}(0, kq(z))$ 的 $u$；Line 18 接受条件 $u \le p(z)$。
+5. **Black swan（黑天鹅稀有事件）**：$X \sim \mathcal{N}(0, \sigma^2)$，估 $\mathbb{E}[R(X)\mathbf{1}\{X > 6\sigma\}]$。策略：importance sampling，proposal $q$ 支撑为 $(6\sigma, \infty)$（如 shifted exponential by $6\sigma$），$\mathbb{E} \approx \sum \bar{w}_n(x_i) R(x_i)$，$w(x) = \mathcal{N}(x|0,\sigma^2)/q(x)$。
+
+### 11. 考点速查表
+
+| 概念 | 要点 |
+|---|---|
+| **SLLN 近似期望** | $\mathbb{E}[f]\approx \frac{1}{n}\sum f(x_i)$，$x_i \overset{\text{iid}}{\sim} p$ |
+| **CDF inverse method** | $X = F^{-1}(U)$，$U \sim \text{Unif}(0,1)$；需 $F$ 可逆 |
+| **Pseudo-inverse** | $F^{-1}(u) = \inf\{x: u \le F(x)\}$（非双射时） |
+| **变换法** | $p_Y(y) = \sum_k p_X(x_k)/\|f'(x_k)\|$ |
+| **Rejection sampling** | $kq \ge \tilde{p}$；接受率 $M/k$；平均 $O(k)$ 次；高维失效 |
+| **Importance sampling** | $w = p/q$；不拒绝；不需 $q \ge p$；需 $\text{supp}\, fp \subseteq \text{supp}\, q$ |
+| **归一化权重** | $\bar{w}_n = w/\sum w$；只需 unnormalized $p, q$ |
+| **SIR** | 采样 + 归一化权重 + 有放回重采样 → 不加权样本 from $p$ |
+| **稀有事件** | 用支撑在事件区的 proposal 做 importance sampling（variance reduction） |
+| **Bayesian rejection** | $q=p(\theta)$（prior）⇒ $k = \max p(D\|\theta)$ = MLE |
+| **Sampling for EM** | E step 难解析时从 $p(z\|x,\theta^{(m)})$ 采样近似 $Q$ |
+
+### 12. 本周要点小结
+
+- **动机**：高维 posterior 无解析形式（conjugate prior 才有闭式），但**能采样就能近似**——SLLN 保证经验平均渐近期望。
+- **CDF inverse method**：$X = F^{-1}(U)$，$U \sim \text{Unif}(0,1)$；适合有解析逆的低维标准分布（Exp/Bernoulli），是复杂方法的 subroutine。
+- **变换法**：$Y=f(X)$ 的 PDF 由 $f(x)=y$ 的解与 $f'$ 决定；可分解复杂分布（Gamma 整数 $a$ = $a$ 个 Exp 求和）。
+- **Rejection sampling**：用 $kq \ge \tilde{p}$ 包络，接受率 $M/k$；只知 unnormalized $p$ 即可；**高维下 $k$ 爆炸、接受率骤降** → 失效。
+- **Importance sampling**：不拒绝，用权重 $w = p/q$ 估期望；不需 $q \ge p$；适合稀有事件（tail probability）；归一化权重 $\bar{w}_n$ 只需 unnormalized $p, q$。
+- **SIR**：importance sampling + 重采样 → 不加权样本 from $p$；Bayesian 中 $q = \text{prior}$，权重 $\propto$ likelihood。
+- **局限**：rejection/importance 在高维收敛慢 → 下周 **MCMC**（先复习 Markov chain）。
+
+---
+
+> **下一周预告**：Week 6 进入 **MCMC（Markov Chain Monte Carlo）**——先复习 Markov chain（transition matrix、stationary distribution、ergodicity），再讲 **Metropolis-Hastings** 与 **Gibbs sampler**，处理本周方法失效的高维分布。MCMC 是 sampling 专题的第二周，也是 Week 7 Quiz 1（覆盖 Week 1–4，不含 Week 5–6）前最后一周新课。

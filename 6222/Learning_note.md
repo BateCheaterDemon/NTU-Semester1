@@ -1427,8 +1427,229 @@ $$
 
 ---
 
-> **下一周（Week 5）预告**：老师末尾说 "we haven't completed all content… next week we study further special cases"。预计继续 Topic 5 的 special case（如 $\boldsymbol{\Sigma}_i=\sigma^2\mathbf{I}$ 的 nearest mean / Euclidean classifier、Naive Bayes 独立假设等），并可能进入 Topic 6（Statistical Estimation and Machine Learning）——如何从 training data 估计 prior 与 class-conditional PDF 的参数。具体以课件为准。
+## Week 5 — Topic 5 续：Scalar Covariance 特例 + Topic 6 起：Statistical Estimation / Machine Learning
+
+> 本周两堂课：上半场收尾 Topic 5（特殊情况最优分类器），下半场进入 Topic 6（Statistical Estimation and Machine Learning），从"已知 PDF 如何做最优分类"转向"未知 PDF 如何从 training data 估计 PDF/参数"。
+
+### 1. 回顾：上一周的 linear classifier
+
+上周在 shared covariance $\boldsymbol{\Sigma}_i=\boldsymbol{\Sigma}$（所有类同一 covariance，不同 mean）假设下，最优 discriminant function 化简为 $\mathbf{x}$ 的**一次函数**：
+
+$$
+g_i(\mathbf{x})=\mathbf{w}_i^T\mathbf{x}+w_{i0},\qquad \mathbf{w}_i=\boldsymbol{\Sigma}^{-1}\boldsymbol{\mu}_i
+$$
+
+- 二次项 $\mathbf{x}^T\boldsymbol{\Sigma}^{-1}\mathbf{x}$ 对所有类相同 → 移除 → linear classifier。
+- ⚠️ 关键（上周已强调）：**共享 $\boldsymbol{\Sigma}$ ≠ covariance 无用**，common $\boldsymbol{\Sigma}$ 仍决定最优边界方向与位置。
+
+### 2. ⭐ Special Case 2：Scalar covariance $\boldsymbol{\Sigma}=\sigma^2\mathbf{I}$
+
+本周进一步**收紧假设**——不止所有类共享同一 covariance，而且该 covariance 是 **scalar matrix**（对角且对角元相同）：
+
+$$
+\boldsymbol{\Sigma}_i=\boldsymbol{\Sigma}=\sigma^2\mathbf{I}\qquad\text{（all classes）}
+$$
+
+- 即一个标量 variance $\sigma^2$ 乘 identity matrix。
+- 此时 $\boldsymbol{\Sigma}^{-1}=\tfrac{1}{\sigma^2}\mathbf{I}$，$|\boldsymbol{\Sigma}|=\sigma^{2D}$（$D$ 为数据维数），计算极大简化。
+
+代入 shared-covariance 的 discriminant function：
+
+$$
+g_i(\mathbf{x})=\tfrac{1}{\sigma^2}\boldsymbol{\mu}_i^T\mathbf{x}-\tfrac{1}{2\sigma^2}\boldsymbol{\mu}_i^T\boldsymbol{\mu}_i+\ln p(\omega_i)
+$$
+
+- 二次项 $\tfrac{1}{2\sigma^2}\mathbf{x}^T\mathbf{x}$ 对所有类相同 → 仍可移除 → 仍是 linear classifier。
+
+### 3. ⭐ Decision boundary：过两 class mean 连线（与上周的区别）
+
+两类 $i,k$ 的 decision boundary 由 $g_i(\mathbf{x})=g_k(\mathbf{x})$ 给出：
+
+$$
+\mathbf{w}^T\mathbf{x}+w_0=0,\qquad \mathbf{w}=\tfrac{1}{\sigma^2}(\boldsymbol{\mu}_i-\boldsymbol{\mu}_k)
+$$
+
+**关键观察**：边界 hyperplane 的法向量 $\mathbf{w}\propto(\boldsymbol{\mu}_i-\boldsymbol{\mu}_k)$，即**类均值差向量方向**。因此：
+
+- 2D：边界是一条**过两 class mean $\boldsymbol{\mu}_i,\boldsymbol{\mu}_k$ 连线**的直线。
+- 3D：边界是一个过两 mean 连线的 plane。
+- 高维：hyperplane 过两 mean 连线。
+
+> ⭐⚠️ **与上周对比**：上周仅 shared $\boldsymbol{\Sigma}$ 时，边界方向由 $\boldsymbol{\Sigma}^{-1}(\boldsymbol{\mu}_i-\boldsymbol{\mu}_k)$ 决定，**不一定过两 mean 连线**。只有当 $\boldsymbol{\Sigma}=\sigma^2\mathbf{I}$（scalar matrix）时，$\boldsymbol{\Sigma}^{-1}$ 是标量乘 $\mathbf{I}$，不改变方向，边界才**必然过两 mean 连线**。这是比上周更严格的条件带来的额外简化。
+
+### 4. 降维到 1D：投影到类均值差向量
+
+由于边界法向量就是 $\boldsymbol{\mu}_i-\boldsymbol{\mu}_k$（单一方向），整个最优分类**只依赖数据在此方向上的投影**：
+
+$$
+\text{scalar projection}=\frac{(\boldsymbol{\mu}_i-\boldsymbol{\mu}_k)^T\mathbf{x}}{\|\boldsymbol{\mu}_i-\boldsymbol{\mu}_k\|}
+$$
+
+- 无论原始数据多少维，在此特例下**最优分类只需一维信息**——沿类均值差向量方向的投影。
+- 这一点与 between-class scatter / Fisher LDA 的思想一致：分类信息集中在 class mean 差所张成的方向。老师提到有研究据此认为"classification 可只在 cluster centers 张成的子空间进行"——但**这只在 scalar covariance 成立**，一般 shared $\boldsymbol{\Sigma}$ 下不成立（回应上周对 Direct LDA 的批评）。
+- $\sigma^2$ 在此特例中只决定 **threshold 的位置（平移）**，不改变边界方向；方向完全由 class mean 差决定。
+
+### 5. Prior 的影响：移动 threshold
+
+- 若两类 prior 相同 $p(\omega_i)=p(\omega_k)$，threshold 位于两 mean 中点附近（对称情形）。
+- 若 prior 不等（如 $p(\omega_i)>p(\omega_k)$），边界向 prior 较小的类一侧**平移**——prior 大的类"地盘"扩大。
+- 若 prior 悬殊，threshold 可**移出两 mean 连线区间**，落在某一侧之外。
+
+### 6. ⭐⭐ Minimum Distance Classifier（Template Matching）
+
+当**进一步假设所有类 prior 相同** $p(\omega_i)=$ const，则 $\ln p(\omega_i)$ 项可移除，discriminant 简化为：
+
+$$
+g_i(\mathbf{x})=-\frac{1}{2\sigma^2}\|\mathbf{x}-\boldsymbol{\mu}_i\|^2\;\propto\;-\|\mathbf{x}-\boldsymbol{\mu}_i\|^2
+$$
+
+即最优分类 = **minimum Euclidean distance classifier**：把 $\mathbf{x}$ 分到**欧氏距离最小的 class mean（cluster center）所在的类**。
+
+$$
+\omega^*=\arg\min_i\|\mathbf{x}-\boldsymbol{\mu}_i\|^2
+$$
+
+- 这就是 **template matching**：每类用一个 class mean（template / 原型点）代表，分类即比较输入到各 template 的距离。
+- ⚠️ **极重要**：minimum distance classifier 虽直观易懂，但**只在极严格条件下才 optimal**：
+  1. 各类 class-conditional PDF 为 Gaussian；
+  2. 所有类共享同一 covariance；
+  3. 该 covariance 还是 scalar matrix $\sigma^2\mathbf{I}$；
+  4. 所有类 prior 相同。
+  - **任一条件不满足，minimum distance classifier 不再是最优分类器**。这正是上周提到的"直观方法需数学条件背书"的体现。
+
+### 7. 能否把任意分布变换成 Gaussian？（一个延伸讨论）
+
+- 理论上，若能把任意分布的数据变换到 Gaussian，就可在新空间解析地设计最优分类器。
+- 类比 histogram equalization（把任意灰度分布变换成 uniform 分布），能否类似地变换成 Gaussian？
+- 结论：**仅对一维数据可行**；高维数据一般找不到这样的变换。但对某些特定分布（如 chi-square 类，常见于 LBP histogram 这类特征）可找到高维变换并发表在 IEEE Trans. on Image Processing。
+- 实践意义有限——大多数高维真实数据无法简单 Gaussian 化，因此需要 Topic 6 的 estimation 方法。
+
+### 8. Topic 6 开场：Statistical Estimation = Machine Learning
+
+至此 Topic 5（分类/预测的最终决策）结束。接下来转入 **Topic 6: Statistical Estimation and Machine Learning**——回答"若不知道 PDF，只有 training data，如何估计 PDF / 参数"。
+
+**核心论点：statistical estimation 就是 machine learning。**
+
+- 最优预测（minimum error rate）需要 posterior $p(\omega_i|\mathbf{x})$，而 posterior = prior × class-conditional PDF / $p(\mathbf{x})$。
+- 实践中**不知道 PDF**，只有一组 training data → 必须从数据**估计** prior、class-conditional PDF。
+- "用 training data 估计随机变量的某些固定量" = statistical estimation；"用 training data 学一个 model 代表输入特性" = machine learning —— **两者本质相同**。
+- PDF 是随机变量的**完备信息**（no more information beyond PDF），所以"学 PDF"= 学到关于输入的一切；理论上学全 PDF 即得最优分类。但实践中样本有限、需选参数，常退而直接优化预测输出（如 cost function），不精确估计 PDF。
+
+### 9. 估计 prior：最简单情形
+
+若只有 training data（已知每个样本的类标签）：
+
+$$
+\hat p(\omega_k)=\frac{N_k}{N}
+$$
+
+- $N_k$：类 $\omega_k$ 的训练样本数；$N$：总训练样本数。
+- 不同类 $N_k$ 不同 → prior 估计不同。
+- 老师认为：若仅有 training data、无其他信息，这是**最好也是最自然**的 prior 估计。
+
+### 10. Topic 6 两大方法路线
+
+| 路线 | 假设 | 本课覆盖 |
+|---|---|---|
+| **Non-parametric approach** | 不假设 PDF 形式，直接从数据估计 PDF 数值 | Parzen window、k-nearest neighbor |
+| **Parametric approach** | 假设 PDF 形式（如 Gaussian），估计其参数 | Maximum Likelihood Estimation (MLE)；Gaussian mixture（本课 skip） |
+
+### 11. Non-parametric：Parzen window 方法（本周已开始）
+
+**核心直觉**：概率密度 × 体积 ≈ 概率（density × volume ≈ mass，类比物理）。
+
+$$
+p(\mathbf{x})\approx\frac{k/N}{V}
+$$
+
+- 以 $\mathbf{x}$ 为中心取一个区域 $R$，体积 $V$；
+- 数落入 $R$ 内的训练样本数 $k$；
+- 概率 $\approx k/N$，密度 $\approx (k/N)/V$。
+
+**实现**：用 kernel function（窗口函数）把"计数"写成可计算求和：
+
+$$
+p(\mathbf{x})=\frac{1}{N}\sum_{i=1}^{N}\frac{1}{h^D}\,K\!\left(\frac{\mathbf{x}-\mathbf{x}_i}{h}\right)
+$$
+
+- $h$：窗口宽度（kernel bandwidth），$D$：维数，$h^D$：归一化体积。
+- 矩形窗（hypercube）→ $K(u)=1$ 当 $|u|<\tfrac12$，否则 $0$。
+
+**问题与改进**：
+- 矩形窗 → 估计 PDF 为**阶梯函数**，不光滑、不平滑（训练样本处突变跳变）。
+- 改用 **Gaussian kernel**：光滑、物理意义合理（样本处贡献最大，远处平滑衰减）。
+- **核函数条件**：$K(u)\ge0$，$\int K(u)\,du=1$（任何 PDF 函数都满足）。
+- ⚠️ **带宽 $h$ 是关键超参数**：$h$ 大 → 过度平滑（极端：含全部样本 → uniform）；$h$ 小 → 过度尖锐（极端：仅在训练点处冲激、其余为零）。不同 $h$ 结果天差地别——机器学习的不确定性来源之一。
+
+**IID 假设**：训练样本须 **independent and identically distributed (IID)** ——独立抽取、同分布。若按"先采男性、再采女性"有目的性地采，则不独立，估计失效。
+
+**与信号处理的类比**：Parzen window 是**采样过程的逆**——采样把连续函数变离散点，Parzen window 把离散训练点变回连续函数（每个样本放一个连续 kernel 再叠加）。机器学习本质是这个逆过程，但有不确定性（带宽/参数选择），故称"learning"而非确定性"feed-forward"。
+
+### 12. ⭐ Parametric：Maximum Likelihood Estimation (MLE)
+
+Parametric approach 假设 PDF 形式已知（如 Gaussian），只需估计参数（Gaussian 的 mean vector、covariance matrix）。
+
+**Likelihood**：参数 $\theta$ 下训练数据出现的联合概率 $p(\mathbf{x}_1,\dots,\mathbf{x}_N|\theta)$，称为参数对数据的 **likelihood**（"可能性"）。
+
+**MLE 原则**：选使 likelihood 最大的参数：
+
+$$
+\hat\theta=\arg\max_\theta\prod_{i=1}^{N}p(\mathbf{x}_i|\theta)
+$$
+
+取 log（乘积变求和）：
+
+$$
+\hat\theta=\arg\max_\theta\sum_{i=1}^{N}\ln p(\mathbf{x}_i|\theta)
+$$
+
+再对参数求导 $\nabla_\theta\sum\ln p(\mathbf{x}_i|\theta)=0$ 解出。
+
+**一维 Gaussian 的 MLE 结果**（老师推导）：
+
+$$
+\boxed{\hat\mu=\frac{1}{N}\sum_{i=1}^{N}\mathbf{x}_i=\text{样本均值}}
+$$
+
+$$
+\boxed{\hat\sigma^2=\frac{1}{N}\sum_{i=1}^{N}(\mathbf{x}_i-\hat\mu)^2=\text{样本方差}}
+$$
+
+- ⭐ **Gaussian mean 的 MLE = 样本均值；Gaussian variance 的 MLE = 样本方差。**
+- 多维情形：covariance matrix 的 MLE = data covariance matrix（样本协方差矩阵）。
+- 这是"常识性"公式，但本周从 MLE 推导**证明**它们就是 Gaussian 参数的最大似然估计。
+- 非 Gaussian 模型：可用 Gaussian mixture 拟合（本课 skip）；deep network 也属 parametric approach（参数化模型，用数据训练）。
+
+### 13. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **scalar covariance $\sigma^2\mathbf{I}$** | 比 shared $\boldsymbol{\Sigma}$ 更严；$\boldsymbol{\Sigma}^{-1}=\tfrac1{\sigma^2}\mathbf{I}$，方向不变 |
+| **边界过两 mean 连线** | 仅 $\sigma^2\mathbf{I}$ 时成立（上周 shared $\boldsymbol{\Sigma}$ 不一定） |
+| **降维到 1D** | 法向量 $\propto\boldsymbol{\mu}_i-\boldsymbol{\mu}_k$，分类只需沿此方向投影 |
+| **prior 移动 threshold** | prior 不等 → 边界平移；悬殊可移出两 mean 区间 |
+| **minimum distance classifier** | $\omega^*=\arg\min_i\|\mathbf{x}-\boldsymbol{\mu}_i\|^2$，= template matching |
+| **min distance 严格条件** | Gaussian + 共享 $\sigma^2\mathbf{I}$ + 等四条件全满足才 optimal |
+| **estimation = ML** | statistical estimation 本质即 machine learning；PDF = 完备信息 |
+| **prior 估计** | $\hat p(\omega_k)=N_k/N$ |
+| **Parzen window** | $p(\mathbf{x})=\frac1N\sum\frac1{h^D}K(\frac{\mathbf{x}-\mathbf{x}_i}{h})$；kernel 光滑化；$h$ 关键 |
+| **IID** | 训练样本须独立同分布 |
+| **MLE Gaussian** | $\hat\mu=$ 样本均值，$\hat\sigma^2=$ 样本方差，covariance = data covariance matrix |
+| **non-parametric vs parametric** | 前者不假设 PDF 形式（Parzen/K-NN），后者假设形式估参数（MLE） |
+
+### 14. 本周要点小结
+
+- **Topic 5 收尾**：scalar covariance $\boldsymbol{\Sigma}=\sigma^2\mathbf{I}$ 特例下，linear classifier 进一步简化——边界法向量 $\propto$ 类均值差，**必然过两 mean 连线**，分类只需沿类均值差方向的一维投影。
+- **Minimum distance classifier**：等 prior + $\sigma^2\mathbf{I}$ 时，最优分类退化为"分到最近 class mean"= template matching。直观但**仅在四条件全满足时 optimal**。
+- **Topic 6 开场**：未知 PDF、只有 training data 时，estimation = machine learning。先估 prior（$N_k/N$），再估 class-conditional PDF。
+- **Non-parametric（Parzen window）**：density × volume ≈ probability；用 kernel 求和估 PDF；矩形窗→阶梯不光滑，改 Gaussian kernel；带宽 $h$ 是关键超参。
+- **Parametric（MLE）**：假设 PDF 形式，最大化 likelihood；Gaussian 的 MLE = 样本均值/样本方差/data covariance matrix。
+- **哲学**：PDF 是随机变量的完备信息；理论上学全 PDF 即最优，实践样本有限需选参数、常直接优化预测输出。
 
 ---
 
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal, prior probability, posterior probability, class-conditional probability, likelihood, chain rule, law of total probability, mixture PDF/PMF, MAP decision rule, Bayes rule, decision region, decision boundary/threshold, error rate, discriminant function, Mahalanobis distance, covariance matrix, Gaussian/multivariate Gaussian, quadratic classifier, linear classifier, hyperplane, within-class scatter, Direct LDA 等）。中文用于组织句意与补充释义。
+> **下一周（Week 6）预告**：老师末尾明确——分类/预测不能直接作用于 raw data，需先做 **feature selection / extraction** 预处理。**未来两周先讲 feature selection**（从高维数据选有用 component 作 feature），之后 Topic 8 讲 **feature extraction**（组合 raw data 各 component 生成新 feature，如 CNN feature map / Transformer token 变换）。feature selection/extraction 在整个系统中起极关键作用。具体以 Week 6 课件为准。
+
+---
+
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal, prior probability, posterior probability, class-conditional probability, likelihood, chain rule, law of total probability, mixture PDF/PMF, MAP decision rule, Bayes rule, decision region, decision boundary/threshold, error rate, discriminant function, Mahalanobis distance, covariance matrix, Gaussian/multivariate Gaussian, quadratic classifier, linear classifier, hyperplane, within-class scatter, Direct LDA, statistical estimation, machine learning, training data, non-parametric approach, parametric approach, Parzen window, kernel function, bandwidth, k-nearest neighbor, IID (independent and identically distributed), maximum likelihood estimation / MLE, likelihood, sample mean, sample variance, data covariance matrix, Gaussian mixture, feature selection, feature extraction 等）。中文用于组织句意与补充释义。

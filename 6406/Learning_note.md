@@ -677,7 +677,7 @@ $$
 
 > **下周（Week 3）预告**：由 **Toh Kar-Ann** 接手，进入 **Lecture 3 — Linear Parametric Models**（Part 1 Analytic Learning 主体起点）。将用本周复习的线性代数与 least-squares 工具，从 closed-form 视角建立线性参数模型。本周数学补充是直接前置知识，建议先消化 gradient、matrix inverse、Lagrangian 三块。
 >
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine learning, supervised/unsupervised/semi-supervised/reinforcement learning, analytic learning, ensemble learning, closed-form solution, iterative optimization, gradient descent, SGD, Adam, hyperparameter, learning rate, bagging, boosting, random forest, Adaboost, gradient boosting, XGBoost, LightGBM, bias, variance, diversity, voting, averaging, regularization, least-squares, kernel ridge regression, matrix inversion, overfitting, interpretability, generalization, continual learning, hybrid learning, lockdown browser, pattern recognition pipeline, feature extraction/selection, dimension reduction, PCA, ICA, SIFT, nominal/ordinal/interval/ratio data, one-hot encoding, rank encoding, Hamming/Spearman/Chebyshev/Minkowski distance, metric/metric space, triangle inequality, L1/L2/Lp-norm, cleansing, completeness/consistency/uniformity/validity, alignment, min-max scaling, standardization, z-score, median absolute deviation (MAD), data leakage, log/exp/sigmoid/tanh transform, vector/matrix, transpose, inner/dot product, determinant, cofactor, adjugate, identity matrix, invertible/nonsingular, linearly dependent/independent, set, domain/codomain/range, linear/affine function, offset/bias, local/global minimum, max/argmax, gradient, Jacobian, Lagrangian, Lagrange multiplier, constrained optimization 等）。中文用于组织句意与补充释义。
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine learning, supervised/unsupervised/semi-supervised/reinforcement learning, analytic learning, ensemble learning, closed-form solution, iterative optimization, gradient descent, SGD, Adam, hyperparameter, learning rate, bagging, boosting, random forest, Adaboost, gradient boosting, XGBoost, LightGBM, bias, variance, diversity, voting, averaging, regularization, least-squares, kernel ridge regression, matrix inversion, overfitting, interpretability, generalization, continual learning, hybrid learning, lockdown browser, pattern recognition pipeline, feature extraction/selection, dimension reduction, PCA, ICA, SIFT, nominal/ordinal/interval/ratio data, one-hot encoding, rank encoding, Hamming/Spearman/Chebyshev/Minkowski distance, metric/metric space, triangle inequality, L1/L2/Lp-norm, cleansing, completeness/consistency/uniformity/validity, alignment, min-max scaling, standardization, z-score, median absolute deviation (MAD), data leakage, log/exp/sigmoid/tanh transform, vector/matrix, transpose, inner/dot product, determinant, cofactor, adjugate, identity matrix, invertible/nonsingular, linearly dependent/independent, set, domain/codomain/range, linear/affine function, offset/bias, local/global minimum, max/argmax, gradient, Jacobian, Lagrangian, Lagrange multiplier, constrained optimization, analytic regression, over-determined/under-determined system, normal equation, least-squares solution, minimum-norm solution, pseudo-inverse, ridge regression, weight decay, Tikhonov regularization, shrinkage, primal/dual ridge, Gram matrix, representer theorem, kernel regression, kernel trick, kernel ridge regression / KRR, threshold classification, feature matrix, one-vs-rest, multi-category learning 等）。中文用于组织句意与补充释义。
 
 ---
 
@@ -996,3 +996,198 @@ $$
 
 > **下周（Week 5）预告**：本周建立了 loss/cost function 框架。按 Toh 的 Analytic Learning 主线，预计 Week 5 进入 **具体学习算法的 cost function 求解**——可能是 logistic regression 的迭代优化（gradient descent / IRLS）、SVM 的 hinge + regularization 求解，或 ridge/lasso 的 closed-form 与 sparse 解。本周的 cost function 公式（4.39–4.42）与正则化（4.36）是直接前置。具体以 Lecture 5 课件为准。
 
+---
+
+## Week 5 — Lecture 5：Over- and Under-determined Analytic Regression
+
+> **教授**：Toh Kar-Ann（TKA，Week 3–8 主讲）。本周回到 Lecture 3 的 regression 解析求解框架，系统讲完 over/under-determined、Primal/Dual Ridge、Kernel/Kernel Ridge Regression，最后接 threshold 做 classification。
+>
+> 老师口述定位："This lecture will be focused on **analytic regression**… lecture five for **regression**, lecture six directly optimize **classification**。"即 Lecture 5 用 regression 学习 + threshold 切割做分类，Lecture 6 才直接对 classification 优化。
+
+### 1. 本课定位：Regression → Threshold → Classification
+
+- Learning 的目标是 **regression**（学一个 predictor $g(\mathbf{x},\mathbf{w})$ 拟合连续 target $y$）。
+- 回归学到的 $g$ 经 **thresholding**（阈值切割）即可用于 **classification**：$g(\mathbf{x},\hat{\mathbf{w}})>\tau$ 归一类、否则另一类。
+- 故本周先讲 regression 的解析解；最后一步补 threshold 即成 classifier。
+- 与 Week 3 的关系：Lecture 3 讲了 closed-form regression 的基础，本周是其完整化（over/under-determined + 正则化 + kernel）。
+
+### 2. SSE Minimization（cost function 与 normal equation）
+
+**模型**：线性 predictor $g(\mathbf{x},\mathbf{w})=\mathbf{w}^T\mathbf{x}$（含偏置），堆叠 $m$ 个训练样本为 feature matrix $P\in\mathbb{R}^{m\times(D+1)}$、target $\mathbf{y}\in\mathbb{R}^{m}$。
+
+**SSE cost function**（Week 4 已建立）：
+
+$$
+J_{\text{SSE}}(\mathbf{w})=\|\mathbf{y}-P\mathbf{w}\|_2^2=(\mathbf{y}-P\mathbf{w})^T(\mathbf{y}-P\mathbf{w})\tag{5.3}
+$$
+
+**Normal equation**（一阶导 $\nabla_{\mathbf{w}}J=0$）：
+
+$$
+-2P^T(\mathbf{y}-P\mathbf{w})=\mathbf{0}\quad\Longrightarrow\quad P^TP\,\mathbf{w}=P^T\mathbf{y}\tag{5.5}
+$$
+
+- $P^TP$ 即 (scaled) sample covariance matrix；$P^T\mathbf{y}$ 即 feature-target 互相关。
+
+### 3. ⭐ Over-determined 系统（$m>D+1$）：唯一解
+
+样本多于参数（$m>D+1$），$P^TP$ 非奇异（observations 独立），unique 最优解：
+
+$$
+\boxed{\;\hat{\mathbf{w}}=(P^TP)^{-1}P^T\mathbf{y}\;}\tag{5.6}
+$$
+
+- 此即 **least-squares 解** / normal equation 解；$J$ 是凸二次函数 → 此解为全局最优。
+- $\hat{\mathbf{w}}$ 是由 $P,\mathbf{y}$ 唯一确定的 fixed point。
+
+### 4. Multi-category Learning：堆叠输出矩阵
+
+对 $C$ 类，把 $C$ 个 binary one-vs-rest target 向量并列成 $Y\in\mathbb{R}^{m\times C}$，权重堆叠 $W\in\mathbb{R}^{(D+1)\times C}$：
+
+$$
+J_{\text{SSE}}(W)=\|Y-PW\|_F^2,\qquad\hat{W}=(P^TP)^{-1}P^TY
+$$
+
+- 列向 = 类别；每列独立是一个 binary regression。
+- 预测：$\text{cls}(g(\mathbf{x}_j,W))=\arg\max_k\,g(\mathbf{x}_j,\mathbf{w}_k)$。
+
+### 5. ⭐ Under-determined 系统（$m<D+1$）：最小范数解
+
+样本少于参数（$m<D+1$），$P^TP\in\mathbb{R}^{(D+1)\times(D+1)}$ 奇异（$P$ 最多 $m$ 个独立行，$\text{rank}(P)\le m$），无唯一解——**有无穷多解**。
+
+此时取**最小范数解**（minimum-norm solution）：
+
+$$
+\min_{\mathbf{w}}\|\mathbf{w}\|_2^2\quad\text{subject to}\quad\mathbf{y}-P\mathbf{w}=\mathbf{0}\tag{5.26}
+$$
+
+用 Lagrangian（Lagrange multiplier $\boldsymbol{\alpha}$）求解，得：
+
+$$
+\hat{\mathbf{w}}=P^T(PP^T)^{-1}\mathbf{y}
+$$
+
+- 注意对偶形式：over-determined 用 $(P^TP)^{-1}$（$(D+1)\times(D+1)$），under-determined 用 $(PP^T)^{-1}$（$m\times m$，更小可逆）。
+- ⚠️ Under-determined 即使加 weight-decay 正则化仍可能 **numerically ill-conditioned**，预测可很不准。
+
+### 6. ⭐ Primal Ridge Regression（加正则化的 closed-form）
+
+**动机**：$P^TP$ 可能奇异或病态 → 加正则化（weight decay / Tikhonov / ridge）保证可逆并控制复杂度。
+
+**Regularized cost**：
+
+$$
+J_{\text{SSE}_r}(\mathbf{w})=\|\mathbf{y}-P\mathbf{w}\|_2^2+\lambda\|\mathbf{w}\|_2^2
+$$
+
+一阶导 $\nabla_{\mathbf{w}}J=0$ 得 **Primal Ridge 解**：
+
+$$
+\boxed{\;\hat{\mathbf{w}}=(P^TP+\lambda I)^{-1}P^T\mathbf{y}\;}\tag{5.31}
+$$
+
+- $\lambda>0$ 使 $(P^TP+\lambda I)$ **恒可逆**（即使 $P^TP$ 奇异）；同时收缩权重（weight decay / shrinkage），降低 overfitting。
+- Multi-category：$\hat{W}=(P^TP+\lambda I)^{-1}P^TY$。
+- 老师强调："Ridge regression is also known as **weight decay regularization**"——名称不同、本质相同。
+
+### 7. ⭐ Dual Ridge Regression（在小空间求逆）
+
+**思想**：在 $(P^TP+\lambda I)$（$(D+1)\times(D+1)$）与 $(PP^T+\lambda I)$（$m\times m$）中选**较小者**求逆。
+
+由 $(P^TP+\lambda I)\mathbf{w}=P^T\mathbf{y}$ 令 $\mathbf{w}=P^T\boldsymbol{\alpha}$（representer 形式）代入：
+
+$$
+(PP^T+\lambda I)\boldsymbol{\alpha}=\mathbf{y}
+$$
+
+定义 **Gram matrix** $K=PP^T$，则：
+
+$$
+\boxed{\;\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y},\qquad\hat{\mathbf{w}}=P^T\hat{\boldsymbol{\alpha}}\;}
+$$
+
+- Multi-category：$\hat{A}=(K+\lambda I)^{-1}Y$，$\hat{W}=P^T\hat{A}$。
+- ⭐ **何时用 dual**：样本数 $m$ < 特征维数 $D+1$（如 kernel 方法、高维特征），在 $m\times m$ 空间求逆更省。
+
+### 8. ⭐ Kernel Regression（用 kernel 替代内积）
+
+据 **representer theorem**：任意 RKHS 下带正则化的 cost minimizer 都可写成训练数据的线性组合 $\mathbf{w}=P^T\boldsymbol{\alpha}$，因此**无需显式构造高维特征**，直接用 kernel $k(\mathbf{x}_i,\mathbf{x}_j)=\phi(\mathbf{x}_i)^T\phi(\mathbf{x}_j)$ 计算内积。
+
+- Gram matrix $K$ 中每项 $K_{ij}=k(\mathbf{x}_i,\mathbf{x}_j)=\phi(\mathbf{x}_i)^T\phi(\mathbf{x}_j)$。
+- 在 dual 空间解 $\boldsymbol{\alpha}$：$\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$。
+- **预测**（unseen $\mathbf{x}_j$）：
+
+$$
+g(\mathbf{x}_j,\hat{\mathbf{w}})=\sum_{i=1}^{m}\hat{\alpha}_i\,k(\mathbf{x}_i,\mathbf{x}_j)=\mathbf{k}(\mathbf{x}_j,P)(K+\lambda I)^{-1}\mathbf{y}
+$$
+
+- ⭐ 核心收益：**避免显式映射到高维（甚至无限维）feature space**——kernel 直接计算高维内积，计算量由 $m$ 决定而非特征维数。
+
+### 9. Kernel Ridge Regression（KRR）
+
+Kernel Regression + Ridge 正则化合一，即 **Kernel Ridge Regression (KRR)**：
+
+$$
+\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y},\qquad g(\mathbf{x}_j)=\mathbf{k}(\mathbf{x}_j,P)(K+\lambda I)^{-1}\mathbf{y}
+$$
+
+- Multi-category：$\hat{A}=(K+\lambda I)^{-1}Y$，$\hat{G}_t=\mathbf{k}(\mathbf{x}_j,P)(K+\lambda I)^{-1}Y$。
+- 训练只需 Gram matrix $K$ + 解线性方程 $(K+\lambda I)\boldsymbol{\alpha}=\mathbf{y}$；预测只需 kernel 求值。
+
+### 10. Threshold 与 Classification Decision
+
+学得 regression 输出 $g(\mathbf{x},\hat{\mathbf{w}})$ 后，加 threshold $\tau$ 做分类：
+
+$$
+\text{cls}(g)=\begin{cases}1 & g(\mathbf{x},\hat{\mathbf{w}})>\tau\\ 0 & g(\mathbf{x},\hat{\mathbf{w}})<\tau\end{cases}
+$$
+
+- 归一化输出 $g\in[0,1]$（$y\in\{0,1\}$）取 $\tau=0.5$；$g\in[-1,+1]$（$y\in\{-1,+1\}$）取 $\tau=0$。
+- ⭐ **regression vs classification**：regression 学连续输出、**不需要 threshold**（逼近 target 即可）；classification 学完再加 threshold 切割成离散类。
+- Multi-category：$\text{cls}(g(\mathbf{x}_j,W))=\arg\max_k\,g(\mathbf{x}_j,\mathbf{w}_k)$。
+
+### 11. ⭐ 公式速查表
+
+| 方法 | 解 / 公式 | 适用 |
+|---|---|---|
+| **Normal equation** | $P^TP\mathbf{w}=P^T\mathbf{y}$ | SSE 一阶条件 |
+| **Over-determined** | $\hat{\mathbf{w}}=(P^TP)^{-1}P^T\mathbf{y}$ | $m>D+1$，$P^TP$ 可逆 |
+| **Multi-category** | $\hat{W}=(P^TP)^{-1}P^TY$ | $C$ 类堆叠 |
+| **Under-determined min-norm** | $\hat{\mathbf{w}}=P^T(PP^T)^{-1}\mathbf{y}$ | $m<D+1$，$(PP^T)^{-1}$ |
+| **Primal Ridge** | $\hat{\mathbf{w}}=(P^TP+\lambda I)^{-1}P^T\mathbf{y}$ | 加正则化，恒可逆 |
+| **Dual Ridge** | $\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$，$\hat{\mathbf{w}}=P^T\hat{\boldsymbol{\alpha}}$，$K=PP^T$ | 小空间求逆 |
+| **Kernel Regression** | $g(\mathbf{x}_j)=\mathbf{k}(\mathbf{x}_j,P)\hat{\boldsymbol{\alpha}}$，$\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$ | kernel 隐式高维内积 |
+| **Kernel Ridge (KRR)** | 同上 + ridge 正则 | Kernel + Ridge |
+| **Threshold** | $\text{cls}(g)=1$ if $g>\tau$（$\tau=0.5$ 或 $0$） | regression→classification |
+
+### 12. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **SSE normal equation** | $-2P^T(\mathbf{y}-P\mathbf{w})=0$ → $P^TP\mathbf{w}=P^T\mathbf{y}$ |
+| **over-determined 解** | $\hat{\mathbf{w}}=(P^TP)^{-1}P^T\mathbf{y}$，唯一、凸最优 |
+| **under-determined** | $P^TP$ 奇异 → 无穷解 → 取 min-norm $\hat{\mathbf{w}}=P^T(PP^T)^{-1}\mathbf{y}$ |
+| **Primal Ridge** | $\hat{\mathbf{w}}=(P^TP+\lambda I)^{-1}P^T\mathbf{y}$；$\lambda$ 使恒可逆 + shrinkage |
+| **Dual Ridge** | $\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$，$K=PP^T$（Gram）；选小空间求逆 |
+| **Gram matrix** | $K=PP^T$ |
+| **Representer theorem** | $\mathbf{w}=P^T\boldsymbol{\alpha}$，解在 dual 空间 |
+| **Kernel Regression** | 用 $k(\cdot,\cdot)$ 隐式高维内积，避免显式映射 |
+| **KRR** | Kernel + Ridge，$\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$ |
+| **Threshold classification** | regression 学完加 $\tau$ 切割；$\tau=0.5$（$\{0,1\}$）或 $0$（$\{-1,+1\}$） |
+| **regression vs classification** | regression 无需 threshold；classification 才 threshold |
+| **ill-conditioned** | under-determined 即使加正则仍可能病态 |
+
+### 13. 本周要点小结
+
+- **SSE 框架**：$J=\|\mathbf{y}-P\mathbf{w}\|^2$，normal equation $P^TP\mathbf{w}=P^T\mathbf{y}$，凸二次 → 唯一最优（over-determined）。
+- **Over vs Under-determined**：$m>D+1$ 用 $(P^TP)^{-1}$；$m<D+1$ 时 $P^TP$ 奇异，取 min-norm 解 $P^T(PP^T)^{-1}\mathbf{y}$（对偶，小空间求逆）。
+- **Ridge Regression**：加 $\lambda\|\mathbf{w}\|^2$ 正则 → $(P^TP+\lambda I)^{-1}$ 恒可逆 + 权重收缩 = weight decay = Tikhonov。
+- **Dual Ridge**：$\mathbf{w}=P^T\boldsymbol{\alpha}$，在 Gram matrix $K=PP^T$ 上解 $\hat{\boldsymbol{\alpha}}=(K+\lambda I)^{-1}\mathbf{y}$；选较小维数求逆。
+- **Kernel / KRR**：representer theorem + kernel trick 隐式高维内积，计算量由 $m$ 决定；KRR = Kernel + Ridge 一体。
+- **Threshold**：regression 学连续输出 → 加 $\tau$（0.5 或 0）切割成 classification。Lecture 5 = regression（解析），Lecture 6 = 直接优化 classification。
+
+---
+
+> **下周（Week 6）预告**：老师明确 "lecture six directly optimize **classification**"——下周从 regression+threshold 转向**直接对 classification cost 优化**的学习方法（如 logistic regression、SVM 的解析/迭代求解），threshold 由模型本身隐含而非后接。本周的 SSE/Ridge/Kernel 公式是直接前置。具体以 Lecture 6 课件为准。
+
+---

@@ -16,7 +16,7 @@
 - **术语说明**：GA（遗传算法）只是进化计算（Evolutionary Computing, EC）这一大类下的**一种**具体技术；但因 GA 最流行，人们习惯把所有进化类方法统称 "GA"。本课中 evolutionary algorithm / evolutionary computing / genetic algorithm 混用，视为同义。
 - **任课教师**：
   - **前 4 周（Week 1–4）**：**A/P LIM Meng Hiot**（School of EEE，办公室 S1-B1b-46，emhlim@ntu.edu.sg），主讲遗传算法/进化计算。
-  - **后半（Week 5 起，机器学习部分）**：由另一位教授接手（转写误拼为 "prop mole"/"Malco"，**待 Week5 课件确认**）。
+  - **后半（Week 5–13，机器学习部分）**：**Mao Kezhi**（School of EEE，办公室 S2-B2c-84，ekzmao@ntu.edu.sg），主讲 Machine Learning（Week 5–13，共 9 周）。转写误拼为 "prop mole"/"Malco"。
 - **教材**：课件标注一本参考书（老师因与作者为友可自由使用其材料）。复杂度理论部分引用经典书 **Garey & Johnson, *Computers and Intractability***。
 - **参考论文**：`week1/IJCAT NQ.pdf` — Bah-Hwee Gwee & Meng-Hiot Lim, *An evolution search algorithm for solving N-queen problems*, IJCAT 2003。演示 N-queens 的 GA 求解（N-permutation 编码、适应度度量、可解到 2000 皇后），与课程 N-Queens 主题直接相关。
 
@@ -26,7 +26,7 @@
 |---|---|---|
 | **Continuous Assessment (CA)** | **40%** | 贯穿全学期；分为两段 |
 | └ CA Part 1（Lim 的 4 周内） | **10%** | **仅一次 Quiz**，**无作业、无考勤考核** |
-| └ CA Part 2（后半 ML 部分） | **30%** | 由后半任课教授安排（待后续课件确认） |
+| └ CA Part 2（后半 ML 部分） | **30%** | Assignments 1&2 共 20%（Week 7/8 发布，Week 10 前提交）+ Quiz 2 共 10%（11 Nov 2026 周二 9:30–10:30，venue 待定） |
 | **Final Exam 期末** | **60%** | 3 小时，覆盖全课程所有内容 |
 
 #### 关键：前 4 周（Lim 部分）的考核
@@ -682,3 +682,160 @@ $$\alpha = \frac{|f(A)-f(B)|}{f(A)+f(B)}$$
 ---
 
 > **下一周预告**：Week 4 是 A/P LIM 部分的最后一周（Quiz 1 已结束）。Week 5 起课程**由另一位教授接手**，进入 **Machine Learning** 部分（CA Part 2，占 30%）。预计从 supervised learning 基础、classification/regression 等主题开始；具体内容以 Week 5 课件为准。LIM 部分的历年真题（EE6227 archive）仍是 Final Exam（60%，覆盖全课程）的复习材料。
+
+---
+
+## Week 5 — Machine Learning 导论（Mao Kezhi 接手，Weeks 5–13）
+
+> **教授**：本周起由 **Mao Kezhi** 教授接手（前半 LIM/EA/GA 部分 LIM 教授的 Quiz 1 已结束）。课程从 Genetic Algorithm / 进化计算转向 **Machine Learning**，共 9 周（Week 5–13）。
+>
+> **课件**：`week5/ML-Slides1.pdf`（52 页，标题 *EE6407 Genetic Algorithms and Machine Learning*）。本周为 ML 导论 + 考核说明 + AI/ML/NN/DL 关系 + ML 三步骤 + 三类 ML + tools/issues。
+
+### 1. ⭐⭐ ML 部分考核安排（开课周必记）
+
+| 项目 | 占比 | 细节 |
+|---|---|---|
+| **CA（Continual Assessment）总** | **40%** | 全课程；含前半 LIM/EA 的 Quiz 1 (10%) + ML 部分 CA (30%) |
+| — Quiz 1（LIM/EA 部分） | 10% | 已于 Week 4 进行 |
+| **ML 部分 CA** | **30%** | = 两个 Assignment (20%) + Quiz 2 (10%) |
+| — Assignment ×2 | **20%** | 用同一数据训练**两个不同 classifier**，预测测试数据 class label 并比较性能；两份合并为单一 PDF 提交。**Week 7 & 8 release，Week 10 提交**（NTULearn portal 上传 PDF） |
+| — **Quiz 2** | **10%** | **周二 11 月 10 日（Week 13，最后一周）9:30–10:30**（紧接课后，因 ~800 名学生需用大阶梯教室；否则改周六/晚上） |
+| **Final Exam** | **60%** | 4 道题，其中约 **3 题来自 ML 部分**（覆盖后半）、1 题来自前半。**每年换题**——只刷往年题会挂，往年题仅作 format 参考 |
+
+> ⚠️ **重要提醒**：
+> - ML 部分在 CA 与 Final Exam 中都占大头（9 周 / 13 周 ≈ 69% 课时，Final 4 题中 3 题）。
+> - Assignment 同一数据集、两个不同 classifier——考察对多种分类器的掌握与对比。
+> - 老师强调题目**逐学期更换**，不要依赖刷题；理解原理与方法为主。
+
+### 2. AI / ML / NN / DL 层级关系
+
+四个术语各有 scope，须分清：
+
+```
+AI ⊃ Machine Learning ⊃ Neural Networks ⊃ Deep Learning
+```
+
+| 术语 | 定义 | 说明 |
+|---|---|---|
+| **AI（Artificial Intelligence）** | 模拟/模仿人类智能，最宽 | 含 computer vision、NLP、电子鼻（模拟嗅觉）等任何模仿人类行为/智能的技术 |
+| **Machine Learning** | data-driven 方法，从数据学模型 | 区别于 rule-based expert system（1950s–80s 主流）；ML 不靠人工编码规则 |
+| **Neural Networks** | ML 的子领域，用数据训练的神经网络 | 一种非线性模型；线性模型（linear model）也属 ML 但非 NN |
+| **Deep Learning** | 多层 NN | NN 中层数多的一类 |
+
+- 历史脉络：1950s–1980s 主导 **rule-based / expert system**（专家知识 → 编码成规则）；之后转向 **data-driven ML**。
+- 实践中 rule-based 与 ML 常整合（hybrid）以提升 robustness、explainability；非二选一。
+- ⭐ **本课范围**：只讲 Machine Learning，**不涵盖 Neural Networks / Deep Learning**（NN/DL 在另一门课 EE6207 / EE7207 讲）。
+
+### 3. ⭐ Machine Learning 三步骤
+
+ML 过程由三部分组成：
+
+| 步骤 | 名称 | 含义 |
+|---|---|---|
+| 1 | **Data Input** | 输入训练数据（如带 label 的图像） |
+| 2 | **Abstraction（抽象）** | 从输入数据学一个 **model**（模型可为规则、decision、数学方程，线性或非线性） |
+| 3 | **Generalization（泛化）** | 将学得的 model 应用到**未来/新数据**做预测 |
+
+- **Abstraction** = 训练阶段（fit a model from training samples）。
+- **Generalization** = 推断阶段（apply trained model to future data）。
+- ⭐ **Overfitting 的危害**：模型在训练范围内表现好，但**范围外泛化极差**——这正是要避免 overfitting 的原因。Generalization capability 是衡量模型质量的关键。
+- 数据质量决定模型质量（garbage in, garbage out）：data → model → generalization capability，环环相扣。
+
+### 4. ⭐ 三类 Machine Learning
+
+| 类型 | 数据 | 任务 | 本课 |
+|---|---|---|---|
+| **Supervised Learning** | 有 label | **classification**（离散、有限类）+ **regression**（连续实值） | ✅ 讲 |
+| **Unsupervised Learning** | 无 label | **clustering**（聚类）+ **association analysis**（关联分析） | ✅ 讲 clustering；association 仅提及 |
+| **Reinforcement Learning** | reward/punishment 反馈 | agent 与 environment 交互、试错学策略 | ❌ 不讲（仅引入概念） |
+
+**Supervised Learning 两大问题**：
+- **Classification（分类）**：输出为**离散、有限的类别**。例：肿瘤恶性/良性、邮件 spam/non-spam、人脸识别（类别数可达成千上万，如 ImageNet 1000 类、人脸 ID 几千）。虽类别数可很大但**仍有限** → classification。
+- **Regression（回归）**：输出为**连续实值、可能值无限**。例：房价预测、销量预测、温度预测。
+- ⭐ 区分依据：**输出取值个数有限 → classification；连续无限 → regression**。Regression 多见于统计学，Classification 多见于 AI/ML。
+
+**Unsupervised Learning**：
+- 数据无 label，仍可从中学到结构。
+- **Clustering（聚类）**：把相似样本聚成簇。
+- **Association Analysis（关联分析）**：市场购物篮分析（market basket analysis）——发现物品间关联（频繁共现），minor topic，本课不深入。
+
+**Reinforcement Learning（概念引入，不考）**：
+- agent 在 environment 中行动，依 reward/punishment 反馈学最优策略；"从错误中学习"。
+- 自主驾驶、ChatGPT 的 RLHF（人类反馈强化学习）等受此启发。
+
+### 5. ML 相关类型与延伸概念
+
+- **Transfer Learning（迁移学习）**：把一个 domain/task 的知识迁移到另一 task；若两 domain 完全无关则迁移无效，甚至**negative transfer**（负迁移）。
+- **Human Learning 的类比**（老师提及）：memorization（记忆）、analogy（类比）、discovery/pattern recovery（模式发现）等不同学习类型，可作为评估 ML 的视角。
+
+### 6. ⭐ 数据准备（Data Preparation）
+
+数据是 ML 基础，质量决定上限。涉及：
+- **Labeling（标注）**：supervised 需 label；标注昂贵、耗时，有时需专家知识；可用 consensus / majority voting 提高标注质量。
+- **Data preprocessing**：处理 missing value、noisy data、outlier；清洗、归一化等。
+- 老师强调模型性能**取决于数据质量**。
+
+### 7. ⭐ Tools（实现工具）
+
+| 工具 | 说明 |
+|---|---|
+| **Python** + **scikit-learn** | 当下最流行 ML 语言/库；assignment 首选 |
+| **R** | 统计/商业领域常用高级语言 |
+| **MATLAB** | 工程背景熟悉，有 ML toolbox；老师自 1989 年起用 |
+| **C** | 底层实现，用于训练/部署大模型 |
+
+- 实现路径：(1) 按公式手写程序实现 classifier（加深理解）；(2) 直接用 toolbox / 库函数。
+- Assignment 可自写或用库；关键是理解原理。
+
+### 8. ⭐ Issues（ML 应用注意事项）
+
+| Issue | 要点 |
+|---|---|
+| **Privacy（隐私）** | 医疗等应用涉及个人数据；即使无隐私顾虑也不应把姓名等敏感属性作 feature |
+| **Reliability（可靠性）** | 模型预测**未必可靠**——质量由数据决定，数据有 bias / 遗漏 → 不可信；需运用 human judgment 判断是否信任 |
+| **Bias（偏差）** | 模型可对某些群体/观点有 bias（如大语言模型因训练数据偏西方而对"中国人吃什么"等给出偏向性答案） |
+| **Ethical（伦理）** | bias、公平性等伦理问题 |
+| **Legal（法律）** | regulation（法规）、privacy、mitigation of bias、transparency 等 |
+
+- ⭐ 老师反复强调：模型预测不一定可信，**始终运用 human judgment**；并关注 ethical / legal / privacy 问题。
+
+### 9. 本课 ML 部分主题路线（预告）
+
+老师预告后续主题（按 ML-Slides1）：
+- 先讲 **classifier 设计**：Linear Discriminant Analysis (LDA)、Support Vector Machine (SVM) 等——含公式、可手写实现。
+- 再讲其他 supervised / unsupervised 方法。
+- 具体 classifier 与顺序以每周课件为准。
+
+### 10. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **考核占比** | CA 40%（Quiz1 10% + ML CA 30%=Assignment 20%+Quiz2 10%），Final 60%（4 题中 3 题 ML） |
+| **Quiz 2** | 10%，周二 11 月 10 日 9:30–10:30（Week 13） |
+| **Assignment** | 20%，Week 7&8 release、Week 10 提交；同一数据两 classifier 对比 |
+| **AI⊃ML⊃NN⊃DL** | 层级关系；本课只讲 ML，不含 NN/DL |
+| **ML 三步骤** | Data Input → Abstraction（学 model）→ Generalization（应用到新数据） |
+| **Generalization / Overfitting** | overfitting → 范围外泛化差；数据质量→模型质量→泛化能力 |
+| **三类 ML** | supervised（有 label）、unsupervised（无 label）、reinforcement（reward） |
+| **Classification vs Regression** | 输出有限离散→classification；连续实值→regression |
+| **clustering / association** | unsupervised 两任务；association = market basket |
+| **Tools** | Python+scikit-learn / R / MATLAB / C |
+| **Issues** | privacy、reliability、bias、ethical、legal；需 human judgment |
+| **换题** | Final 逐学期换题，刷往年题不够 |
+
+### 11. 本周要点小结
+
+- **课程切换**：Week 5 起 Mao Kezhi 接手，进入 ML（9 周，CA 与 Final 占大头）。
+- **考核**：ML CA 30%（Assignment 20% Week 7&8 出/Week 10 交 + Quiz 2 10% 11/10）；Final 60%（4 题 3 题 ML，换题）。
+- **AI/ML/NN/DL 层级**：AI ⊃ ML ⊃ NN ⊃ DL；本课仅 ML。
+- **ML 三步骤**：Data Input → Abstraction（学 model）→ Generalization（用 model 预测新数据）；overfitting 损害泛化。
+- **三类 ML**：supervised（classification + regression）、unsupervised（clustering + association）、reinforcement（本课不讲）。
+- **Classification vs Regression**：输出有限离散 vs 连续实值。
+- **Tools**：Python/scikit-learn、R、MATLAB、C。
+- **Issues**：privacy、reliability（需 human judgment）、bias、ethical、legal。
+
+---
+
+> **下一周（Week 6）预告**：按 ML-Slides1 路线，下周起进入具体 **classifier 设计**——预计从 Linear Discriminant Analysis (LDA)、Support Vector Machine (SVM) 等监督分类器开始，含公式推导与实现。本周的 ML 三步骤、classification/regression 区分是直接前置。具体以 Week 6 课件为准。
+
+---
