@@ -839,3 +839,285 @@ ML 过程由三部分组成：
 > **下一周（Week 6）预告**：按 ML-Slides1 路线，下周起进入具体 **classifier 设计**——预计从 Linear Discriminant Analysis (LDA)、Support Vector Machine (SVM) 等监督分类器开始，含公式推导与实现。本周的 ML 三步骤、classification/regression 区分是直接前置。具体以 Week 6 课件为准。
 
 ---
+
+## Week 6 — Machine Learning 数据准备（Data Preparation for ML）
+
+> **教授**：Mao Kezhi（Week 5–13 ML 部分，第 2 周）。
+>
+> **课件**：`week6/ML-Slides2.pdf`（64 页，标题 *Lecturer Organization / School of EEE*，§2 Data Preparation for Machine Learning）。本周承接 Week 5 的 ML 三步骤（Data Input → Abstraction → Generalization），专门展开第一步 **Data Input** 的准备工作——数据是 ML 基础，"garbage in, garbage out"，数据质量直接决定模型质量与泛化能力。
+>
+> ⚠️ **本周实际主题为 Data Preparation（数据准备），不是 Week 5 预告中的 classifier design。** 转写末尾老师明确说 "next week we will just use this well prepared data to learn different types of models"，即 **Week 7 才进入 classifier design（分类器设计）**。
+>
+> 转写噪声修正（以 PDF 为准）：
+> - "mache / machen / machina" → machine / machine learning
+> - "abstion / exploation / espion / exploation" → exploration
+> - "pession / pssion / prepsion / presion / purple session / perception" → preprocessing
+> - "domint / domino / domnot / dominoy / dmin / minaltis" → dimensionality / dimension
+> - "fatie / fathe / fisie / fishie / fisie striation / fish station / facial elation / fat elation" → feature extraction / feature selection
+> - "subsclation / selation / subselation" → subset selection
+> - "mission value / misson" → missing value；"autis / ats / ties / alias / at value" → outliers
+> - "linu / linual / linear / lanu / lining" → learning（上下文中多指"训练"）
+> - "CGP / C GPA / CGB / CDP" → CGPA；"snivion / sivan / sini / vision / suni vision" → standard deviation
+> - "vars" → variance；"trial classified / atrial classified" → a typical classifier
+> - "pan classification / p classified" → pattern classification / classifier
+> - "ha unhealthy" → happy/unhappy；"barrel class" → basic class
+
+### 1. 本周主线：数据准备为什么重要
+
+ML 并非"拿到数据丢进 scikit-learn 就出模型"那么简单——数据收集后必须**仔细准备**才能喂给算法。老师反复强调：**数据质量直接决定模型质量，进而决定预测的可靠性**。
+
+数据准备活动（PDF §2.1）：
+
+1. **Understand the type of data**（理解数据类型）——不同模型对数据类型有假设（如要求 continuous 且服从 normal distribution），不满足则性能下降。
+2. **Explore the nature and quality**（探索数据性质/质量）——噪声、spread、分布形态。
+3. **Explore relationships amongst data elements**（探索变量间关系）——inter-feature relationship，发现 redundant/irrelevant features。
+4. **Find potential issues**（发现潜在问题）——missing value、outliers。
+5. **Do remediation**（补救/修复）——impute missing values、handle outliers。
+6. **Apply preprocessing**（应用预处理）——scaling/normalization、dimensionality reduction。
+
+数据准备好后，学习任务才开始（PDF §2.1 p3）：
+- **Supervised learning**：把数据分成 **training data + test data**（有时加 validation data 用于确定 hyperparameter）。
+- 考虑不同 model/learning algorithm，基于 training data 训练，再应用到 test data 评估性能。
+- **Unsupervised learning**：无需 train/test 分割，直接对 input data 施加算法。
+
+⭐ **Hyperparameter vs. Parameter**（本周关键区分）：
+- **Parameter（参数）**：从 training data **估计**得到（如线性模型权重）。
+- **Hyperparameter（超参数）**：训练前**手动设定**，不由数据估计（如 kNN 的 k、正则化系数 C）；用 **validation data** 选择合适取值。
+
+### 2. ⭐ 数据类型（Types of Data）
+
+数据集（data set）是相关记录的集合。约定：**一行 = 一个 sample（样本）**，**一列 = 一个 attribute/feature/variable（属性/特征/变量）**。术语在不同领域同义：
+- Computer Science：**feature**
+- Pattern recognition / classification：**feature** 或 **attribute**
+- Statistics：**variable**
+
+数据分为两大类，每类再分两子类（PDF §2.2）：
+
+```
+              Attributes
+    /                     \
+Qualitative/Categorical   Quantitative/Numeric
+  /          \              /          \
+Nominal    Ordinal      Interval     Ratio
+```
+
+| 大类 | 子类 | 特点 | 可执行运算 | 例子 |
+|---|---|---|---|---|
+| **Qualitative（定性）/ Categorical（类别）** | **Nominal（名义）** | 命名值，**无序**；可能值数有限 | 仅能判等（=≠）；**不能**加减乘除、不能算 mean/variance | 血型 A/B/O/AB、国籍、性别 |
+| | **Ordinal（有序）** | 命名值，**可排序** | 可排大小、可算 **median**、quartile；**不能**加减乘除、**不能** mean | 成绩等级 A/B/C、满意度 happy/unhappy、金属硬度 |
+| **Quantitative（定量）/ Numeric（数值）** | **Interval（区间）** | 有序且差值已知，**无绝对零** | 加减、mean、median、mode、standard deviation；**不能**乘除（ratio 无意义） | 摄氏温度、日期/时间 |
+| | **Ratio（比率）** | 有序、差值已知、**有绝对零** | 加减乘除全部可；mean、median、mode、standard deviation 均可 | 长度、高度、重量、价格 |
+
+⭐ **为什么要分清数据类型？** 因为 classifier design 中常需对数据做运算（mean、variance 等），nominal 数据上做加法无意义。理解数据类型才能选对模型、选对预处理方式。
+
+按取值个数还可分：
+- **Discrete（离散）**：有限或可数无穷（countably infinite）个可能值。Nominal/ordinal 属此类；某些 numeric（如 count）也属。**Binary attribute** 是 discrete 的特例（两个取值）。
+- **Continuous（连续）**：可取任意实数值。Interval/ratio 属此类。
+
+### 3. ⭐ 探索数据结构（Exploring Structure of Data）
+
+#### 3.1 Data Dictionary（数据字典）
+
+每个规范数据集应附 **data dictionary**（metadata repository）——记录每个 attribute 的描述、数据类型、是否有 missing value 等。如 Auto MPG 数据集字典会标明：
+- 数据集特征（features 数、samples 数 398）、关联任务（regression）、各 attribute 类型（continuous/integer）。
+- **Target variable（目标变量）**：要预测的变量（如 MPG），不是 feature。
+  - target 为 **categorical → classification 问题**；target 为 **continuous → regression 问题**。
+
+#### 3.2 探索数值数据（Exploring Numerical Data）
+
+**Central Tendency（集中趋势）**：
+- **Mean（均值）**：$$\bar{x}=\frac{1}{n}\sum_{i=1}^{n}x_i$$。**对 outlier 敏感**。
+- **Median（中位数）**：排序后中间值。**对 outlier 鲁棒**（robust）。Mean 与 median 差异大 ⇒ 数据 **skewed（偏斜）**，需 drill down 找原因。
+- **Mode（众数）**：出现最频繁的值。主要用于 **nominal data** 的 central tendency（ordinal 可用 median，更好）。
+
+**Data Spread（数据分散度）**：
+- **Variance（方差）**：$$\sigma^2=\frac{1}{n}\sum_{i=1}^{n}(x_i-\bar{x})^2$$
+- **Standard Deviation（标准差）**：$$\sigma=\sqrt{\sigma^2}$$
+
+⭐ 老师把 variance 引申到模型评估：同一算法不同 train/test 划分会得到不同性能，重复实验后报告 **mean ± standard deviation**——std 小 ⇒ 模型 **robust（鲁棒）**；std 大 ⇒ 不确定性高、不鲁棒。这是研究论文的标准做法。
+
+**Data Value Position（位置度量）——Five-Number Summary（五数概括）**：
+- 排序后将数据分为四等分，得 **minimum、Q1、Q2(median)、Q3、maximum**。
+  - **Q1**：前半部分的中位数（25th percentile）
+  - **Q2**：整体中位数（50th percentile）
+  - **Q3**：后半部分的中位数（75th percentile）
+- **IQR（Inter-Quartile Range，四分位距）** = Q3 − Q1。
+- 五数之间间距不等可反映 **skewness**：如 Auto MPG 中 displacement 的 Q2 到 Q3 距离（113.5）远大于 Q1 到 Q2（44.3）⇒ 大值端更分散 ⇒ 右偏（right-skewed）。
+
+#### 3.3 可视化（Visualization）
+
+**Box Plot（箱线图，PDF §2.4.3.1）**：
+- 箱体从 Q1 到 Q3，中间横线为 median。
+- **Whisker（须）**：从 Q1 向下延伸至 `Q1 − 1.5×IQR` 内的最大数据点；从 Q3 向上延伸至 `Q3 + 1.5×IQR` 内的最小数据点。
+- **超出 whisker 的点 = outliers**。
+- 例：Q1=73, median=76, Q3=79, IQR=6 ⇒ 下界 64、上界 88。若数据中有 70、63、60，下须落在 70（最接近 64 且 ≥64 的点）。
+- 箱体形状可揭示分布：median 居中且对称 ⇒ 近对称分布；Q1 与箱体距离不均 ⇒ skewed。
+
+**Histogram（直方图，PDF §2.4.3.2）**：
+- 将值域分为等宽 **bins**（默认 10），统计每个 bin 中数据点数（count）。
+- 形态可揭示分布类型：
+  - 各 bin count 相近 ⇒ **uniform distribution（均匀分布）**
+  - 单峰对称 ⇒ **normal distribution（正态分布）**
+  - 双峰 ⇒ **bimodal distribution（双峰分布）**——可能需用两个 Gaussian 函数建模
+  - 长尾在右 ⇒ **right-skewed**；长尾在左 ⇒ **left-skewed**
+- ⭐ 老师强调：下周学 classification 的基本 decision rule 时要**近似数据分布**（density function），需先通过 histogram 判断分布形态，不能盲目假设 normal。
+
+#### 3.4 探索类别数据（Exploring Categorical Data）
+
+类别数据可能值少，用**频数表**展示各取值的样本数（如 car.name 每种车各多少、cylinders 3/4/5/6/8 各多少辆）。
+
+#### 3.5 探索变量间关系（Exploring Relationships）
+
+| 方法 | 说明 |
+|---|---|
+| **Scatter Plot（散点图，§2.6.1）** | 两变量构成二维点，点的分布形态揭示相关性。若点呈趋势（非随机散布）⇒ 两变量相关。用于 feature↔target（判断 feature 是否有用）或 feature↔feature（发现 redundancy）。完全相同两 feature ⇒ 所有点落在 45° 直线上。 |
+| **Two-way Cross-tabulation（交叉表 / Contingency Table，§2.6.2）** | 矩阵形式，展示两 categorical attribute 的联合频率。如各 origin 区域下不同 cylinder 数的车辆数。 |
+
+⭐ Scatter plot 判断 feature 有无价值：feature 与 target 的散点若呈趋势 ⇒ 该 feature 与 target 相关、应纳入模型；若随机散布 ⇒ 该 feature 对预测无用、应排除。
+
+### 4. ⭐ 数据质量与修复（Data Quality and Remediation）
+
+两类常见问题（PDF §2.7）：
+
+#### 4.1 Missing Value（缺失值）
+
+成因：数据收集时信息不可得、录入遗漏。表现：表格中空缺或 `?`。
+
+**处理策略**：
+1. **Eliminate samples（删除样本）**：缺失样本占比小时可行（如 Auto MPG 398 中仅 6 个 horsepower 缺失 ⇒ 删除后剩 392，够用）。占比高时不可删（数据损失大）。
+2. **Imputation（插补）**：
+   - 用 **mean/median/mode** 替换：
+     - Quantitative attribute ⇒ 用 mean 或 median（有 outlier 时用 median）
+     - Qualitative attribute ⇒ 用 mode
+     - **Supervised 问题中按 class 分别计算**：同类样本 feature 值相近，应从同类样本估统计量再填充。
+   - **Similarity-based imputation（基于相似性的插补）**：在同类样本中找最相似的若干样本，用其 mean/median/mode 填充——比全类均值更精确。
+   - **Estimate via feature relationship（利用特征关系估算）**：若 feature 间有相关，可建立回归关系 $x_1 \approx f(x_2,\dots)$，用其他 feature 预测缺失 feature 值。
+
+#### 4.2 Outliers（异常值）
+
+成因：记录错误（如身高记成 179 而非 1.79）、测量错误、或代表真实异常群体（如高血压患者）。
+
+**识别**：box plot 中超出 whisker 的点；或距 mean 超过若干个 standard deviation。
+
+**处理策略**：
+1. **Remove outliers（移除）**：outlier 数量少（如 1–2%）且移除不影响建模结果时可行——最简单。
+2. **Imputation（插补）**：用 mean/median/mode 替换（同 missing value 思路，按 class 分别估）。
+3. **Capping（盖帽）**：超出 `Q1 − 1.5×IQR` 或 `Q3 + 1.5×IQR` 的值用 **5th percentile 或 95th percentile** 替换；或用 box plot 的 min/max 替换。
+4. **Separate modeling（分离建模）**：outlier 数量显著时，可能代表新模式（如高血压人群），应把数据分成两部分分别建模——类似 bimodal 场景。
+5. **Natural outliers 保留**：若 outlier 是真实有意义的（非错误），不应修改。
+
+### 5. ⭐ 数据预处理（Data Pre-processing）
+
+#### 5.1 Feature Scaling（特征缩放，PDF §2.8.1）
+
+目的：把不同特征的取值转换到**相似尺度**，避免大数值 feature 主导模型。
+
+**为何需要——两个理由**：
+
+| 场景 | 理由 |
+|---|---|
+| **Distance-based algorithms（基于距离的算法）** | classifier 用 Euclidean distance 等度量样本相似度。若一 feature 取值范围远大于另一（如 CGPA 0–5 vs salary 60000–70000），大值 feature **dominate 距离计算**，小值 feature 被忽略。scaling 后各 feature 对距离贡献均衡。 |
+| **Gradient descent-based algorithms（基于梯度下降的算法）** | 参数更新 $\theta_i \leftarrow \theta_i - \eta\frac{\partial L}{\partial\theta_i}$，更新幅度 $\propto x_i$。若 feature $x_i$ 数值大则更新大 ⇒ **训练不稳定、可能不收敛**。scaling 后更新幅度均衡，梯度下降更快收敛到 minima。 |
+
+⭐ **Euclidean distance 公式**（老师口述）：
+$$d(x,y)=\sqrt{\sum_{i=1}^{n}(x_i-y_i)^2}$$
+每个 feature 的差值平方求和再开方。feature 尺度差异会让大值 feature 主导此项。
+
+⭐ **Gradient descent 参数更新**（老师口述，下周 classifier 会复用）：
+$$\theta_i \leftarrow \theta_i - \eta\frac{\partial L}{\partial\theta_i}$$
+其中 $\eta$ 为 learning rate，$L$ 为 loss function，$x_i$ 为第 $i$ 个 feature。$x_i$ 大 ⇒ 更新大 ⇒ 不稳定。
+
+#### 5.2 ⭐ Normalization（归一化，Min-Max Scaling，§2.8.2）
+
+把数据映射到 **[0,1]** 区间：
+
+$$x' = \frac{x - x_{\min}}{x_{\max} - x_{\min}}$$
+
+- $x_{\min}$、$x_{\max}$ 为该 feature 的最小、最大值（outlier 与 missing value 已处理后再算）。
+- $x = x_{\min} \Rightarrow x'=0$；$x = x_{\max} \Rightarrow x'=1$。
+- **线性变换**，简单直观，范围固定。
+
+#### 5.3 ⭐ Standardization（标准化，§2.8.3）
+
+把数据中心化到 **mean=0、standard deviation=1**：
+
+$$x' = \frac{x - \mu}{\sigma}$$
+
+- $\mu$ 为 mean、$\sigma$ 为 standard deviation（处理完 outlier/missing 后计算）。
+- 变换后 **mean=0, std=1**，但**取值无固定范围**（可能超出 [−1,1]）。
+- 适合数据近似服从正态分布的场景。
+
+⭐ **Normalization vs. Standardization 对比**：
+
+| 特性 | Normalization（Min-Max） | Standardization（Z-score） |
+|---|---|---|
+| 范围 | 固定 [0,1] | 无固定范围 |
+| 中心 | 最小值→0 | mean→0 |
+| 尺度 | max−min | std=1 |
+| 对 outlier | **敏感**（max/min 受 outlier 影响） | 相对鲁棒（mean/std 受影响但较小） |
+| 适用 | feature 范围已知、需固定区间 | 数据近似正态、距离/梯度算法 |
+
+> 老师指出：文献中两术语有时混用，关键理解变换效果——Min-Max 映射到 [0,1]，Z-score 映射到 mean=0/std=1。
+
+#### 5.4 ⭐ Dimensionality Reduction（降维，§2.8.4）
+
+高维数据计算开销大，且并非所有 feature 都有用。降维可减少复杂度、降低 overfitting 风险、提升泛化能力。
+
+两类方法：
+
+| 方法 | 说明 | 本课 |
+|---|---|---|
+| **Feature Extraction（特征提取）** | 创建新 feature（原 feature 的线性组合），如 **PCA（Principal Component Analysis）**、**SVD（Singular Value Decomposition）**。新 feature **不可解释**（如 0.5×CGPA+0.7×gender+0.6×weight，语义模糊） | ❌ 不讲（其他课程覆盖） |
+| **Feature Subset Selection / Feature Selection（特征子集选择）** | 从原 feature 集中选最优子集，**不创建新 feature**，保留原 feature 语义 ⇒ 模型可解释 | ✅ 本课将讲（某周会介绍） |
+
+⭐ 老师强调本课选讲 **feature selection** 而非 feature extraction，因为 feature selection **保留 feature 原始语义**，模型更可解释（interpretable）。
+
+### 6. 数据准备完整流程汇总
+
+```
+收集数据
+  → 探索数据类型（qualitative/quantitative, nominal/ordinal/interval/ratio）
+  → 探索数据结构（data dictionary, central tendency, spread, box plot, histogram, scatter plot, cross-tab）
+  → 发现问题：missing value, outliers
+  → 修复：imputation / removal / capping（按 class 分别处理）
+  → 预处理：feature scaling（normalization 或 standardization）
+  → 降维：feature selection（本课）或 feature extraction（PCA/SVD，本课不讲）
+  → 得到高质量数据集
+  → 划分 train/validation/test
+  → 进入模型学习（Week 7 起 classifier design）
+```
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **数据类型四级分类** | Qualitative（nominal/ordinal）vs Quantitative（interval/ratio）；各自可执行的运算 |
+| **central tendency 选法** | nominal→mode, ordinal→median（或 mode）, interval/ratio→mean（outlier 时用 median） |
+| **five-number summary** | min, Q1, Q2, Q3, max；IQR=Q3−Q1 |
+| **box plot whisker** | Q1−1.5×IQR / Q3+1.5×IQR；超界点=outlier |
+| **histogram 判分布** | 单峰/双峰/均匀/左偏/右偏；为下周 decision rule 选 density function 做准备 |
+| **outlier 处理** | remove / impute / cap(5th/95th percentile) / 分离建模 / 自然则保留 |
+| **missing value 处理** | eliminate（占比小）/ impute（mean/median/mode，按 class 分别；或 similarity-based）/ estimate via feature relationship |
+| **feature scaling 必要性** | distance-based（避免大值 dominate）+ gradient descent（更新均衡稳定） |
+| **Normalization 公式** | $x'=(x-x_{\min})/(x_{\max}-x_{\min})$，映射到 [0,1] |
+| **Standardization 公式** | $x'=(x-\mu)/\sigma$，mean=0, std=1, 无固定范围 |
+| **降维两路线** | feature extraction（PCA/SVD，新 feature 不可解释，本课不讲）vs feature selection（子集，保留语义，本课讲） |
+| **hyperparameter vs parameter** | hyperparameter 训练前设定（validation data 选）；parameter 从 train data 估计 |
+| **classification vs regression** | target 离散→classification；target 连续→regression |
+| **variance 用于模型评估** | 重复实验报告 mean±std；std 小=robust |
+
+### 8. 本周要点小结
+
+- **本周主题**：Data Preparation（数据准备），不是 classifier design。承接 Week 5 的 ML 三步骤，展开第一步 Data Input 的完整流程。
+- **数据类型**：Qualitative（nominal/ordinal）与 Quantitative（interval/ratio）四级分类；不同类型可执行的运算不同，决定可用模型与预处理方式。
+- **探索工具**：central tendency（mean/median/mode）、data spread（variance/std）、five-number summary、box plot（whisker=1.5×IQR 判 outlier）、histogram（判分布形态）、scatter plot（判 feature↔target/feature↔feature 关系）、cross-tab（两 categorical 变量）。
+- **数据质量**：missing value（eliminate/impute/similarity-based/feature-relationship）与 outliers（remove/impute/cap/分离建模/自然保留）。
+- **预处理**：feature scaling 分 normalization（Min-Max→[0,1]）与 standardization（Z-score→mean=0,std=1）；动机=distance-based 算法避免大值 dominate + gradient descent 更新均衡稳定。
+- **降维**：feature extraction（PCA/SVD，新 feature 不可解释，本课不讲）vs feature selection（子集，保留语义，本课讲）。
+- **模型评估**：重复实验报告 mean±std，std 衡量 robustness。
+
+---
+
+> **下一周（Week 7）预告**：本周结束老师明确说 "next week we will just use this well prepared data to learn different types of models"，即 Week 7 正式进入 **classifier design（分类器设计）**——预计从 Linear Discriminant Analysis (LDA)、Support Vector Machine (SVM) 等 supervised classifier 开始，含公式推导与实现。本周的数据类型、feature scaling、hyperparameter 等概念是直接前置。具体以 Week 7 课件为准。
+
+---

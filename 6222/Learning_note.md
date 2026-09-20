@@ -1652,4 +1652,416 @@ $$
 
 ---
 
-> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal, prior probability, posterior probability, class-conditional probability, likelihood, chain rule, law of total probability, mixture PDF/PMF, MAP decision rule, Bayes rule, decision region, decision boundary/threshold, error rate, discriminant function, Mahalanobis distance, covariance matrix, Gaussian/multivariate Gaussian, quadratic classifier, linear classifier, hyperplane, within-class scatter, Direct LDA, statistical estimation, machine learning, training data, non-parametric approach, parametric approach, Parzen window, kernel function, bandwidth, k-nearest neighbor, IID (independent and identically distributed), maximum likelihood estimation / MLE, likelihood, sample mean, sample variance, data covariance matrix, Gaussian mixture, feature selection, feature extraction 等）。中文用于组织句意与补充释义。
+> **笔记约定**：本课英文授课、英文考试，核心术语保留英文（machine vision, image, pixel, convolution, impulse response, LSI/LTI, filter, filter mask, histogram, gray level, color space, RGB, HSI, LBP, HOG, Fourier transform, DFT, DTFT, sinusoid, sinc function, impulse train, magnitude/phase, conjugate symmetry, convolution theorem, zero padding, translation/rotation invariant, sampling, Nyquist, aliasing, band-limited, low-pass/high-pass filter, point processing, gamma correction, log transform, piecewise linear, histogram equalization, cdf, feature extraction, template matching, Euclidean distance, norm, normalization, correlation coefficient, nearest neighbor classifier, K-NN, order-statistic filter, median filter, alpha-trimmed mean, root signal, prior probability, posterior probability, class-conditional probability, likelihood, chain rule, law of total probability, mixture PDF/PMF, MAP decision rule, Bayes rule, decision region, decision boundary/threshold, error rate, discriminant function, Mahalanobis distance, covariance matrix, Gaussian/multivariate Gaussian, quadratic classifier, linear classifier, hyperplane, within-class scatter, Direct LDA, statistical estimation, machine learning, training data, non-parametric approach, parametric approach, Parzen window, kernel function, bandwidth, k-nearest neighbor, IID (independent and identically distributed), maximum likelihood estimation / MLE, likelihood, sample mean, sample variance, data covariance matrix, Gaussian mixture, feature selection, feature extraction, PCA, principal component analysis, LDA, linear discriminant analysis, eigenvector, eigenvalue, total scatter matrix, within-class scatter matrix, between-class scatter matrix, reconstruction error, variance, projection, dimensionality reduction, unsupervised, supervised, integral image, Haar-like feature, AdaBoost, Viola-Jones, boosting, feature generation, feature pool, sliding window, object detection 等）。中文用于组织句意与补充释义。
+
+---
+
+## Week 6 — Topic 8：Feature Extraction（PCA / LDA 维度缩减）＋ Topic 7 起：Feature Selection（Viola-Jones / AdaBoost 预告）
+
+> **权威来源说明**：本周**没有官方 PDF 课件**，仅由 `week6.txt` 转写整理。转写噪声极大，以下笔记基于转写内容 + 已有 Week 1–5 笔记的上下文推断。无法确认的术语标注"待课件确认"。本周典型 ASR 错拼修正：
+> - "road data" → **raw data**（原始数据）
+> - "clasph / classp / classer / clasp" → **classifier**
+> - "fue / full year transform" → **Fourier transform**
+> - "cores magics / comet metrics / cosmetri / corns matrix / co matrix" → **covariance matrix**
+> - "sycto matrix / scyt matrix / skate matrix" → **scatter matrix**
+> - "ichenvector / ien vector / eichen vector / chen vector / i vector" → **eigenvector**
+> - "ichenvalue / ichen vue / ien value / numbda / Nanda" → **eigenvalue**
+> - "lacung / granger optimization" → **Lagrangian / Lagrange optimization**
+> - "meniar / miniar / ninear / menial" → **linear**
+> - "discrepant / discrepant analyses / discrettive" → **discriminant / discriminant analysis**
+> - "ADA / ALDA" → **LDA**（linear discriminant analysis）
+> - "precar / pretty car / pretty clear" → "pretty clear"（老师口头禅）
+> - "recontraction / recontraction era / recontraction arrow" → **reconstruction error**
+> - "g value / ge value / grid value / gi value" → **gray value**
+> - "Vela / Vela Jones" → **Viola-Jones**
+> - "adder boost" → **AdaBoost**
+> - "IGCV" → **IJCV**（International Journal of Computer Vision）
+> - "face titan / facial phase" → **Fisherfaces**
+
+### 1. 本周主线与课程安排
+
+老师开课即说明：
+
+- **Assignment 已发布**，主题是 **dimensionality reduction for classification**（用 PCA / LDA 降维后做分类，比较不同降维方法与不同维度数下的 classification accuracy）。
+- 本周先讲 **Topic 8（feature extraction / 维度缩减）**，再开始 **Topic 7（feature selection）**——因为下周只有半节课，下半节用于 **quiz**（Week 1 公布的 Week 7 课堂 quiz 30 分钟）。
+- Topic 8 对应 Assignment，故本周讲解中会穿插 assignment 要求。
+
+**承接 Week 5**：Week 5 结束于 Topic 6（statistical estimation / MLE），回答了"未知 PDF 如何从 training data 估计参数"。本周进入 Topic 7–8：**classifier 不能直接作用于 raw data，需先做 feature extraction 或 feature selection**。即便 deep learning / Transformer 的核心也是 feature extraction——最终 classification layer 只是一个简单 linear classifier。
+
+### 2. Feature Extraction 的概念框架
+
+#### 2.1 为什么需要 feature extraction
+
+- Raw data 维度极高。例：300×200 灰度图像 → 展平为 **60,000 维向量**。
+- 直接用 60,000 维做分类计算量过大，且大量信息与分类任务无关。
+- 需把 60,000 维降维到例如 60 维（缩减 1000 倍），再做 classification。
+
+#### 2.2 ⭐ Feature extraction vs Feature selection（核心区分）
+
+| | Feature Extraction | Feature Selection |
+|---|---|---|
+| **方式** | **组合所有** raw component 生成新 feature（每个新 feature = 全部输入的加权和） | 从原始 component 中**选取子集**，不组合 |
+| **数学形式** | $\mathbf{y}=\boldsymbol{\Phi}^T\mathbf{x}$，$\boldsymbol{\Phi}$ 为 $n\times m$ 矩阵 | 选取 $\mathbf{x}$ 的某些分量，其余丢弃 |
+| **计算量** | 每个新 feature 需全部输入参与 → **较慢** | 训练时确定选哪些，预测时只算被选的 → **很快** |
+| **本周归属** | Topic 8（PCA / LDA） | Topic 7（Viola-Jones / AdaBoost） |
+| **对应课程编号** | Topic 8: Visual Data Dimensionality Reduction as Feature Extraction | Topic 7: Handcrafted Feature Generation and Feature Selection |
+
+> ⭐ **Feature extraction**：每个新 feature 是**所有**原始数据的 combination（不同权重），故每个 feature 都 depends on all inputs。**Feature selection**：直接从原始数据中选一部分 component 作 feature，不组合，计算快。
+
+#### 2.3 线性维度缩减的一般形式
+
+所有 **linear method** 的维度缩减都可表示为矩阵乘法：
+
+$$
+\mathbf{y}=\boldsymbol{\Phi}^T\mathbf{x}
+$$
+
+- $\mathbf{x}\in\mathbb{R}^n$：$n$ 维原始数据（列向量）；$\boldsymbol{\Phi}\in\mathbb{R}^{n\times m}$：权重矩阵；$\mathbf{y}\in\mathbb{R}^m$：$m$ 维降维后数据（$m<n$）。
+- Fourier transform、wavelet transform 等也是此形式，只是 $\boldsymbol{\Phi}$ 的元素**由人类预定义**（如 Fourier 的 $e^{-j2\pi u_i n/N}$）。
+- 本课关注**由 training data 学习 $\boldsymbol{\Phi}$** 的方法（machine learning），而非人定义的 transform。
+
+**矩阵乘法的两个效果**：
+1. **Feature scaling**：每个输出 = 全部输入的 weighted sum，不同权重对输入做不同缩放。重要 component 赋大权重，不重要的赋小权重。
+2. **Dimensionality reduction**：$\boldsymbol{\Phi}$ 为矩形（非方阵）时，$n$ 维 → $m$ 维。
+
+### 3. ⭐⭐ PCA（Principal Component Analysis）— 本周核心之一
+
+#### 3.1 问题设定
+
+给定 $Q$ 个 training samples $\mathbf{x}_1,\dots,\mathbf{x}_Q$，每个 $\mathbf{x}_i\in\mathbb{R}^n$。目标：找最优降维。
+
+#### 3.2 第一步：找最佳代表点（mean）
+
+用一个点 $\mathbf{x}_0$ 代表所有 training data，最小化 mean squared error：
+
+$$
+\mathbf{x}_0=\arg\min_{\mathbf{x}_0}\sum_{i=1}^{Q}\|\mathbf{x}_i-\mathbf{x}_0\|^2
+$$
+
+- 对 $\mathbf{x}_0$ 求导令零，得 $\mathbf{x}_0=\frac{1}{Q}\sum_{i=1}^{Q}\mathbf{x}_i$，即**样本均值（sample mean）**。
+- ⭐ 与 Week 5 呼应：mean 是使 mean squared error 最小的点，也是 Gaussian PDF 中心的最大似然估计（MLE）。
+- **Centralize**：所有训练样本减去 mean，$\tilde{\mathbf{x}}_i=\mathbf{x}_i-\mathbf{x}_0$，组成中心化数据矩阵。
+
+#### 3.3 第二步：找最佳一维方向（第一主成分）
+
+在 $n$ 维空间中找一个**单位长度向量** $\boldsymbol{\phi}$（代表一个方向/坐标轴），将所有数据投影到该方向：
+
+$$
+a_i=\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i\quad(\text{标量投影})
+$$
+
+用 $a_i$ 重建原始数据：$\hat{\mathbf{x}}_i=a_i\boldsymbol{\phi}$。重建误差为：
+
+$$
+\epsilon=\sum_{i=1}^{Q}\|\tilde{\mathbf{x}}_i-a_i\boldsymbol{\phi}\|^2
+$$
+
+展开化简（利用 $\boldsymbol{\phi}^T\boldsymbol{\phi}=1$）：
+
+$$
+\epsilon=\sum_{i}\|\tilde{\mathbf{x}}_i\|^2-\sum_{i}(\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i)^2
+$$
+
+- 第一项与 $\boldsymbol{\phi}$ 无关 → 最小化 $\epsilon$ 等价于**最大化** $\sum_i(\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i)^2$。
+
+#### 3.4 ⭐ 识别出 covariance / scatter matrix
+
+将最大化目标改写：
+
+$$
+\sum_{i=1}^{Q}(\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i)^2=\sum_{i=1}^{Q}\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i\tilde{\mathbf{x}}_i^T\boldsymbol{\phi}=\boldsymbol{\phi}^T\left(\sum_{i=1}^{Q}\tilde{\mathbf{x}}_i\tilde{\mathbf{x}}_i^T\right)\boldsymbol{\phi}
+$$
+
+$$
+\mathbf{S}_T=\sum_{i=1}^{Q}\tilde{\mathbf{x}}_i\tilde{\mathbf{x}}_i^T\quad\text{（total scatter matrix / covariance matrix）}
+$$
+
+- $\mathbf{S}_T$ 即训练数据的 **total scatter matrix**（或 covariance matrix，差一个 $1/Q$ 因子）。
+- 最大化目标变为 $\boldsymbol{\phi}^T\mathbf{S}_T\boldsymbol{\phi}$，约束 $\|\boldsymbol{\phi}\|=1$。
+
+#### 3.5 ⭐ Lagrangian 推导 → 特征方程
+
+条件优化：最大化 $\boldsymbol{\phi}^T\mathbf{S}_T\boldsymbol{\phi}$，约束 $\boldsymbol{\phi}^T\boldsymbol{\phi}=1$。
+
+用 **Lagrangian method**（拉格朗日乘子法）转化为无条件优化，对 $\boldsymbol{\phi}$ 求导令零：
+
+$$
+\mathbf{S}_T\boldsymbol{\phi}=\lambda\boldsymbol{\phi}
+$$
+
+⭐ **这正是 eigenvector / eigenvalue 的定义方程**。最优投影方向 $\boldsymbol{\phi}$ 是 $\mathbf{S}_T$ 的 **eigenvector**，对应的 $\lambda$ 是 **eigenvalue**。
+
+#### 3.6 ⭐⭐ PCA 的物理意义（老师重点，务必理解）
+
+**Eigenvector 的物理意义**：
+
+$$
+\boldsymbol{\phi}^T\mathbf{S}_T\boldsymbol{\phi}=\boldsymbol{\phi}^T\left(\sum_i\tilde{\mathbf{x}}_i\tilde{\mathbf{x}}_i^T\right)\boldsymbol{\phi}=\sum_i(\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i)^2=\sum_i a_i^2
+$$
+
+- $a_i=\boldsymbol{\phi}^T\tilde{\mathbf{x}}_i$ 是数据投影到 $\boldsymbol{\phi}$ 方向后的标量值。
+- $\sum a_i^2$（中心化后 $a_i$ 均值为 0）就是数据沿 $\boldsymbol{\phi}$ 方向投影的 **variance（方差）**。
+- ⭐ **Eigenvector = 使投影后方差最大的方向**。对应的 **eigenvalue = 该方向上的方差值**。
+
+> **一句话**：PCA 的 eigenvector 是数据投影后方差最大的方向；eigenvalue 就是该方向的 variance。第一主成分（largest eigenvalue 对应的 eigenvector）方向方差最大，第二主成分次之，依此类推。
+
+#### 3.7 推广到 $m$ 维：PCA 算法
+
+取 $\mathbf{S}_T$ 的 **$m$ 个最大 eigenvalue 对应的 eigenvector** $\boldsymbol{\phi}_1,\dots,\boldsymbol{\phi}_m$，组成 eigenvector matrix $\boldsymbol{\Phi}=[\boldsymbol{\phi}_1,\dots,\boldsymbol{\phi}_m]$：
+
+$$
+\mathbf{y}=\boldsymbol{\Phi}^T\tilde{\mathbf{x}}\in\mathbb{R}^m\quad\text{（降维后 feature）}
+$$
+
+重建：
+
+$$
+\hat{\mathbf{x}}=\boldsymbol{\Phi}\mathbf{y}+\mathbf{x}_0
+$$
+
+⭐ **重建误差**等于**未被选取的 eigenvalue 之和**：
+
+$$
+\epsilon=\sum_{j=m+1}^{n}\lambda_j\quad\text{（剩余 eigenvalue 之和）}
+$$
+
+- 取最大的 $m$ 个 eigenvalue → 剩余 eigenvalue 之和最小 → **重建误差最小**。
+- 若取所有非零 eigenvalue 对应的 eigenvector，重建误差可为 **零**（信息无损）。
+
+#### 3.8 ⭐ Scatter matrix 的秩与无损降维
+
+- $\mathbf{S}_T$ 由 $Q$ 个训练样本构成，其秩 $\text{rank}(\mathbf{S}_T)\le Q-1$（减 mean 后损失一个自由度）。
+- 若 $Q-1\ll n$（训练样本远少于数据维度），则 $\mathbf{S}_T$ 最多有 $Q-1$ 个非零 eigenvalue。
+- → 可将 $n$ 维数据无损降至 $Q-1$ 维（重建误差为零），因为其余 $n-(Q-1)$ 个 eigenvalue 为零。
+
+> **直觉**：所有训练点在高维空间中实际只分布在一个低维子空间（如 3D 中所有点恰在一个平面上 → 垂直于该平面的方向 variance 为零 → eigenvalue 为零 → 该方向可丢弃）。
+
+#### 3.9 ⭐ Symmetric matrix 的性质
+
+- $\mathbf{S}_T$（covariance / scatter matrix）是 **symmetric matrix（对称矩阵）**。
+- 对称矩阵的 eigenvector 对应**不同 eigenvalue** 的彼此 **orthogonal（正交）**。
+- 取 unit length 后即为 **orthonormal（正交归一）**：$\boldsymbol{\Phi}^T\boldsymbol{\Phi}=\mathbf{I}$，$\boldsymbol{\Phi}\boldsymbol{\Phi}^T=\mathbf{I}$。
+- → eigenvector 可作为新坐标系的正交轴。
+
+⭐ 由此得两个重要关系：
+
+$$
+\boldsymbol{\Phi}^T\mathbf{S}_T\boldsymbol{\Phi}=\boldsymbol{\Lambda}\quad\text{（对角化：对角元为 eigenvalue）}
+$$
+
+$$
+\mathbf{S}_T=\boldsymbol{\Phi}\boldsymbol{\Lambda}\boldsymbol{\Phi}^T\quad\text{（谱分解）}
+$$
+
+- 投影到 eigenvector 后，新数据 $\mathbf{y}$ 的 covariance matrix 为**对角矩阵**（各分量 uncorrelated / 去相关）。
+- ⭐ **与 Transformer 的联系**（老师提示）：Transformer 的 attention 本质是 covariance matrix 的运算；理解 covariance matrix 的物理意义有助于理解最先进的 AI 模型。
+
+#### 3.10 二维可视化示例
+
+- 2D 数据散点呈椭圆形云（cloud），沿长轴方向 variance 最大 → $\boldsymbol{\phi}_1$（第一主成分）沿长轴方向。
+- $\boldsymbol{\phi}_2$ 沿短轴方向，与 $\boldsymbol{\phi}_1$ 正交。
+- 投影到 $(\boldsymbol{\phi}_1,\boldsymbol{\phi}_2)$ 后只是**旋转坐标系**，数据本身不变，但新坐标下 covariance matrix 变为对角矩阵（两分量 uncorrelated）。
+- Covariance matrix 的对角元 $\sigma_{11},\sigma_{22}$ 决定椭圆的长短轴（variance），非对角元 $\sigma_{12}$ 决定椭圆的倾斜程度（correlation）：
+  - $\sigma_{12}=0$：椭圆轴与坐标轴对齐（uncorrelated）。
+  - $|\sigma_{12}|$ 大：椭圆很扁、倾斜（强相关）。
+  - 完全 linear correlated：椭圆退化为一条直线（短轴为零）。
+
+### 4. ⭐⭐ LDA（Linear Discriminant Analysis）— 本周核心之二
+
+#### 4.1 PCA 的问题：unsupervised，不利用 class membership
+
+- PCA 只最大化**总体 variance**，不关心类别信息（**unsupervised**）。
+- ⭐ **关键反例**（老师详讲）：两类数据（黑点与十字），沿最大 variance 方向（PCA 选的红线）投影后两类**完全重叠** → classification error ≈ 50%。而沿另一方向（绿线，variance 较小但两类分离好）投影后 error ≈ 5–10%。
+- **结论**：PCA 对 classification **不一定好**——最大化 general information（variance）≠ 最大化 discriminative information。
+
+#### 4.2 LDA 的核心思想
+
+LDA 是 **supervised**（利用 class membership），目标：找投影方向使得
+- **Between-class variance 最大化**（不同类中心尽量分开）；
+- **Within-class variance 最小化**（同类数据尽量紧凑）。
+
+#### 4.3 ⭐ 两个 scatter matrix
+
+**Within-class scatter matrix** $\mathbf{S}_W$：
+
+- 对每个类 $\omega_k$ 计算 class-conditional covariance matrix $\mathbf{S}_k=\sum_{i\in\omega_k}(\mathbf{x}_i-\boldsymbol{\mu}_k)(\mathbf{x}_i-\boldsymbol{\mu}_k)^T$。
+- $\mathbf{S}_W=\sum_{k=1}^{c}P_k\mathbf{S}_k$（按类先验/样本数加权平均）。
+- $\mathbf{S}_W$ 反映**各类内部**数据的 variation（average of class-conditional covariance）。
+
+**Between-class scatter matrix** $\mathbf{S}_B$：
+
+$$
+\mathbf{S}_B=\sum_{k=1}^{c}P_k(\boldsymbol{\mu}_k-\boldsymbol{\mu})(\boldsymbol{\mu}_k-\boldsymbol{\mu})^T
+$$
+
+- $\boldsymbol{\mu}_k$：类 $k$ 的 mean；$\boldsymbol{\mu}$：全局 mean。
+- $\mathbf{S}_B$ 反映**各类中心之间**的差异。
+
+⭐ **重要关系**：
+
+$$
+\mathbf{S}_T=\mathbf{S}_W+\mathbf{S}_B
+$$
+
+- Total variation = within-class variation + between-class variation。这与 Week 4–5 的 discriminant function 中 covariance 的角色一致。
+
+#### 4.4 ⭐ LDA 的优化目标与求解
+
+最大化 **Fisher criterion**（投影后 between-class variance / within-class variance）：
+
+$$
+\boldsymbol{\phi}=\arg\max_{\boldsymbol{\phi}}\frac{\boldsymbol{\phi}^T\mathbf{S}_B\boldsymbol{\phi}}{\boldsymbol{\phi}^T\mathbf{S}_W\boldsymbol{\phi}}
+$$
+
+- 最大化 $\mathbf{S}_B$ 的同时最小化 $\mathbf{S}_W$ → 用 $\mathbf{S}_W^{-1}\mathbf{S}_B$。
+- 与 PCA 同理，解变为 **eigenvector / eigenvalue 问题**：
+
+$$
+\mathbf{S}_W^{-1}\mathbf{S}_B\boldsymbol{\phi}=\lambda\boldsymbol{\phi}
+$$
+
+- LDA 取 $\mathbf{S}_W^{-1}\mathbf{S}_B$ 的 **largest eigenvalue** 对应的 eigenvector。
+
+⭐ **PCA vs LDA 求解对比**：
+
+| | PCA | LDA |
+|---|---|---|
+| **矩阵** | $\mathbf{S}_T$（total scatter） | $\mathbf{S}_W^{-1}\mathbf{S}_B$ |
+| **监督** | Unsupervised（不用 class label） | Supervised（用 class membership） |
+| **最大化** | Total variance | Between-class / within-class ratio |
+| **求解** | Eigenvector of $\mathbf{S}_T$ | Eigenvector of $\mathbf{S}_W^{-1}\mathbf{S}_B$ |
+| **对分类** | 不保证好（最大化 general variance） | 更好（最大化 discriminative information） |
+
+#### 4.5 ⭐ LDA 的实际问题：$S_W$ 不满秩
+
+- $\text{rank}(\mathbf{S}_W)=Q-c$（$Q$：总训练样本数，$c$：类数；每类减 mean 损失一个自由度）。
+- 20 年前常见情形：$Q$ 远小于数据维度 $n$（如每人仅 2–3 张人脸图像，维度上百万）→ $\mathbf{S}_W$ **不满秩** → $\mathbf{S}_W^{-1}$ 不存在 → 无法直接做 LDA。
+- ⭐ **解决方案：PCA + LDA**（先 PCA 降维到 $\mathbf{S}_W$ 满秩的维度，再 LDA）。人脸识别中称为 **Fisherfaces**。
+- 这是当年数千篇论文的研究热点。
+
+#### 4.6 ⭐⭐ 老师的批判性思考（重点理解，与 assignment 相关）
+
+老师提出一个**根本性问题**，指出大量研究者忽视了它：
+
+> 原始高维数据应该含有**最多**的 discriminative information。LDA 降维后**丢失**一部分信息，却声称保留"最 discriminative"的信息。如果"最 discriminative"信息意味着最好的分类结果，那为什么不在原始高维空间直接分类？为什么要降维？
+
+**老师的洞察**：
+
+- 降维能**提高** classification accuracy 的真正原因，不是"保留了最 discriminative 的信息"（LDA 只能**尽量不丢** discriminative 信息，但不能**新增**信息），而是**去除了 misleading information（误导信息）**。
+- **Misleading information**：训练数据中某些信息虽然是 discriminative 的（能区分类别），但实际上是**噪声/虚假的 discriminative 信息**，会误导 classifier。
+  - 例：人脸图像含表情、光照等信息，这些信息虽然能"区分"训练样本，但对**识别身份**是 misleading 的。
+- **关键**：真正提升 accuracy 的关键是**识别并去除 misleading information**，而非单纯保留 discriminative information。
+- 去除 misleading information → accuracy 可超过原始高维数据。
+- 但识别 misleading information 非常困难（难以区分 real discriminative vs misleading discriminative）。
+
+**Assignment 要求**：
+
+- 用 PCA 和 LDA 降维到不同维度，画出 **classification accuracy vs. dimension** 曲线。
+- 观察并解释曲线形状：一般 dimension 减少时 accuracy 下降；但若降维方法好（去除了 misleading info），低维可能不降甚至略升。
+- 老师给了 3 篇参考论文（待课件确认具体论文）。
+- ⚠️ 老师批评：很多研究者在低维下比较 PCA vs LDA 得出"LDA 更好"的结论，但若只看低维段，结论可能错误——LDA 只是让 accuracy 下降慢，真正提升来自去除 misleading info 的步骤。
+
+### 5. 降维后的分类流程总结
+
+1. 用 training data 计算 scatter matrix（$\mathbf{S}_T$ for PCA，$\mathbf{S}_W,\mathbf{S}_B$ for LDA）。
+2. 求 eigenvector / eigenvalue，取 top-$m$ eigenvector 组成 $\boldsymbol{\Phi}$。
+3. 对所有数据（训练+测试）投影：$\mathbf{y}=\boldsymbol{\Phi}^T(\mathbf{x}-\boldsymbol{\mu})$。
+4. 在 $m$ 维 feature space 中做分类：
+   - 计算 feature space 的 mean $\boldsymbol{\mu}_{k,F}$ 和 covariance $\boldsymbol{\Sigma}_{k,F}$（或 pooled covariance）。
+   - 用 Mahalanobis distance / minimum distance classifier 分类。
+5. ⭐ 实践中常用 **pooled covariance**（$\mathbf{S}_W$）而非每类各自的 covariance——样本少时更可靠（average over all classes），且共享 covariance → linear classifier。
+
+### 6. Topic 7 开场：Feature Selection 与 Viola-Jones 方法
+
+#### 6.1 为什么需要 feature selection
+
+- Feature extraction（PCA / LDA）每个新 feature 需**全部**原始数据参与计算 → 计算量大。
+- 某些应用需**极快**的 feature 计算 → **feature selection**：直接选取原始数据的部分 component，不组合。
+- 训练时确定选哪些 component，预测时只算被选的 → 极快。
+
+#### 6.2 ⭐ 应用驱动：Object Detection（物体检测）
+
+以 **face detection** 为例（老师详讲）：
+
+- 输入图像中，目标（face）位置和大小未知。
+- 方法：用固定大小窗口（如 24×24）**扫描（sliding window）**所有位置，每个位置做一次 binary classification（face / non-face）。
+- 还需尝试不同 window size 以检测不同 scale 的 face。
+- → 需在每个位置提取 feature + 分类，执行次数可达**数万甚至百万级**。
+- → 极需快速 feature 计算与快速分类。
+
+**三大挑战**：
+1. 如何**快速计算** feature（避免重复计算，如 FFT vs DFT）？
+2. 如何用**少量 feature** 就能代表整个 raw data？
+3. 如何在少量 feature 下仍获得好的 classification accuracy？
+
+#### 6.3 ⭐ Viola-Jones 方法（face detection 经典方法，IJCV 发表）
+
+- **Viola 和 Jones**（来自—in the transcript—待课件确认机构）提出，发表于 **IJCV**（International Journal of Computer Vision）。
+- 深度学习前最流行的 face detection 方法，被各大公司采用。
+
+**核心组件**：
+
+1. **Haar-like feature（矩形特征）**：两个矩形区域 average gray value 的**差值**。
+   - 差值反映**对比度（contrast）**，能捕捉图像结构。例：鼻部两侧亮度差大，眼部上下亮度差大。
+   - 用矩形是因为矩形内像素之和可**极快计算**（利用 integral image）。
+
+2. **⭐ Integral Image（积分图）**：预处理一步，之后任意矩形内像素之和只需 **3 次加减法**。
+   - 定义：$I(x,y)=\sum_{x'\le x,\,y'\le y}f(x',y')$，即左上角到 $(x,y)$ 的所有像素之和。
+   - **快速计算**：利用已算出的相邻位置的 integral image 值，递推只需 2 次加法/像素。
+   - **任意矩形 D 的像素和**：$\text{Sum}(D)=I(4)-I(2)-I(3)+I(1)$，其中 $1,2,3,4$ 是矩形四个角点（3 次加减法，与矩形大小无关）。
+   - → 任意大小、任意位置的 Haar-like feature 都可在常数时间算出。
+
+3. **Feature pool 巨大**：24×24 检测窗口可生成约 **180,000** 种不同 Haar-like feature（不同矩形形状、大小、位置组合）。
+
+4. **Feature selection**：从 180,000 个 feature 中选约 **100 个**最有效的 → 预测时只算这 100 个 → 极快。
+
+5. **AdaBoost（Adaptive Boosting）**：用于从大 pool 中选取最有效的少量 feature。具体算法**下周讲**（半节课）。
+
+#### 6.4 Feature selection 的流程
+
+| 阶段 | 操作 |
+|---|---|
+| **离线训练** | 用 training data 生成全部 feature（如 180,000 个），用 AdaBoost 选出最有用的约 100 个 |
+| **在线预测** | 只计算被选中的 100 个 feature + 分类 → 极快 |
+
+- Viola-Jones 原始实验：4,900 张 face + 10,000 张 non-face 训练数据（20 年前已算大规模）。
+- 关键：feature selection 后预测阶段无需计算未选 feature，计算量大幅降低。
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 | 节号 |
+|---|---|---|
+| **feature extraction vs selection** | extraction 组合全部输入；selection 选取子集；后者更快 | §2.2 |
+| **线性降维一般形式** | $\mathbf{y}=\boldsymbol{\Phi}^T\mathbf{x}$，$\boldsymbol{\Phi}$ 可人定义或从数据学习 | §2.3 |
+| **PCA：最佳代表点 = mean** | mean 最小化 MSE，也是 Gaussian 中心的 MLE | §3.2 |
+| **PCA：最佳方向 = 最大 variance 方向** | 投影后方差最大的方向 = eigenvector of $\mathbf{S}_T$ | §3.3–3.6 |
+| **PCA：Lagrangian → 特征方程** | $\mathbf{S}_T\boldsymbol{\phi}=\lambda\boldsymbol{\phi}$ | §3.5 |
+| **⭐ eigenvector 物理意义** | 投影后方差最大的方向 | §3.6 |
+| **⭐ eigenvalue 物理意义** | 该方向的 variance 值 | §3.6 |
+| **PCA 重建误差** | 未被选取的 eigenvalue 之和 | §3.7 |
+| **无损降维条件** | 取所有非零 eigenvalue；$\text{rank}(\mathbf{S}_T)\le Q-1$ | §3.8 |
+| **对称矩阵性质** | eigenvector orthonormal；$\boldsymbol{\Phi}^T\mathbf{S}_T\boldsymbol{\Phi}=\boldsymbol{\Lambda}$（对角化去相关） | §3.9 |
+| **PCA 是 unsupervised** | 不用 class label，最大化 total variance | §4.1 |
+| **PCA 对分类不好** | 最大 variance 方向可能两类重叠（error ≈ 50%） | §4.1 |
+| **LDA：Fisher criterion** | $\max\,\boldsymbol{\phi}^T\mathbf{S}_B\boldsymbol{\phi}/\boldsymbol{\phi}^T\mathbf{S}_W\boldsymbol{\phi}$ | §4.4 |
+| **LDA 求解** | eigenvector of $\mathbf{S}_W^{-1}\mathbf{S}_B$ | §4.4 |
+| **$\mathbf{S}_T=\mathbf{S}_W+\mathbf{S}_B$** | total = within + between | §4.3 |
+| **LDA：$S_W$ 不满秩** | $Q\ll n$ 时 $S_W$ 奇异 → PCA+LDA（Fisherfaces） | §4.5 |
+| **⭐⭐ 降维提升 accuracy 的原因** | 去除 misleading information，非保留 discriminative info | §4.6 |
+| **pooled covariance** | 样本少时更可靠 → 共享 $\Sigma$ → linear classifier | §5 |
+| **Viola-Jones** | Haar-like feature + integral image + AdaBoost feature selection | §6.3 |
+| **Integral image** | 任意矩形像素和只需 3 次加减法 | §6.3 |
+| **Feature pool 大小** | 24×24 窗口 → ~180,000 feature | §6.3 |
+
+### 8. 本周要点小结
+
+- **Feature extraction**（Topic 8）组合全部原始数据生成新 feature，每个 feature = 全部输入的加权和；**feature selection**（Topic 7）直接选取原始 component 子集，计算更快。
+- **PCA**：unsupervised，找 covariance matrix $\mathbf{S}_T$ 的 eigenvector，投影后方差最大；eigenvalue = variance；重建误差 = 未选 eigenvalue 之和；取 top-$m$ 个 → 最小重建误差。对称矩阵 eigenvector orthonormal → 投影后去相关。
+- **LDA**：supervised，利用 class membership，最大化 $\mathbf{S}_B/\mathbf{S}_W$ 比，解 $\mathbf{S}_W^{-1}\mathbf{S}_B$ 的特征方程。$\mathbf{S}_T=\mathbf{S}_W+\mathbf{S}_B$。$S_W$ 不满秩时用 PCA+LDA（Fisherfaces）。
+- **PCA vs LDA for classification**：PCA 最大化 total variance，不保证分类好；LDA 最大化 discriminative information。但老师强调：降维提升 accuracy 的真正原因是**去除 misleading information**，而非保留 discriminative info——很多研究者未深究此问题。
+- **Viola-Jones**：face detection 经典。Haar-like feature（矩形 average gray value 差）+ integral image（任意矩形和 3 次运算）+ AdaBoost（从 ~180,000 feature 中选 ~100 个）→ 极快检测。
+- **Assignment**：用 PCA / LDA 降维到不同维度，画 classification accuracy vs dimension 曲线，观察并解释。
+
+---
+
+> **下一周（Week 7）预告**：老师明确说明下周只有**半节课**（下半节用于 **quiz**，Week 1 公布的 30 分钟课堂 quiz，占 10%）。上半节将继续 Topic 7 的 **AdaBoost（Adaptive Boosting）算法**——如何从巨大的 feature pool 中用 boosting 方法选出最有效的少量 feature。Viola-Jones 的 feature selection 具体算法将在下周完成。AdaBoost 是 ensemble learning 的经典方法，也可视为 embedded feature selection 的代表（feature selection 与 classifier 训练同时进行）。具体以 Week 7 课件/转写为准。

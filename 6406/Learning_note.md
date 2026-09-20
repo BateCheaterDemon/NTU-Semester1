@@ -1191,3 +1191,340 @@ $$
 > **下周（Week 6）预告**：老师明确 "lecture six directly optimize **classification**"——下周从 regression+threshold 转向**直接对 classification cost 优化**的学习方法（如 logistic regression、SVM 的解析/迭代求解），threshold 由模型本身隐含而非后接。本周的 SSE/Ridge/Kernel 公式是直接前置。具体以 Lecture 6 课件为准。
 
 ---
+
+## Week 6 — Lecture 6：Advanced Analytic Classification（直接优化分类目标）
+
+> **教授**：Toh Kar-Ann（TKA）。本周转回 classification 直接优化视角：不先做 regression 再加 threshold，而是把 classification metric（TER / AUC）本身作为 learning cost function 直接求 closed-form 解。全讲分四部分：(1) Introduction（classification error based learning 动机）、(2) Total Error Rate Learning、(3) Operating Characteristics Learning（AUC based）、(4) A Generalized Learning Framework（通过 data transformation 统一 LSE/TER/AUC/FLD）。
+>
+> 老师口述定位："This class, we are moving on to **classification** learning in **analytic** way… we want to introduce a way to solve the classification error **directly**. This has not been able to solve in analytic form [previously]… We'll introduce two solutions: one is **total error rate**, one is the **AUC** solution."即两种分类器学习解均可 closed-form 求得且具有 nonlinear mapping capability（通过 polynomial/kernel 的 $p(x)$ 嵌入）。
+
+### 1. 从 Regression 到 Classification：动机与思路
+
+- **回顾**：Lecture 5 用 regression（SSE / Ridge / Kernel）学连续 predictor $g(\mathbf{x},\mathbf{w})$，再加 threshold $\tau$ 做 classification——classification 只是 regression 的后接副产物。
+- **本周核心问题**：既然目标是 classification，**为何不直接优化 classification metric 本身**（如 misclassification count、TER、AUC），而要绕道 regression？
+- **难点**：classification metric 是 **counting nature**（计数型，如 0-1 loss），导致 cost function **non-differentiable**（不可微）——传统方法只能用 iterative numerical optimization 求解，无 closed-form。
+- **本周突破**：介绍两个 **closed-form** classification 学习解：
+  1. **TER based learning**：直接用 Total Error Rate（$FPR+FNR$）作 objective function。
+  2. **AUC based learning**：用 Area Under ROC Curve 作 objective function。
+- 两者均通过 **quadratic approximation + data manipulation** 把 non-differentiable step loss 转为可微 convex 问题，从而得到 closed-form 解。
+- ⭐ **关键 insight**：solution 的结构类似 regression（normal equation 形式），但 data 按 class 分拆、class-specific normalization——本质是 **weighted least squares**。
+
+### 2. Total Error Rate（TER）Based Learning
+
+#### 2.1 TER 作为 objective function
+
+回顾 Week 4 的 TER 定义（$TER=FPR+FNR$）。用 threshold $\tau$ 表达：
+
+$$
+\text{TER}=FPR+FNR=\frac{1}{m^-}\sum_{j=1}^{m^-}\mathrm{cls}\bigl(g(\mathbf{x}_j^-, \mathbf{w})>\tau\bigr)+\frac{1}{m^+}\sum_{i=1}^{m^+}\mathrm{cls}\bigl(g(\mathbf{x}_i^+, \mathbf{w})<\tau\bigr) \tag{5.65}
+$$
+
+- $\mathrm{cls}(\cdot)$ 为 classification function：条件成立时输出 1（error），否则 0。
+- $m^+$、$m^-$ 分别为 positive / negative 样本数。
+
+#### 2.2 变量替换统一 loss 形式
+
+利用 $g(\mathbf{x}_j^-)>\tau$ 与 $g(\mathbf{x}_i^+)<\tau$ 的对称性，做 change of variables 统一为"threshold at zero"：
+
+$$
+\varepsilon_j = g(\mathbf{x}_j^-, \mathbf{w})-\tau,\quad j=1,\dots,m^- \qquad \epsilon_i = \tau - g(\mathbf{x}_i^+, \mathbf{w})-\Delta,\quad i=1,\dots,m^+
+$$
+
+- $\Delta\to 0$ 处理严格不等号，实际可忽略。
+- 统一后两式的 error 均 $>0$ 时计为错误。
+
+$$
+\text{TER}=\frac{1}{m^-}\sum_{j=1}^{m^-}L(\varepsilon_j>0)+\frac{1}{m^+}\sum_{i=1}^{m^+}L(\epsilon_i>0) \tag{5.66}
+$$
+
+- 学习目标：$\hat{\mathbf{w}}=\arg\min_{\mathbf{w}}\text{TER}$。
+- $L(\cdot)$ 是 threshold at zero 的 classification decision function，targets 为 $\{-1,+1\}$（而非 $\{0,1\}$）。
+
+#### 2.3 ⭐ Sigmoid 近似及其问题
+
+(5.67) 的 step loss **不可微**，自然用 smooth sigmoid 近似：
+
+$$
+\sigma(\theta)=\frac{1}{1+e^{-\gamma\theta}},\quad \gamma>0 \tag{5.69}
+$$
+
+- $\gamma$ 控制 slope：$\gamma$ 大则接近 step function。
+- 近似后 TER 变为 smooth differentiable 问题 (5.70)。
+
+**但 sigmoid 近似有两个问题**：
+1. **Nonlinear formulation w.r.t. $\mathbf{w}$**：$\sigma(\varepsilon)$ 中 $\varepsilon$ 是 $\mathbf{w}$ 的函数，故 $\sigma(\mathbf{w})$ 非线性 → **多个 local solutions**，不同 initialization 收敛到不同 local optimum，需 trial-and-error。
+2. **Local plateaus**：sigmoid 的 flat regions 叠加后梯度近零，迭代搜索 stuck、进展缓慢。
+
+> 老师口述补充：早期神经网络（1960s–70s backpropagation）广泛用 sigmoid activation，至今 deep learning 仍用 sigmoid 变体。local minima 问题仍在，但大数据量下"many local minima 给出的解对人眼足够好"——理论未解决但实践可用。
+
+#### 2.4 ⭐ Link-Loss Functional Pair：Linear Link + Quadratic Loss
+
+**关键思路**：用 **link function**（模型 $g$）与 **loss function**（$L$）的匹配 pair 保证 convex → closed-form。
+
+- **Linear link** $g(\mathbf{x},\mathbf{w})=\mathbf{w}^T\mathbf{x}$（含 polynomial/kernel 的 $p(\mathbf{x})$ 嵌入，linear w.r.t. $\mathbf{w}$）。
+- **Quadratic loss** $L(\cdot)=(\cdot)^2$。
+- **Linear + Quadratic → convex → closed-form 可解**。
+
+**但 quadratic loss 的逻辑问题**：quadratic 两端均高（$|\varepsilon|$ 大时 loss 大），而 classification 需要的是"错误高、正确低"（monotonic，类似 step function）——quadratic 不区分正负，不能直接用。
+
+#### 2.5 ⭐ Offset Trick：只用 quadratic 的一臂
+
+**解决方法**：给 error 加一个 uniform offset $\eta$，把 quadratic curve 推到一侧，使 data 只落在 quadratic 的**单臂**上：
+
+$$
+\text{TER}(\mathbf{w})\approx\min_{\mathbf{w}}\left[\frac{1}{2m^-}\sum_{j=1}^{m^-}(\varepsilon_j+\eta)^2+\frac{1}{2m^+}\sum_{i=1}^{m^+}(\epsilon_i+\eta)^2\right] \tag{5.71}
+$$
+
+- $\eta$ 把 quadratic 中心偏移，使得错误样本 $(\varepsilon>0$ 或 $\epsilon>0)$ 落在高 loss 臂、正确样本落在低 loss 区。
+- 系数 2 来自两个 square 项的微分归一化。
+- ⭐ **核心技巧**：用 monotonic 的单臂 quadratic 近似 step loss，既可微又保持 convex。
+
+#### 2.6 ⭐ TER Closed-form Solution（Primal）
+
+加入 weight decay regularization $b\|\mathbf{w}\|_2^2$，线性 predictor $g=\mathbf{w}^T p(\mathbf{x})$：
+
+$$
+\min_{\mathbf{w}}\left[\frac{b}{2}\|\mathbf{w}\|_2^2+\frac{1}{2m^-}\sum_{j=1}^{m^-}\bigl(\mathbf{w}^T p(\mathbf{x}_j^-)-\tau+\eta\bigr)^2+\frac{1}{2m^+}\sum_{i=1}^{m^+}\bigl(\tau-\mathbf{w}^T p(\mathbf{x}_i^+)+\eta\bigr)^2\right] \tag{5.72}
+$$
+
+对 $\mathbf{w}$ 求一阶偏导令零（first-order necessary condition；quadratic → 充分），得：
+
+$$
+\boxed{\;\hat{\mathbf{w}}=\left[bI+\frac{1}{m^-}\sum_{j=1}^{m^-}p_j^-{p_j^-}^T+\frac{1}{m^+}\sum_{i=1}^{m^+}p_i^+{p_i^+}^T\right]^{-1}\left[\frac{(\tau-\eta)}{m^-}\sum_{j=1}^{m^-}p_j^-+\frac{(\tau+\eta)}{m^+}\sum_{i=1}^{m^+}p_i^+\right]\;}
+$$
+
+- $p_j^-=p(\mathbf{x}_j^-)\in\mathbb{R}^{D+1}$，$p_i^+=p(\mathbf{x}_i^+)\in\mathbb{R}^{D+1}$。
+- $b$ 控制 regularization 强度（默认 $10^{-4}$）。
+
+**矩阵形式**（$P^+$、$P^-$ 分别为 positive/negative 样本的 projection matrix）：
+
+$$
+\hat{\mathbf{w}}=\left[bI+\frac{1}{m^-}{P^-}^T P^-+\frac{1}{m^+}{P^+}^T P^+\right]^{-1}\left[\frac{(\tau-\eta)}{m^-}{P^-}^T\mathbf{1}^-+\frac{(\tau+\eta)}{m^+}{P^+}^T\mathbf{1}^+\right] \tag{5.76}
+$$
+
+- ⭐ **与 regression 解的对比**：regression 用统一的 $P^TP$；TER 把 $P$ 按 class 拆成 $P^-$、$P^+$，分别 normalize（$1/m^-$、$1/m^+$），target 也分拆为 $y^-=(\tau-\eta)$ 和 $y^+=(\tau+\eta)$。本质是 **class-specific weighted least squares**。
+- **balanced class**（$m^+=m^-$）时 TER 退化为 regression 解（权重相同）；**imbalanced class** 时 TER 的 class-specific normalization 使决策边界不受类别密度影响——这是 TER 优于 regression 的关键。
+
+#### 2.7 Multi-category TER
+
+$C$ 类，每类用 one-hot indicator。第 $k$ 类的 positive target $y_k^+=(\tau+\eta)\mathbf{1}^+$，negative target $y_k^-=(\tau-\eta)\mathbf{1}^-$。解堆叠：
+
+$$
+\hat{W}=[\hat{\mathbf{w}}_1,\cdots,\hat{\mathbf{w}}_C] \tag{5.78}
+$$
+
+- 每个 $\hat{\mathbf{w}}_k$ 独立求解（类似 multi-category regression 的列独立），但 $P_k^+$、$P_k^-$ 对每个类的正负划分不同（one-hot encoding 导致）。
+
+#### 2.8 ⭐ TER Dual Space 解
+
+定义 class-specific diagonal weighting matrices $M^-$、$M^+$（对角元素 $1/m^-$、$1/m^+$），$M=M^-+M^+$：
+
+$$
+\hat{\mathbf{w}}=\left[bI+P^T(M^-+M^+)P\right]^{-1}P^T(M^-+M^+)\mathbf{y}=\left[bI+P^TMP\right]^{-1}P^T M\mathbf{y} \tag{5.82}
+$$
+
+- target 向量 $\mathbf{y}$ 按类排列：前 $m^-$ 个为 $(\tau-\eta)/m^-$，后 $m^+$ 个为 $(\tau+\eta)/m^+$。
+
+用 representer 形式 $\mathbf{w}=P^T M\boldsymbol{\alpha}$（类似 dual ridge regression 推导）：
+
+$$
+\boxed{\;\hat{\boldsymbol{\alpha}}=(bI+P^TP M)^{-1}\mathbf{y},\qquad \hat{\mathbf{w}}=P^T M(bI+P^T P M)^{-1}\mathbf{y}\;} \tag{5.83-5.84}
+$$
+
+- Multi-category：$\hat{\mathbf{w}}_k=P_k^T M_k(bI+P_k P_k^T M_k)^{-1}\mathbf{y}_k$，$k=1,\dots,C$ (5.86)。
+- ⭐ **Primal vs Dual 选择**：$m\ge D+1$（over-determined）用 Primal（在 $(D+1)\times(D+1)$ 求逆）；$m<D+1$（under-determined）用 Dual（在 $m\times m$ 求逆），与 Week 5 ridge regression 策略一致。
+
+#### 2.9 Example 5.4（TER 学习示例）
+
+- 5 个 2D 训练样本，labels $\{1,0,1,0,0\}$（imbalanced：3 个 class-0、2 个 class-1），3rd-order polynomial model。
+- Python 代码用 `PolynomialFeatures(3)` 生成 $P$，`TERtrain` 函数自动选 Primal/Dual（$m\ge D$ 用 Primal，否则 Dual）。
+- 测试 2 个点，预测正确率 100%。Decision boundary 在 threshold 0（one-hot encoding 隐含，不同于 Example 3 的 explicit $\tau=0.5$）。
+
+> **考试提示**：老师强调"for quiz two and exam, use it to hand calculate these values"——需能手算小规模 TER 解。MCQ 多考概念（如 TER vs regression 在 imbalanced data 下的差异）。
+
+### 3. ⭐ Operating Characteristics Learning：AUC Based Learning
+
+#### 3.1 从 single threshold 到 all thresholds
+
+- TER 在**单一** threshold $\tau$ 下优化 error rate。
+- ROC curve 覆盖**所有** operating thresholds，但曲线是 range 非 scalar，不便于 optimization。
+- **AUC**（Area Under ROC Curve）是自然替代：单一 scalar 值概括所有 threshold 下的 ranking 性能。
+
+#### 3.2 AUC 的 Wilcoxon-Mann-Whitney 统计形式
+
+定义正负样本预测值差 $\xi_{ij}=g(\mathbf{x}_i^+)-g(\mathbf{x}_j^-)$，Heaviside step function：
+
+$$
+u(\xi)=\begin{cases}1,&\xi>0\\0.5,&\xi=0\\0,&\xi<0\end{cases} \tag{5.87}
+$$
+
+$$
+\text{AUC}(\mathbf{w},\mathbf{x})=\frac{1}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}u(\xi_{ij})=\frac{1}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}u\bigl(g(\mathbf{x}_i^+)-g(\mathbf{x}_j^-)\bigr) \tag{5.88}
+$$
+
+- AUC = 正负样本对中正确排序的比例（$\xi_{ij}>0$ 即 positive score > negative score）。
+- 此式即 **Wilcoxon-Mann-Whitney statistic**（Week 4 已建立）。
+
+#### 3.3 AAC（Area Above Curve）minimization
+
+AUC 是 maximization，转为 minimization 用 **AAC**（Area Above ROC Curve）：
+
+$$
+\min_{\mathbf{w}}\text{AAC}(\mathbf{w},\mathbf{x})=\min_{\mathbf{w}}\frac{1}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}u(-\xi_{ij}) \tag{5.89}
+$$
+
+- $-\xi_{ij}>0$（即 $g(\mathbf{x}_j^-)>g(\mathbf{x}_i^+$，错误排序）时 $u=1$，计为 error。
+- 与 TER 同理：step function 不可微 → 用 quadratic approximation。
+
+#### 3.4 ⭐ AUC Quadratic Approximation + Offset
+
+对 linear parametric predictor $g(\mathbf{x},\mathbf{w})=\mathbf{w}^T p(\mathbf{x})$，用 quadratic + offset $\eta$ + weight decay：
+
+$$
+\min_{\mathbf{w}}\text{AAC}(\mathbf{w},\mathbf{x})\approx\min_{\mathbf{w}}\left[\frac{b}{2}\|\mathbf{w}\|_2^2+\frac{1}{2m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}\bigl((p(\mathbf{x}_j^-)-p(\mathbf{x}_i^+))^T\mathbf{w}+\eta\bigr)^2\right] \tag{5.90}
+$$
+
+- ⭐ **与 TER 的区别**：TER 的 error 是 $g(\mathbf{x})-\tau$（单样本 vs threshold）；AUC 的 error 是 $g(\mathbf{x}_j^-)-g(\mathbf{x}_i^+)$（正负样本**对** vs 对），故 AUC 有**双重求和** $m^+\times m^-$ 项。
+- $g\in[0,1]$ 时 $\xi_{ij}\in[-1,+1]$，选 $\eta=\pm 1$ 使得错排样本的 quadratic 值高于正确排样本——只用 quadratic 单臂。
+
+#### 3.5 Offset $\eta$ 的方向选择（Fig. 3）
+
+| $\eta$ | 效果 |
+|---|---|
+| $\eta=+1$ | 错排（$\xi_{ij}<0$，solid-line）的 $(-\xi_{ij}+1)^2$ **高于** 正排（dashed-line）→ 可用 |
+| $\eta=-1$ | 错排的 $(-\xi_{ij}-1)^2$ **低于** 正排 → 不可用（方向反了） |
+
+- 选对 $\eta$ 的符号使 quadratic 单臂对错排给高 penalty、正排给低 penalty。
+
+#### 3.6 ⭐ AUC Closed-form Solution
+
+对 (5.90) 求梯度令零，得 closed-form：
+
+$$
+\boxed{\;\hat{\mathbf{w}}=\left[bI+\frac{1}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}(p_j^- - p_i^+)(p_j^- - p_i^+)^T\right]^{-1}\left[\frac{-\eta}{m^+m^-}\sum_{i=1}^{m^+}\sum_{j=1}^{m^-}(p_j^- - p_i^+)\right]\;}
+$$
+
+$$\tag{5.91}
+$$
+
+- ⭐ 解在**单步**求得（single evaluation），least-squares optimal 但在 AUC sense。
+- 预测 unseen data：$\hat{g}(\{x_1,\dots,x_n\})=P_n\hat{\mathbf{w}}$（与 regression 相同的 stacking）。
+- **无 explicit threshold**：AUC 优化覆盖所有 threshold，解对所有 operating point 最优。
+
+#### 3.7 ⭐ Optimal Threshold for TER（从 AUC 解出发）
+
+AUC 解无 explicit threshold，但实际应用需特定 threshold。用 (5.91) 的 $\hat{\mathbf{w}}$，对 approximated TER (5.71) 关于 $\tau$ 优化：
+
+$$
+\tau=\frac{1}{2m^-}\sum_{j=1}^{m^-}\hat{\mathbf{w}}^T p_j^-+\frac{1}{2m^+}\sum_{i=1}^{m^+}\hat{\mathbf{w}}^T p_i^+ \tag{5.92}
+$$
+
+- 即正负类预测均值的**加权平均**——class-balanced 最优 threshold。
+- 实际应用可据 security 需求偏移（banking 要低 FPR、手机解锁要低 FNR）。
+
+#### 3.8 AUC vs TER vs Regression 对比
+
+| 特性 | Regression（LSE） | TER | AUC |
+|---|---|---|---|
+| **优化目标** | $\|\mathbf{y}-P\mathbf{w}\|^2$（距离） | $FPR+FNR$（计数） | 正负对排序比例（ranking） |
+| **threshold** | 后接（需另选） | 嵌入 formulation（固定 $\tau$） | 无 explicit（覆盖所有 $\tau$） |
+| **class normalization** | 无（统一） | class-specific（$1/m^+$, $1/m^-$） | class-specific + pairwise |
+| **imbalanced data** | 受密度影响（拟合密度） | 不受密度影响（只计数） | 不受密度（ranking-based） |
+| **求和结构** | 单重 $\sum$ | 单重 $\sum$（按 class 分拆） | **双重** $\sum\sum$（pairwise） |
+| **计算复杂度** | 低 | 中 | 高（$m^+\times m^-$ 对） |
+| **closed-form** | 是 | 是 | 是 |
+| **nonlinear capability** | 通过 $p(\mathbf{x})$ | 通过 $p(\mathbf{x})$ | 通过 $p(\mathbf{x})$ |
+
+> ⭐ **TER vs Regression 在 imbalanced data 下的差异**：balanced class（$m^+=m^-$）时 TER 退化为 regression；imbalanced 时 TER 的 class-specific weighting 使决策边界不受多数类主导。Regression 拟合数据密度（多数类拉偏曲线），TER 只计数错分（与密度无关）。老师示例中 AUC/TER 的 decision boundary（蓝虚线）与 regression（绿线）不同——imbalanced 时差异明显。
+
+### 4. A Generalized Learning Framework：Data Transformation 统一视角
+
+> 老师口述："part four, you only need to know the **concept** wise, you don't have to know the detailed deliberation."本节只需理解全局概念：LSE/TER/AUC/FLD 等分类器可通过**简单的 data manipulation** 相互联通。
+
+#### 4.1 Data Transformation 设定
+
+对输入 $\mathbf{x}\in\mathbb{R}^d$，label $y\in\{0,1\}$，定义 additive linear transformation：
+
+$$
+\tilde{\mathbf{x}}=T\mathbf{x}+\mathbf{a} \tag{5.93}
+$$
+
+- $T$：$d\times d$ scaling matrix；$\mathbf{a}$：$d\times 1$ translation vector。
+- 也可在 projection 空间操作：$\tilde{p}(\mathbf{x})=Tp(\mathbf{x})+\mathbf{a}$ (5.95)。
+- $K$ 组不同的 $(T^k, \mathbf{a}^k)$ 产生 $m\times K$ 个变换样本 (5.94)。
+
+#### 4.2 Transformed AUC（TAUC）
+
+在变换空间上的 AUC learning formulation (5.98) 的 closed-form 解 $\tilde{\mathbf{w}}_{\text{TAUC}}$ (5.99) 包含三重求和（$m^+\times m^-\times K$）。
+
+#### 4.3 ⭐ 各分类器作为 TAUC 的特例（Table 1 核心）
+
+通过设置不同的 scaling（$\beta_1,\beta_2,\gamma_1,\gamma_2$）和 translation（$u_1,u_2,v_1,v_2$）参数，TAUC 退化为不同分类器：
+
+| Classifier | $m^+$ | $m^-$ | $b$ | $\eta$ | $\beta_1$ | $\beta_2$ | $\gamma_1$ | $\gamma_2$ | $u_1$ | $u_2$ | $v_1$ | $v_2$ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **FLD** | 1 | 1 | $b$ | 1/2 | 1 | 0 | 0 | 1 | $\boldsymbol{\mu}^+$ | 0 | 0 | $\boldsymbol{\mu}^-$ |
+| **LSE** | 1 | 1 | $b$ | 1/2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
+| **TER** | $m^+$ | $m^-$ | $b$ | 1/2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
+| **AUC** | $m^+$ | $m^-$ | $b$ | 1/2 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| **Novel** | $m^+$ | $m^-$ | $b$ | 1/2 | $r$ | $r$ | $r$ | $r$ | $r$ | $r$ | $r$ | $r$ |
+
+- $b=10^{-4}$（regularization），$r$ 为 random number（novel/g generalized classifier）。
+- $\boldsymbol{\mu}^+=\frac{1}{m^+}\sum_{i=1}^{m^+}p(\mathbf{x}_i^+)$，$\boldsymbol{\mu}^-=\frac{1}{m^-}\sum_{j=1}^{m^-}p(\mathbf{x}_j^-)$（类内均值）。
+
+**关键关系**：
+- **AUC → TAUC**：当 $\beta_1=\beta_2=\gamma_1=\gamma_2=1$，$a_k=0$，TAUC (5.101) 退化为标准 AUC (5.91)。
+- **TAUC → TER**：当 $K=2$，$\gamma_1=\beta_2=0$，$\beta_1=\gamma_2=1$，$a_k=0$，TAUC (5.102) 退化为 TER（除默认 $\tau=0$ 外）。
+- **TAUC → FLD**：当 $b=\gamma_1=\beta_2=0$，$\beta_1=\gamma_2=1$，$\eta=1/2$，$u_2=v_1=0$，$u_1=\boldsymbol{\mu}^-$，$v_2=\boldsymbol{\mu}^+$，TAUC (5.104) 退化为 **Fisher Linear Discriminant**（FLD）。FLD 是 TER 的 centered 版本。
+- **TER → LSE**：不加 regularization 时 TER (5.105) = Weighted Least Squares；Weighted-LS 与 LS 的关系已知 → AUC 在 scaling space 提供统一框架涵盖 TER / Weighted-LS / LS。
+
+#### 4.4 与 Bayesian Inference 的关系
+
+- TER 的 quadratic approximation 可视为 **dual-Gaussian regression**：正负两类各有 Gaussian noise $\mathcal{N}(0,\sigma_{\pm}^2)$，target 为 $y_j^-=\tau-\eta$ 和 $y_i^+=\tau+\eta$。
+- Likelihood 为双 Gaussian 乘积 (5.112)，加 Gaussian prior $\mathbf{w}\sim\mathcal{N}(0,\Sigma_p)$ 得 posterior：
+
+$$
+p(\mathbf{w}|\mathbf{y},X)\sim\mathcal{N}(\bar{\mathbf{w}},\Sigma) \tag{5.109}
+$$
+
+$$
+\bar{\mathbf{w}}=\left(\frac{1}{\sigma_-^2}{X^-}^T X^-+\frac{1}{\sigma_+^2}{X^+}^T X^++\Sigma_p^{-1}\right)^{-1}\left(\frac{1}{\sigma_-^2}{X^-}^T\mathbf{y}^-+\frac{1}{\sigma_+^2}{X^+}^T\mathbf{y}^+\right) \tag{5.115}
+$$
+
+- ⭐ posterior mean $\bar{\mathbf{w}}$ 与 TER solution 结构一致——TER 的 quadratic approximation 对应 Gaussian likelihood + Gaussian prior 的 MAP 估计。
+- AUC 的 quadratic approximation 可视为以 pairwise data $(\mathbf{x}_j^- - \mathbf{x}_i^+)$ 为输入的 Gaussian process。
+
+### 5. ⭐ 考点速查表
+
+| 考点 | 要点 |
+|---|---|
+| **TER objective** | $TER=FPR+FNR$，class-specific normalized error count |
+| **TER 变量替换** | $\varepsilon_j=g(\mathbf{x}_j^-)-\tau$，$\epsilon_i=\tau-g(\mathbf{x}_i^+)$，统一 threshold at zero |
+| **Sigmoid 近似问题** | local solutions + local plateaus（非线性 w.r.t. $\mathbf{w}$） |
+| **Link-loss pair** | linear link + quadratic loss → convex → closed-form |
+| **Offset trick** | 加 $\eta$ 偏移 quadratic 中心，只用单臂，使 loss monotonic |
+| **TER closed-form** | $[bI+\frac{1}{m^-}{P^-}^TP^-+\frac{1}{m^+}{P^+}^TP^+]^{-1}[\cdots]$，class-specific weighting |
+| **TER = Weighted LS** | 本质是 class-specific weighted least squares |
+| **TER vs regression** | imbalanced 时 TER 不受密度影响，regression 拟合密度 |
+| **AUC objective** | Wilcoxon-Mann-Whitney statistic，正负对排序比例 |
+| **AAC** | $\min\text{AAC}=\min\frac{1}{m^+m^-}\sum\sum u(-\xi_{ij})$，AUC 的 minimization 版 |
+| **AUC closed-form** | pairwise $p_j^- - p_i^+$，双重求和，single evaluation |
+| **AUC threshold** | 无 explicit；optimal $\tau$ via (5.92) = 加权类均值 |
+| **TAUC 统一框架** | FLD/LSE/TER/AUC 均为 data transformation 特例 |
+| **FLD = TER centered** | FLD 是 TER 加 class mean centering |
+| **Bayesian 对应** | TER quadratic approx ≈ dual-Gaussian MAP |
+
+### 6. 本周要点小结
+
+- **动机**：从 regression+threshold 转为**直接优化 classification metric**（TER / AUC），避免绕道。
+- **TER Learning**：用 offset $\eta$ 把 quadratic 推到单臂近似 step loss → convex → closed-form。解按 class 分拆 $P^+/P^-$，class-specific normalization $1/m^+$、$1/m^-$ → 本质 weighted LS。Primal/Dual 选择同 Week 5（选小空间求逆）。
+- **AUC Learning**：用 Wilcoxon-Mann-Whitney statistic 把 AUC 表达为正负对排序比例，quadratic + offset 近似后 closed-form。双重求和 $m^+\times m^-$ 计算量大；无 explicit threshold，可用 (5.92) 求最优 TER threshold。
+- **Generalized Framework**：通过 data transformation（scaling + translation），FLD / LSE / TER / AUC 都是 TAUC 的特例——**changing algorithm = changing data**。FLD 是 TER 的 centered 版本；TER 是 Weighted-LS；AUC 在 scaling space 统一三者。
+- **Bayesian 对应**：TER quadratic approximation 等价于 dual-Gaussian likelihood + Gaussian prior 的 MAP 估计。
+- **实践**：Python 代码（`TERtrain`/`TERtest`，Primal/Dual 自动选择）；手算小规模示例用于 quiz/exam；imbalanced data 下 TER/AUC 优于 regression。
+
+---
+
+> **下周（Week 7）预告**：本周未讲完 Part 4（Generalized Framework 的 data transformation 细节），老师明确说"next week we have a bit of time, we can continue remaining just a few more slides"。预计 Week 7 补完 TAUC/FLD/LSE 关系的剩余 slides 后进入 **Lecture 7 — Analytic Methods for Penalized Learning**（Toh 的 Part 1 收尾段，penalized/regularized learning 的解析方法，对应课程大纲 L7）。本周的 TER/AUC closed-form 解与 quadratic approximation 是直接前置。具体以 Lecture 7 课件为准。
+
+---

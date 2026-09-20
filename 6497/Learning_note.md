@@ -1387,3 +1387,492 @@ $$Q(\theta|\theta^{(m)}) \approx \frac{1}{n}\sum_{i=1}^n \log p(x, z_i | \theta)
 ---
 
 > **下一周预告**：Week 6 进入 **MCMC（Markov Chain Monte Carlo）**——先复习 Markov chain（transition matrix、stationary distribution、ergodicity），再讲 **Metropolis-Hastings** 与 **Gibbs sampler**，处理本周方法失效的高维分布。MCMC 是 sampling 专题的第二周，也是 Week 7 Quiz 1（覆盖 Week 1–4，不含 Week 5–6）前最后一周新课。
+
+---
+
+## Week 6 — Markov Chain Monte Carlo（MCMC：Metropolis-Hastings 与 Gibbs Sampling）
+
+> **权威来源说明**：本节先由 `week6/week6.txt` 录播转写整理，再以 `week6/6_MCMC.pdf`（官方课件，Tay W.P.，42 页）核对修正。转写噪声较多（"tic mark chain Marcel chain Multi Color"→Markov Chain Monte Carlo (MCMC)，"syncing/sencing/centering/sering"→sampling，"pyal/pyro/pier"→prior，"posior/poste"→posterior，"lot livelihood/lilihood/hod"→likelihood，"gaucin/galsiu/dozing/goal/Dalcen/galsin"→Gaussian，"Ming Mal/mean ski/Mosk"→Minkowski，"apoal/apo"→posterior，"bone Wah/bona wash/long watch"→Baum-Welch，"verte B"→Viterbi，"CLAP/clap"→Wooclap，"Tang"→Tay Wee Peng，"Depo"→Wang Lipo，"Ciford/pile Ciford"→Clifford，"speciation"→statistician，"pedo number"→pseudo-random number，"ez one to four"→Weeks one to four，"lock down browser/lock quiz"→lockdown browser/mock quiz，"com a review/comb a review"→conduct a review，"pizzer/pizza/pizzel/pit"→pixel，"dousing/dozing"→Gaussian，"sendling/sent"→sampling，"resembling"→resampling，"per side/per side x"→ψ(x)，"sikmoi"→sigmoid，"godic/agobi/gobi"→ergodic，"redu/reduc/reducer"→irreducible/reducible，"costly recurrent"→positive recurrent，"APD/AP/APOE/ePod"→aperiodic），均以 PDF 为准修正。本周主题是 MCMC——sampling 专题的第二周，也是 Quiz 1 前最后一周新课。
+
+### 0. ⭐ 行政公告（Quiz 1 最终确认）
+
+老师开场再次确认 Quiz 1 安排（与 Week 5 一致，此处补充细节）：
+
+| 事项 | 安排 |
+|---|---|
+| **Quiz 1** | **下周（Week 7）lecture 时段**，约 **7:00 PM** 开始，**60 分钟** |
+| 覆盖范围 | **Week 1–4**（Week 5 sampling 与 Week 6 MCMC **不含**于 quiz，但**期末考**会考） |
+| 形式 | NTULearn + **lockdown browser**；需提前**安装并测试**（有 mock quiz 可练手，现场安装来不及） |
+| **Review session** | **9 月 16 日（周三）10:00 AM**，Teams 线上，会录像上传 NTULearn；review questions 已发布 |
+| 提交方式 | 在 lecture theater 现场用自带 laptop/tablet 完成 |
+
+> 老师强调：本周是前半学期**最后一节完整新课**。Week 7 quiz 之后会做 summary review（讲解 past exam questions、复习要点），然后进入 recess week，后半学期由 Wang Lipo 讲深度学习。
+
+### 1. MCMC 动机：为什么需要它
+
+#### 1.1 回顾：上周 sampling 方法的局限
+
+Week 5 讲了 standard distributions（CDF inverse method）、rejection sampling、importance sampling——这些方法只适用于**低维分布**（标量或至多二维）。
+
+- 当维度达到**数百、数千**（如 image denoising 的 $z \in \mathbb{R}^{\text{像素数}}$），rejection sampling 的包络常数 $k$ 指数爆炸、接受率骤降；importance sampling 的权重方差爆炸。
+- 但这些方法仍可作为**子程序**（subroutine）在 MCMC 内部使用（如从 proposal distribution 采样）。
+
+#### 1.2 核心动机：高维 posterior
+
+回到 Week 5 的 image denoising 例子（贯穿两周）：
+
+- 干净图像 $z$（每个像素 $z_j \in \{-1, 1\}$），观测 $y$ 是加噪版本。
+- **Posterior**：
+
+$$
+p(z|y) = \frac{p(y|z)p(z)}{p(y)}
+$$
+
+- **Likelihood** $p(y|z) = \prod_j \mathcal{N}(y_j | z_j, \sigma^2)$——各像素独立被 Gaussian noise 腐蚀，可分解。
+- **Prior** $p(z)$：相邻像素高度相关（白像素邻居多为白），需建模邻域关系 → **不能分解成独立乘积** → 高维分布。
+- 分母 $p(y) = \int p(y|z)p(z)\,dz$ 是**高维积分**，无法解析计算。
+
+结论：$p(z|y)$ 是高维分布，无解析形式（conjugate prior 不适用），但**只要能从中采样就能近似它**（SLLN）。MCMC 就是高维分布采样的主力方法。
+
+#### 1.3 MCMC 的历史地位
+
+MCMC 被誉为**20 世纪最重要的十大算法之一**。
+
+| 年份 | 人物 | 贡献 |
+|---|---|---|
+| 1953 | Metropolis（物理化学） | 提出 Metropolis algorithm（最初用于物理/化学） |
+| 1970 | Hastings（统计） | 推广为更一般版本 → **Metropolis-Hastings** |
+| 1984 | Geman & Geman | 提出 **Gibbs sampling**（MH 的特例） |
+| 1990 | Gelfand & Smith | 普及 MCMC，使其成为现代统计/ML 的基石 |
+
+老师引用 Peter Clifford（1993）的话：
+
+> "…from now on we can compare our data with the model we actually want to use rather than with a model which has some mathematically convenient form. This is surely a revolution."
+
+直觉：MCMC 让你不再受"能否解析推导"的限制——几乎可以处理任何分布/模型，只需从中采样即可。
+
+### 2. Markov Chain 基础回顾（MCMC 的数学基础）
+
+#### 2.1 Markov chain 与 transition kernel
+
+- 离散时间随机变量序列 $Z_0, Z_1, Z_2, \ldots$，满足 **Markov property**：$Z_m$ 只依赖 $Z_{m-1}$，与更早的历史无关。
+- **Transition probability**（转移概率）$T(x, y) = P(Z_m = y | Z_{m-1} = x)$，本周只考虑 **homogeneous MC**（$T$ 不随 $m$ 变）。
+- 状态分布演化：$\pi_t(y) = \sum_x \pi_{t-1}(x) T(x, y)$，即 $\pi_t = \pi_{t-1} T = \pi_0 T^t$。
+
+#### 2.2 ⭐ Stationary Distribution（平稳分布）
+
+$\pi$ 是 **stationary distribution**（平稳分布）若：
+
+$$
+\sum_x \pi(x) T(x, y) = \pi(y), \quad \forall y
+$$
+
+即 $\pi T = \pi$——分布经过转移后**保持不变**。
+
+- 求解：解线性方程组 $\pi T = \pi$（加上 $\sum \pi = 1, \pi \ge 0$）。
+- **例**（3 状态 MC，PDF p7）：
+
+$$
+T = \begin{bmatrix} 0.2 & 0.2 & 0.6 \\ 0.3 & 0.5 & 0.2 \\ 0.5 & 0.0 & 0.5 \end{bmatrix}, \quad \text{解 } \pi T = \pi \Rightarrow \pi = \frac{1}{69}\begin{bmatrix} 25 & 10 & 34 \end{bmatrix}
+$$
+
+#### 2.3 Stationary Distribution 的存在条件（Supplementary）
+
+| 条件 | 含义 |
+|---|---|
+| **Irreducible（不可约）** | 从任一状态出发，有限步内正概率到达任一其他状态 → 每个状态被无限次访问 |
+| **Positive recurrent（正常返）** | 从状态 $i$ 出发，返回 $i$ 的期望时间有限 → 每个状态占用时间比例为正 |
+
+- **有限状态**的 irreducible MC **一定** positive recurrent → 一定有 stationary distribution。
+- 图例（PDF p6）：左图 1↔2↔3↔1 irreducible；右图 1↔2 但 3 孤立 → reducible。
+
+#### 2.4 ⭐ Asymptotic Convergence（渐近收敛）与 Ergodicity
+
+**问题**：从任意初始分布 $\pi_0$ 出发，$\pi_k = \pi_0 T^k$ 是否收敛到 $\pi$？
+
+**收敛条件**（ergodic MC，遍历链）：
+
+| 条件 | 含义 |
+|---|---|
+| Irreducible + positive recurrent | stationary distribution 存在 |
+| **Aperiodic（非周期）** | 不在少数状态间振荡 |
+
+- **周期性反例**（PDF p9）：$T = \begin{bmatrix}0&1\\1&0\end{bmatrix}$，在状态 1,2 间振荡，$T^k$ 在 $\begin{bmatrix}0&1\\1&0\end{bmatrix}$ 和 $\begin{bmatrix}1&0\\0&1\end{bmatrix}$ 间交替，**不收敛**。
+- **Aperiodic**：周期为 1（不存在这种振荡）。
+- **Ergodic MC（遍历链）** = irreducible + positive recurrent + aperiodic ⇒ $\pi_k \to \pi$（无论初始分布）。
+
+> 本课总是假设上述条件成立。经过足够长的 **burn-in period** $m$ 后，$k > m$ 时刻的分布近似为 $\pi$。
+
+#### 2.5 ⭐ Reversible MC（可逆链）与 Detailed Balance
+
+**Reversible（可逆）** 的充分（非必要）条件——**detailed balance（细致平衡）**：
+
+$$
+\pi(x) T(x, y) = \pi(y) T(y, x), \quad \forall x, y
+$$
+
+- 概率"从 $x$ 流向 $y$"等于"从 $y$ 流向 $x$"——平衡。
+- 由此可推出 $\pi$ 是 stationary distribution：
+
+$$
+\sum_x \pi(x) T(x, y) = \sum_x \pi(y) T(y, x) = \pi(y) \sum_x T(y, x) = \pi(y)
+$$
+
+> **MCMC 的核心策略**：要采样 from target $\pi(x)$，设计一个 transition probability $T(x,y)$ 使得 MC **reversible**（满足 detailed balance）且 **aperiodic** → $\pi$ 是 stationary distribution → 运行 MC 足够长后样本近似 from $\pi$。
+
+### 3. ⭐ Metropolis-Hastings Algorithm（MH 算法）
+
+#### 3.1 算法
+
+**目标**：采样 from $\pi(x)$，$x \in \mathcal{X}$（如 $\mathcal{X} = \mathbb{R}^{1000}$，高维）。
+
+**假设**：
+- 能计算 **unnormalized target** $\tilde{\pi}(x)$（即 $\pi(x) = \tilde{\pi}(x) / Z$，$Z$ 未知）。
+- 选一个 **proposal distribution**（建议分布）$q(x, y) = q(y|x)$——irreducible、aperiodic、**易采样**。
+
+**算法**（每步 $m$）：
+
+1. 令 $x = Z_{m-1}$（当前状态）。
+2. 从 $q(x, y)$ 采样 $y$（候选状态）。
+3. 计算 **acceptance probability**（接受概率）：
+
+$$
+A(x, y) = \min\left(1, \frac{\tilde{\pi}(y) q(y, x)}{\tilde{\pi}(x) q(x, y)}\right)
+$$
+
+4. 以概率 $A(x,y)$ **接受** $y$：生成 $U \sim \text{Unif}[0,1]$，若 $U \le A(x,y)$ 则 $Z_m = y$；否则 $Z_m = x$（停留在原地）。
+
+> 实现：从 $\tilde{\pi}(x)$、$q(x,y)$ 各算一次，取比值即可——不需 normalizing constant。
+
+#### 3.2 MH 的关键性质
+
+- $Z_0, Z_1, \ldots$ 是 **Markov chain**（$Z_m$ 只依赖 $Z_{m-1}$，因 proposal 与 acceptance 都只依赖 $x = Z_{m-1}$）。
+- 与 rejection/importance sampling 一样，**不需知道 normalizing constant**。
+- 适合高维：每步只需从"简单的" $q(x, \cdot)$ 采样，而非直接从 $\pi$ 采样。
+- 与上周方法的精确性对比（老师强调）：
+  - **Standard distributions + rejection sampling**：给出**精确**的 target 样本。
+  - **Importance sampling / SIR / MCMC**：给出**近似**样本（SLLN 渐近），burn-in 越长近似越好。
+
+#### 3.3 ⭐ Proof of MH（Supplementary，可逆性证明）
+
+**Lemma**：MH 构造的 MC 是 reversible 的，$\pi(x)$ 是其 stationary distribution。
+
+**Proof**（对 $x \ne y$）：
+
+$$
+\pi(x) T(x, y) = \pi(x) q(x, y) A(x, y) = \pi(x) q(x, y) \min\left(1, \frac{\pi(y) q(y, x)}{\pi(x) q(x, y)}\right)
+$$
+
+$$
+= \min\big(\pi(x) q(x, y),\; \pi(y) q(y, x)\big) = \pi(y) q(y, x) \min\left(\frac{\pi(x) q(x, y)}{\pi(y) q(y, x)}, 1\right) = \pi(y) T(y, x)
+$$
+
+- 关键步骤：$\min(a, b) = \min(b, a)$，对称性使两边相等。
+- 若 MC irreducible（positive recurrent）aperiodic ⇒ $Z_n$ 分布 → $\pi$。
+- **设计巧妙**：acceptance probability 的形式恰好使 detailed balance 成立。
+
+#### 3.4 Proposal Distribution 的选择
+
+| 类型 | 形式 | 特点 |
+|---|---|---|
+| **Random walk MH** | $q(x, y) = q(y - x)$，如 $y - x \sim \mathcal{N}(0, \Sigma)$ 或 $\text{Unif}[-\delta, \delta]^d$ | 在状态空间随机游走；需选合适的方差 |
+| **Independence chain MH** | $q(x, y) = q(y)$（与 $x$ 无关） | 取决于 $q$ 逼近 $\pi$ 的程度；需 $q$ 比 $\pi$ **heavy-tailed** |
+| **Exploit $\pi$ 结构** | $\pi(x) \propto \psi(x) h(x)$，$h$ 可采样，$\psi$ 有界；取 $q(x,y) = h(y)$ | $A(x,y) = \min(1, \psi(y)/\psi(x))$ |
+
+**Random walk MH 的特例——Metropolis Algorithm**：
+
+当 $q(x, y) = q(y, x)$（对称 proposal，如 Gaussian、Uniform）：
+
+$$
+A(x, y) = \min\left(1, \frac{\tilde{\pi}(y) q(y, x)}{\tilde{\pi}(x) q(x, y)}\right) = \min\left(1, \frac{\tilde{\pi}(y)}{\tilde{\pi}(x)}\right)
+$$
+
+> 老师强调：Gaussian 与 Uniform 都是标准选择，采样方法已内置（含高维 multivariate Gaussian 也有标准程序）。
+
+#### 3.5 ⭐ Proposal Variance 的调参
+
+$\sigma$（proposal 的标准差）至关重要：
+
+| $\sigma$ | 效果 |
+|---|---|
+| **太小** | 每步移动很小，探索空间慢；acceptance rate 太高；2000 步可能仍困在局部区域 |
+| **太大** | 步子大但 acceptance rate 很低，长期卡在原地不动 |
+
+**Rules of thumb（经验法则）**：
+
+| MH 类型 | 目标 acceptance rate |
+|---|---|
+| Random walk MH | **0.25 – 0.5** |
+| Independence chain MH | **接近 1** |
+
+> PDF 演示（p20）：$\sigma$ 太小时 2000 样本全挤在一个小区域，从未到达另一高概率区。
+
+#### 3.6 MH 示例（PDF p19）
+
+$$
+\pi(x) \propto \exp(-x^2)\, x^2\, (5 + \sin(2x))
+$$
+
+- 用 Gaussian random walk proposal $q(x, y) = \mathcal{N}(y | x, \sigma^2) = \mathcal{N}(x | y, \sigma^2) = q(y, x)$（对称）。
+- $A(x, y) = \min(1, \tilde{\pi}(y)/\tilde{\pi}(x))$。
+- 每步：采 $y \sim q(Z_m, y)$；采 $U \sim \text{Unif}[0,1]$；若 $U \le A(Z_m, y)$ 则 $Z_{m+1} = y$，否则 $Z_{m+1} = Z_m$。
+
+### 4. ⭐ Burn-In 与 Thinning（MCMC 收敛诊断）
+
+#### 4.1 Burn-In（预热/烧入期）
+
+- **Burn-in phase**：丢弃 MC 初始阶段的样本（此时分布尚未接近 stationary distribution）。
+- 典型值：丢弃前 **1000 – 5000** 步。
+- **难点**：难以诊断何时"已烧入"。例（PDF p22）：$\text{Unif}(\{0,1,\ldots,20\})$ 的 MC 要跑 **400+ 步**才"忘记"起始点。
+- 老师补充：MH 实现很简单、很快，即使丢弃 5000 步也不费时。
+
+#### 4.2 Thinning（稀疏化）
+
+- MC 样本**不独立**（相邻样本相关），通过**每隔 $d$ 步取一个**来降低相关性。
+- $d$ 越大 → 样本间相关性越低，近似 i.i.d.；但浪费更多样本。
+- 适用场景：$\sigma$ 太大导致长期卡在同一位置时，thinning 可避免重复值。
+
+#### 4.3 获取近似 i.i.d. 样本的两种方式
+
+1. **多条独立链**：生成 $r$ 条独立 Gibbs/MH 序列（各长 $m$），取每条最终值。
+2. **单条长链 + thinning**：生成一条长序列，丢弃 burn-in，每 $d$ 步取一个。
+
+### 5. ⭐ Gibbs Sampling（吉布斯采样）
+
+#### 5.1 算法
+
+Gibbs sampling 是 **MH 的特例**，用于采样 from 多维分布 $p(z_1, \ldots, z_d)$（高维时直接采样困难）。
+
+**关键**：若能计算各分量的 **full conditional**（满条件分布）$p(z_i | z_{-i})$，其中 $z_{-i} = \{z_1, \ldots, z_{i-1}, z_{i+1}, \ldots, z_d}$，则：
+
+1. 初始化 $(z_1^{(0)}, \ldots, z_d^{(0)})$。
+2. 每次迭代 $k$，按顺序逐分量采样：
+
+$$
+z_1^{(k)} \sim p(\cdot | z_2^{(k-1)}, \ldots, z_d^{(k-1)})
+$$
+
+$$
+z_2^{(k)} \sim p(\cdot | z_1^{(k)}, z_3^{(k-1)}, \ldots, z_d^{(k-1)})
+$$
+
+$$
+\vdots
+$$
+
+$$
+z_j^{(k)} \sim p(\cdot | z_1^{(k)}, \ldots, z_{j-1}^{(k)}, z_{j+1}^{(k-1)}, \ldots, z_d^{(k-1)})
+$$
+
+$$
+\vdots
+$$
+
+$$
+z_d^{(k)} \sim p(\cdot | z_1^{(k)}, \ldots, z_{d-1}^{(k)})
+$$
+
+3. 丢弃 burn-in 期的样本。
+
+> 注意：更新 $z_j$ 时用**已更新的** $z_1^{(k)}, \ldots, z_{j-1}^{(k)}$ 与**尚未更新的** $z_{j+1}^{(k-1)}, \ldots, z_d^{(k-1)}$。
+
+#### 5.2 Gibbs = MH with acceptance probability = 1（Supplementary）
+
+Gibbs 的每一步等价于一个 MH step，其中 proposal $q_j(x_{-j}, y_j) = p(z_j | x_{-j})$（full conditional），且：
+
+$$
+A(x_j, y_j) = \frac{p(y_j)\, q_j(y_j, x_j)}{p(x_j)\, q_j(x_j, y_j)} = \frac{p(y_j)\, p(z_j | x_{-j})}{p(x_j)\, p(z_j | x_{-j})} = \frac{p(z_j | x_{-j})\, p(x_{-j})\, p(z_j | x_{-j})}{p(z_j | x_{-j})\, p(x_{-j})\, p(z_j | x_{-j})} = 1
+$$
+
+即 **acceptance probability 恒为 1**——Gibbs 总是接受，不需计算接受概率。这是它比一般 MH 高效的原因。
+
+#### 5.3 如何求 Full Conditional
+
+$$
+p(z_1 | z_2, \ldots, z_d) = \frac{p(z_1, \ldots, z_d)}{p(z_2, \ldots, z_d)}
+$$
+
+**步骤**：
+1. 写出 joint distribution $p(z_1, \ldots, z_d)$。
+2. **忽略所有不含 $z_1$ 的项**（它们是关于 $z_{-1}$ 的常数）。
+3. 识别剩余部分的**已知分布**（如 Gaussian、Beta、Binomial、Poisson 等）。
+
+#### 5.4 Gibbs Sampling 示例（PDF p30）
+
+$$
+p(x, y, n) \propto \binom{n}{x} y^x (1-y)^{n-x} e^{-\lambda} \frac{\lambda^n}{n!}
+$$
+
+其中 $a, b, \lambda$ 为正常数。分解各 full conditional：
+
+| 条件分布 | 形式 | 识别结果 |
+|---|---|---|
+| $p(x | y, n)$ | $\propto \binom{n}{x} y^x (1-y)^{n-x}$ | $\text{Bin}(x | n, y)$ |
+| $p(y | x, n)$ | $\propto y^{x+a-1} (1-y)^{n-x+b-1}$ | $\text{Beta}(y | x+a, n-x+b)$ |
+| $p(n | x, y)$ | $\propto \frac{((1-y)\lambda)^{n-x}}{(n-x)!}$ | $\text{Pois}(n | (1-y)\lambda) + x$ |
+
+> 即使只想采样 $x$，也可用 Gibbs 采样 joint $(x, y, n)$ 再丢弃 $y, n$——因为直接求 $p(x)$（marginal）很困难，但 full conditionals 都是已知分布。
+
+### 6. ⭐ 应用：Image Denoising with Ising Model（Ising 模型图像去噪）
+
+这是贯穿 Week 5-6 的核心应用，MCMC 的典型场景。
+
+#### 6.1 模型设定
+
+- 干净图像 $z_j \in \{-1, 1\}$（hidden），观测 $y$ 是加噪版本。
+- **Likelihood**（各像素独立被 Gaussian noise 腐蚀）：
+
+$$
+p(y|z) = \prod_j \mathcal{N}(y_j | z_j, \sigma^2)
+$$
+
+- **Ising prior**（建模邻域相关性）：
+
+$$
+p(z_j | z_{-j}) \propto \prod_{s \in \mathcal{N}_j} \psi(z_s, z_j), \quad \psi(u, v) = \exp(Juv), \quad J > 0
+$$
+
+其中 $\mathcal{N}_j$ 是像素 $j$ 的邻域（如 4-邻接），$J$ 是 coupling strength（耦合强度）。
+
+- $J > 0$ 意味着**相同值的邻居更可能**（$z_s = z_j$ 时 $\psi = e^J > 1$；$z_s \ne z_j$ 时 $\psi = e^{-J} < 1$）。
+
+#### 6.2 Ising Prior 的 Full Conditional
+
+计算 $p(z_j | z_{-j})$（$z_j$ 二值，只有 $\pm 1$）：
+
+$$
+p(z_j | z_{-j}) = \frac{\prod_{s \in \mathcal{N}_j} \psi(z_s, z_j)}{\prod_{s \in \mathcal{N}_j} \psi(z_s, z_j) + \prod_{s \in \mathcal{N}_j} \psi(z_s, -z_j)}
+$$
+
+$$
+= \frac{\exp\big(J \sum_{s \in \mathcal{N}_j} z_s z_j\big)}{\exp\big(J \sum_{s \in \mathcal{N}_j} z_s z_j\big) + \exp\big(-J \sum_{s \in \mathcal{N}_j} z_s z_j\big)}
+$$
+
+$$
+= \frac{1}{1 + \exp\big(-2J \sum_{s \in \mathcal{N}_j} z_s z_j\big)} = \text{sigmoid}(2J \eta_j)
+$$
+
+其中 $\text{sigmoid}(u) = \frac{1}{1+e^{-u}}$，$\eta_j = \sum_{s \in \mathcal{N}_j} z_s z_j$。
+
+#### 6.3 Posterior 的 Full Conditional（Gibbs 所需）
+
+$$
+p(z_j | z_{-j}, y) = p(z_j | z_{-j}, y_j) = \frac{p(z_j | z_{-j})\, p(y_j | z_j)}{p(y_j | z_{-j})}
+$$
+
+$$
+= \frac{\text{sigmoid}(2J\eta_j)\, p(y_j | z_j)}{\text{sigmoid}(2J\eta_j)\, p(y_j | z_j) + \text{sigmoid}(-2J\eta_j)\, p(y_j | -z_j)}
+$$
+
+$$
+= \text{sigmoid}\left(2J\eta_j - \log\frac{\mathcal{N}(y_j | -z_j, \sigma^2)}{\mathcal{N}(y_j | z_j, \sigma^2)}\right)
+$$
+
+- $z_j$ 二值 → 用此条件分布直接采样（伯努利）。
+- **Gibbs sampling**：逐像素更新 $z_j$，迭代至收敛，取样本均值估计 posterior mean。
+- Notebook：`06_ising_image_denoise_demo.ipynb`。
+
+#### 6.4 Bayesian Neural Networks（补充应用）
+
+- 传统神经网络只给一个输出值；**Bayesian neural network**（贝叶斯神经网络）估计输出的 **posterior probability** $p(\text{output} | \text{input})$。
+- 这是高维 posterior，解析不可行 → 用 **MCMC 训练**，估计输出的 standard deviation（不确定性度量）。
+- 老师提及这是 MCMC 在深度学习中的现代应用（后半学期 Wang Lipo 部分可能涉及）。
+
+### 7. ⭐ Wooclap 例题
+
+本周结尾有一道 Wooclap 判断题（转写 "one last set clap"）：
+
+> **题**："To ensure fast convergence, you should accept every sample."（为确保快速收敛，应该接受每个样本。）
+
+> **答案**：**False**。
+>
+> MH algorithm 的 acceptance probability $A(x,y)$ 必须严格遵循 $\min\big(1, \frac{\tilde{\pi}(y)q(y,x)}{\tilde{\pi}(x)q(x,y)}\big)$ 的形式，才能保证 Markov chain 收敛到 stationary distribution $\pi$。不能随意设 $A = 1$（除非是 Gibbs sampling 这种 full conditional 作 proposal 的特例）。乱改 acceptance probability 会破坏 detailed balance，MC 不会收敛到正确分布。
+
+### 8. ⭐ MH vs Gibbs vs Rejection/Importance Sampling 对比
+
+| 特性 | Rejection sampling | Importance sampling | **MH (MCMC)** | **Gibbs (MCMC)** |
+|---|---|---|---|---|
+| 样本精确性 | **精确** | 近似（SLLN） | 近似（burn-in 后） | 近似（burn-in 后） |
+| 需要 normalizing constant | 否 | 否（归一化权重） | 否 | 否 |
+| 需要 $kq \ge \tilde{p}$ | **是** | 否 | 否 | 否 |
+| 高维适用性 | **差**（$k$ 爆炸） | **差**（权重方差大） | **好** | **好** |
+| 样本独立性 | i.i.d. | i.i.d.（加权） | **不独立**（MC 相关） | **不独立**（MC 相关） |
+| Acceptance | 概率 $M/k$ | 全接受（加权） | $A(x,y) = \min(1, \cdot)$ | **恒为 1** |
+| 需要的条件 | $kq \ge \tilde{p}$，support 覆盖 | support 覆盖 $fp$ | proposal $q$ 易采样 | full conditional 可算 |
+| 收敛诊断 | 不需要 | 不需要 | **burn-in + thinning** | **burn-in + thinning** |
+
+### 9. Practice Problems（PDF p39-42，考点）
+
+#### P1：MH 退化条件
+
+**题**：若 $q(x, y) = \pi(y)$（proposal = target），证明 MH 退化为普通采样。
+
+**解**：
+
+$$
+A(x, y) = \min\left(1, \frac{\pi(y) q(y, x)}{\pi(x) q(x, y)}\right) = \min\left(1, \frac{\pi(y) \pi(x)}{\pi(x) \pi(y)}\right) = \min(1, 1) = 1
+$$
+
+acceptance probability 恒为 1 → 每步都接受 → 等于直接从 $\pi$ 采样。
+
+#### P2：Gibbs 采样推导 full conditionals
+
+**题**：$p(z_1, z_2, z_3) \propto z_1^{z_2+a-2}(1-z_1)^{b-1} \frac{z_2^{z_1}}{z_2!} \mathbf{1}\{z_3 \in [0, z_1]\}$，求各 full conditional。
+
+**解**：
+
+| 条件分布 | 推导 | 结果 |
+|---|---|---|
+| $p(z_1 | z_2, z_3)$ | $\propto z_1^{z_2+a-2}(1-z_1)^{b-1} \mathbf{1}\{z_1 \ge z_3\}$ | $\text{Beta}(z_1 | z_2+a-1, b)$，截断 $z_1 \ge z_3$ |
+| $p(z_2 | z_1, z_3)$ | $\propto \frac{z_2^{z_1}}{z_2!} \cdot z_1^{z_2}$ → $\propto \frac{(z_1 z_2)^{z_1}}{z_2!} = \frac{e^{z_1 z_2 \cdot \text{?}}}{z_2!}$ | $\text{Pois}(z_2 | z_1)$ |
+| $p(z_3 | z_1, z_2)$ | $\propto \mathbf{1}\{z_3 \in [0, z_1]\}$ | $\text{Unif}(z_3 | (0, z_1))$ |
+
+#### P3：综合题（rejection + importance + MH）
+
+给定某 PDF $p(x)$（图示，峰值约 0.0407）：
+
+**(a) Julia 用 rejection sampling 从截断分布 $p_1(x) \propto p(x)\mathbf{1}\{0 \le x \le 125\}$ 采样，proposal 用 Uniform：**
+
+- $q(x) = \text{Unif}(0, 125)$，$k = 0.0407 / (1/125) = 5.0875$，使 $kq(x) \ge \tilde{p}_1(x)$。
+
+**(b) Freddy 用 importance sampling 估 tail probability $\int_{100}^\infty p(x)\,dx$：**
+
+- Proposal $q(x) = \lambda \exp(\lambda(x-100))\mathbf{1}\{x > 100\}$（shifted exponential），采 $z_1, \ldots, z_n$，算 $w(z_i) = p(z_i)/q(z_i)$，估 $\frac{1}{n}\sum_i w(z_i)$。
+
+**(c) Russell 用 random walk MH 采样，$q(x,y) = \mathcal{N}(y-x | 0, 1)$，trajectory 有问题——为什么？**
+
+- **标准差太小**（$\sigma = 1$），acceptance rate 过高，移动太慢，困在局部。
+- **修正**：增大 $\sigma$ 使 acceptance rate 达到 **0.25–0.5**（如 $\sigma = 15$）。
+
+### 10. 考点速查表
+
+| 概念 | 要点 |
+|---|---|
+| **MCMC 动机** | 高维 posterior 无解析形式，rejection/importance 在高维失效；MCMC 用 MC 收敛到 stationary distribution |
+| **Stationary distribution** | $\pi T = \pi$；存在需 irreducible + positive recurrent |
+| **Ergodic MC** | irreducible + positive recurrent + aperiodic ⇒ $\pi_k \to \pi$ |
+| **Detailed balance** | $\pi(x)T(x,y) = \pi(y)T(y,x)$ ⇒ $\pi$ 是 stationary distribution（充分非必要） |
+| **MH acceptance** | $A(x,y) = \min\big(1, \frac{\tilde{\pi}(y)q(y,x)}{\tilde{\pi}(x)q(x,y)}\big)$；不需 normalizing constant |
+| **Metropolis algorithm** | $q(x,y)=q(y,x)$（对称）⇒ $A = \min(1, \tilde{\pi}(y)/\tilde{\pi}(x))$ |
+| **Random walk MH** | $q(x,y) = q(y-x)$，如 Gaussian/Uniform；acceptance rate 0.25–0.5 |
+| **Independence chain MH** | $q(x,y) = q(y)$，与 $x$ 无关；需 heavy-tailed；acceptance 接近 1 |
+| **Burn-in** | 丢弃初始 1000–5000 步；难诊断何时收敛 |
+| **Thinning** | 每隔 $d$ 步取一个，降低 MC 样本相关性 |
+| **Gibbs sampling** | MH 特例；逐分量从 full conditional $p(z_i | z_{-i})$ 采样；$A \equiv 1$ |
+| **Full conditional 求法** | 写 joint，忽略不含目标变量的项，识别已知分布 |
+| **Ising model** | $p(z_j | z_{-j}) = \text{sigmoid}(2J\eta_j)$，$\eta_j = \sum_{s \in \mathcal{N}_j} z_s z_j$ |
+| **MH 可逆性证明** | $\pi(x)q(x,y)A(x,y) = \min(\pi(x)q(x,y), \pi(y)q(y,x)) = \pi(y)q(y,x)A(y,x)$ |
+
+### 11. 本周要点小结
+
+- **MCMC 动机**：上周的 rejection/importance sampling 只适合低维；高维分布（如 image denoising 的 $p(z|y)$）需 MCMC。核心思想：设计一个 reversible + aperiodic 的 Markov chain，使其 stationary distribution = target $\pi$，运行足够长后样本近似 from $\pi$。
+- **Markov chain 基础**：stationary distribution $\pi T = \pi$（存在需 irreducible + positive recurrent）；ergodic MC（+ aperiodic）保证 $\pi_0 T^k \to \pi$；detailed balance $\pi(x)T(x,y) = \pi(y)T(y,x)$ 是 stationary 的充分条件——MCMC 的设计工具。
+- **Metropolis-Hastings**：每步从 proposal $q(x,y)$ 采 $y$，以 $A(x,y) = \min\big(1, \frac{\tilde{\pi}(y)q(y,x)}{\tilde{\pi}(x)q(x,y)}\big)$ 接受/拒绝；不需 normalizing constant；proof 用 detailed balance；proposal 选择影响效率（random walk 需调 $\sigma$，acceptance rate 0.25–0.5）。
+- **Burn-in & thinning**：丢弃初始样本（1000–5000 步）；thinning 降低样本相关性；两种获取近似 i.i.d. 样本方式（多条短链 or 单条长链 + thinning）。
+- **Gibbs sampling**：MH 特例，$A \equiv 1$；逐分量从 full conditional $p(z_i | z_{-i})$ 采样；求法：写 joint、忽略无关项、识别已知分布；即使只想采样 marginal，也可 Gibbs 采样 joint 再丢弃多余分量。
+- **Ising model 应用**：image denoising 的 posterior $p(z|y)$ 用 Gibbs 采样；Ising prior 给出 $p(z_j | z_{-j}) = \text{sigmoid}(2J\eta_j)$；posterior full conditional 结合 prior 与 likelihood；Bayesian neural network 是 MCMC 在深度学习中的现代应用。
+- **与上周对比**：rejection/standard 给精确样本但高维失效；MCMC 给近似样本但高维可行；importance sampling 不拒绝、用权重估期望，MCMC 用 acceptance + MC 相关性。
+
+---
+
+> **下一周预告**：Week 7 是 **Quiz 1**（覆盖 Week 1–4，60 分钟，lockdown browser，填空题）+ **Summary Review**。Quiz 后老师会讲解 past exam questions 并复习 Week 1–4 的重点。Week 5–6 内容（sampling + MCMC）不在 Quiz 1 范围内，但**会在期末考**。Quiz 1 之后进入 recess week，后半学期（Week 8–13）由 Wang Lipo 讲授 Neural Networks / Deep Learning。
