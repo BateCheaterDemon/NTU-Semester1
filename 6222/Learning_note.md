@@ -2065,3 +2065,241 @@ $$
 ---
 
 > **下一周（Week 7）预告**：老师明确说明下周只有**半节课**（下半节用于 **quiz**，Week 1 公布的 30 分钟课堂 quiz，占 10%）。上半节将继续 Topic 7 的 **AdaBoost（Adaptive Boosting）算法**——如何从巨大的 feature pool 中用 boosting 方法选出最有效的少量 feature。Viola-Jones 的 feature selection 具体算法将在下周完成。AdaBoost 是 ensemble learning 的经典方法，也可视为 embedded feature selection 的代表（feature selection 与 classifier 训练同时进行）。具体以 Week 7 课件/转写为准。
+
+## Week 7 — AdaBoost Feature Selection 与 Cascade Classifier（Quiz 1 周）
+
+> 本周上半节课讲完 Topic 7 的核心算法 **AdaBoost（Adaptive Boosting）**，完成 Viola-Jones feature selection 的算法部分；下半节为 **Quiz 1**（25 题 / 30 分钟，占 10%）。本笔记聚焦 AdaBoost 部分与 cascade classifier；Quiz 1 的行政/考务信息在末尾简述。
+
+### 1. 回顾：Feature Extraction vs Feature Selection
+
+- **Feature extraction**（PCA / LDA）：每个新 feature = **全部**原始数据的线性组合 → 预测时计算量大（如 30,000 像素 → 100 feature，每个 feature 都需对全部 30,000 做加权和）。
+- **Feature selection**：从预先生成的大 feature pool 中**选子集**，预测时只算被选中的 feature → 极快。
+  - 不能直接从原始 pixel 中选（少量 pixel 不是好 feature）；需先生成合理的 feature pool（如 Haar-like feature）。
+  - 训练阶段：计算所有候选 feature + 用 AdaBoost 选出最有用的少量 feature。
+  - 在线预测阶段：只计算被选中的 ~100 个 feature + 分类。
+
+| 阶段 | 操作 | 计算量 |
+|---|---|---|
+| **离线训练** | 生成全部 feature（如 ~180,000 个 Haar-like feature），用 AdaBoost 选出 ~100 个 | 大，但只做一次 |
+| **在线预测** | 只计算被选中的 ~100 个 feature + 分类 | 极快 |
+
+### 2. ⭐ Boosting 思想：从 Weak Learner 到 Strong Learner
+
+#### 2.1 Ensemble Learning 与 Boosting 动机
+
+- **Boosting**（提升方法）属于 **ensemble learning（集成学习）**：组合多个 weak learner → 一个 strong learner。
+- 在 Viola-Jones 中，每个 **weak classifier** 只使用 **一个 single feature**（一个 Haar-like feature 对应一个 weak classifier）。
+  - 1 维 feature（单个 Haar-like feature 值）→ 用一个 threshold 分类为两类 → 极简单。
+  - 选 feature = 选 weak classifier（一一对应）。
+- **Weak learner**：error rate 略好于随机猜（binary classification 最大 error rate = 0.5，weak learner 只需 error rate < 0.5）。
+- **Strong learner**：组合多个 weak learner 后，error rate 可极小。
+
+#### 2.2 ⭐ 为什么不能贪心选"各自最优"的 feature
+
+- 若每次独立选当前 error rate 最低的 feature，第二个 feature 可能与第一个**高度相似** → 组合后 accuracy 几乎不提升。
+- **关键需求**：所选 feature 应**互相补偿（compensate each other）**——后续 feature 应修正前序 feature 的错误，而非重复其能力。
+- AdaBoost 的核心智慧：通过**调整样本权重**实现 compensating selection——让后续 feature 重点关注前序 feature 分错的样本。
+
+#### 2.3 为什么不直接联合搜索最优 feature 子集
+
+| 选 feature 数 | 组合数（从 10,000 个中选） | 可行性 |
+|---|---|---|
+| 1 | 10,000 | 可行（逐一测试） |
+| 2 | ≈ 10,000² = 10⁸ | 勉强可行 |
+| 100 | ≈ 10,000¹⁰⁰ | 完全不可行 |
+
+- 联合搜索 100 个 feature 的最优组合是 NP-hard 级别。
+- AdaBoost 退而求其次：**逐个选**（每轮只测 ~10,000 次），但通过权重更新保证所选 feature 互补。
+
+### 3. ⭐⭐ AdaBoost 算法详解
+
+#### 3.1 记号
+
+| 符号 | 含义 |
+|---|---|
+| $x_1, x_2, \ldots, x_N$ | $N$ 个 training sample（训练图像） |
+| $y_1, y_2, \ldots, y_N$ | class label，$y_i \in \{+1, -1\}$（+1 = positive，-1 = negative） |
+| $g$ | feature 池中某个 feature 的 index |
+| $f_g$ | 第 $g$ 个 feature 的值 |
+| $h_g(x)$ | 用 feature $g$ 构建的 weak classifier（threshold classifier） |
+| $t$ | 迭代轮次，$t = 1, 2, \ldots, T$（$T$ = 要选的 feature 总数） |
+| $w_t(i)$ | 第 $t$ 轮中 training sample $i$ 的权重 |
+| $\varepsilon_t$ | 第 $t$ 轮选中的 weak classifier 的（加权）error rate |
+| $\alpha_t$ | 第 $t$ 个 weak classifier 在 strong classifier 中的组合权重 |
+
+#### 3.2 Weak Classifier 设计（单 feature threshold）
+
+每个 feature $g$ 对应一个最简单的 1-D threshold classifier：
+
+$$
+h_g(x_i) = \begin{cases} +1 & \text{if } f_g(x_i) > \theta_g \\ -1 & \text{if } f_g(x_i) \le \theta_g \end{cases}
+$$
+
+- $\theta_g$：feature $g$ 的最优 threshold，通过扫描所有 training sample 的 feature 值、取相邻样本间的值来确定（使 error rate 最小）。
+- 每个 feature 都可独立构建一个 weak classifier → 选 feature = 选 weak classifier。
+
+#### 3.3 ⭐ 算法步骤
+
+**初始化**：所有 training sample 权重均等
+
+$$
+w_1(i) = \frac{1}{N}, \quad i = 1, 2, \ldots, N
+$$
+
+**For** $t = 1, 2, \ldots, T$：
+
+1. **训练 weak classifier**：对每个候选 feature $g$，用其 weak classifier $h_g$ 分类所有 training sample，计算加权 error rate：
+
+$$
+\varepsilon_g = \sum_{i=1}^{N} w_t(i) \cdot \mathbf{1}[h_g(x_i) \neq y_i]
+$$
+
+2. **选择最小 error rate 的 feature**：
+
+$$
+\varepsilon_t = \min_g \varepsilon_g, \quad h_t = h_{g^*} \text{（对应最小 error rate 的 feature } g^*）
+$$
+
+   - ⭐ 注意：error rate 必须满足 $\varepsilon_t < 0.5$（binary classification 最大 error rate = 0.5，否则该 weak classifier 无意义；实际中总能满足）。
+
+3. **计算 weak classifier 的组合权重 $\alpha_t$**：
+
+$$
+\boxed{\alpha_t = \frac{1}{2} \ln\!\left(\frac{1 - \varepsilon_t}{\varepsilon_t}\right)}
+$$
+
+   - $\varepsilon_t \to 0$（极好 feature）→ $\frac{1-\varepsilon_t}{\varepsilon_t} \to \infty$ → $\alpha_t \to \infty$（该 classifier 在 strong classifier 中占主导）。
+   - $\varepsilon_t \to 0.5$（最差 weak learner）→ $\frac{1-\varepsilon_t}{\varepsilon_t} \to 1$ → $\alpha_t \to 0$（几乎无贡献）。
+   - 取 logarithm 的原因：后续权重更新用 exponential 函数，log 与 exp 可相互抵消，避免数值范围剧烈变化；乘 $\frac{1}{2}$ 为常规缩放（非严格必需）。
+
+4. **更新 sample 权重**：
+
+$$
+\boxed{w_{t+1}(i) = \frac{w_t(i) \cdot \exp\!\left(-\alpha_t \, y_i \, h_t(x_i)\right)}{Z_t}}
+$$
+
+   - $Z_t$：normalization factor，使 $\sum_i w_{t+1}(i) = 1$。
+   - **分类正确**（$y_i = h_t(x_i)$）→ $y_i \cdot h_t(x_i) = +1$ → $\exp(-\alpha_t) < 1$ → 权重**减小**。
+   - **分类错误**（$y_i \neq h_t(x_i)$）→ $y_i \cdot h_t(x_i) = -1$ → $\exp(+\alpha_t) > 1$ → 权重**增大**。
+   - ⭐ 核心：被前序 feature 分错的 sample 权重变大 → 下一轮选 feature 时若仍分错这些 sample，加权 error rate 会很大 → 不会被选中 → 迫使下一轮选能修正前序错误的 feature。
+
+**输出**：Strong classifier（加权投票）
+
+$$
+\boxed{H(x) = \begin{cases} +1 & \text{if } \displaystyle\sum_{t=1}^{T} \alpha_t \, h_t(x) \geq \frac{1}{2}\sum_{t=1}^{T} \alpha_t \\ -1 & \text{otherwise} \end{cases}}
+$$
+
+- 即所有 weak classifier 的**加权投票**，超过权重总和一半 → positive，否则 → negative。
+- 若 $h_t(x) \in \{0, 1\}$（而非 $\{-1, +1\}$），则判据为 $\frac{\sum \alpha_t h_t(x)}{\sum \alpha_t}$ 与 $\frac{1}{2}$ 比较（归一化加权平均与 0.5 比）。
+
+#### 3.4 ⭐ 权重更新的直观理解（3 轮可视化示例）
+
+转写中老师用 2D 可视化讲解了 3 轮 AdaBoost 的过程（11 个 training sample，positive "+" / negative "−"）：
+
+| 轮次 | 权重状态 | 选 feature 行为 | 分错样本处理 |
+|---|---|---|---|
+| **Round 1** | 均匀权重（所有样本等高） | 选全局 error rate 最低的 feature | 2 个 negative 样本被分错 → 权重增大 |
+| **Round 2** | 分错样本权重高 | 不选与 Round 1 相似的 feature（分错高权重样本会产生大 error rate）→ 选能修正 Round 1 错误的 feature | 另一组样本被分错 → 权重增大 |
+| **Round 3** | 被前两轮都分错的样本权重最高 | 选能分对高权重样本的 feature | 3 个 feature 组合后形成分段分类边界 → 100% 正确 |
+
+- 关键：若无权重更新，Round 2 会选与 Round 1 相似的 feature（因为全局 error rate 最低），组合后 accuracy 不提升。权重更新使 Round 2 **被迫**关注 Round 1 分错的样本。
+
+### 4. ⭐ Overfitting 风险：Feature 数量的权衡
+
+- 增加 feature 数量 $T$ → training data 上 error rate 可降至 0（甚至 100% accuracy）。
+- ⚠️ 但 **training accuracy ≠ test accuracy**：feature 过多 → **overfitting**，对未知数据 generalization 下降。
+- 选 feature 的目的是用于**未知数据**（test data / future data），而非追求 training data 上的 100%。
+- 需选择适当数量的 feature，平衡 accuracy 与 generalization。
+
+### 5. ⭐ Cascade Classifier（级联分类器）
+
+#### 5.1 动机：利用检测问题的类别不平衡
+
+- Object detection（如 face detection）用 sliding window 扫描整幅图像：
+  - 10,000 个窗口中可能只有 ~10 个是 face，9,990 个是 non-face → **极度类别不平衡**。
+- 串行使用全部 ~200 个 feature 分类每个窗口 → 仍不够快，无法 real-time。
+
+#### 5.2 Cascade 思路
+
+- **不一次性用全部 feature**，而是 feature **逐级**使用：
+  - **Stage 1**：只用 1 个（或少数几个）feature 做初步分类。设置 threshold 使**所有 face 必定正确分类**（保证不漏检），同时大量 non-face 被快速拒绝。
+    - 10,000 个窗口中 ~9,000 个在此阶段被判定为 non-face → 立即结束。
+  - **Stage 2**：只有通过 Stage 1 的窗口（少量）进入下一级，用更多 feature 进一步分类。
+  - **Stage 3, ...**：依此类推，只有极少数"疑似 face"的窗口走完全部 stage。
+
+| 阶段 | 通过窗口比例 | 累计 feature 计算量 |
+|---|---|---|
+| Stage 1（1 feature） | ~90% 被拒绝 → ~10% 通过 | 极低 |
+| Stage 2（少量 feature） | 大部分通过者被拒绝 | 低 |
+| Stage T（全部 feature） | 极少窗口到达 | 少数窗口算全部 feature |
+
+- ⭐ 绝大多数窗口在早期 stage 被快速拒绝 → 总体检测速度极快。
+- 只有极少数"疑似 face"窗口需走完全部 stage。
+- 利用 detection 问题的 **unbalanced** 性质（background 远多于 object）→ cascade 是自然加速方案。
+
+#### 5.3 Viola-Jones 的完整 pipeline
+
+| 组件 | 作用 |
+|---|---|
+| **Haar-like feature + Integral image** | 快速 feature 计算（任意矩形 3 次加减法） |
+| **AdaBoost feature selection** | 从 ~180,000 feature 中选 ~100 个互补 feature |
+| **Cascade classifier** | 逐级拒绝 non-face，极少量窗口走完全部 feature → real-time |
+
+- Viola-Jones 是**第一个 real-time face detection 系统**（深度学习之前，甚至早于 neural network 在 CV 中的广泛应用）。
+- 曾被各大公司广泛采用，OpenCV 中仍可调用。
+- 虽然现已被 deep learning 超越，但作为 traditional CV 的经典方法，其 feature selection + cascade 思想仍有重要意义。
+
+### 6. Weak Learner vs Strong Learner 对比
+
+| 属性 | Weak Learner | Strong Learner |
+|---|---|---|
+| 使用 feature 数 | 1 个 | $T$ 个（如 ~100） |
+| Error rate | 略低于 0.5（仅比随机猜好一点） | 可极小 |
+| 结构 | 1-D threshold classifier | 加权投票组合 |
+| 角色 | AdaBoost 每轮选一个 | 最终输出 |
+| 构建方式 | 逐轮选择 + 权重更新 | $\sum \alpha_t h_t(x)$ 加权组合 |
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 | 节号 |
+|---|---|---|
+| **feature extraction vs selection** | extraction 组合全部输入；selection 选子集；后者预测更快 | §1 |
+| **boosting 思想** | 组合 weak learner → strong learner；weak classifier = 1 feature | §2.1 |
+| **compensating feature** | 所选 feature 互补，不重复；非各自最优 | §2.2 |
+| **联合搜索不可行** | 100 feature 从 10,000 选 ≈ 10,000¹⁰⁰ → 逐个选 | §2.3 |
+| **⭐⭐ AdaBoost 权重更新公式** | $w_{t+1}(i) \propto w_t(i)\exp(-\alpha_t y_i h_t(x_i))$；分错↑分对↓ | §3.3 |
+| **⭐⭐ $\alpha_t$ 公式** | $\alpha_t = \frac{1}{2}\ln\frac{1-\varepsilon_t}{\varepsilon_t}$；$\varepsilon \to 0$ 则 $\alpha \to \infty$ | §3.3 |
+| **strong classifier 判据** | $\sum \alpha_t h_t(x)$ 与 $\frac{1}{2}\sum\alpha_t$ 比较 | §3.3 |
+| **权重更新直观** | 分错样本权重↑ → 下一轮被迫关注 | §3.4 |
+| **overfitting** | feature 过多 → training 100% 但 test 下降 | §4 |
+| **⭐ cascade classifier** | 逐级拒绝 non-face，利用类别不平衡加速 | §5 |
+| **cascade 保证** | Stage 1 设 threshold 保证 face 不漏检 | §5.2 |
+| **Viola-Jones 三组件** | Haar-like + integral image + AdaBoost + cascade | §5.3 |
+
+### 8. 本周要点小结
+
+- **AdaBoost** 是 ensemble learning 的经典 boosting 方法，在 Viola-Jones 中用于 feature selection：从 ~180,000 个 Haar-like feature 中逐轮选出 ~100 个互补 feature。
+- **核心机制**：每轮选当前权重下加权 error rate 最低的 feature → 计算 classifier 权重 $\alpha_t$ → 更新 sample 权重（分错的样本权重增大，分对的减小）→ 迫使下一轮选能修正前序错误的 feature。
+- **Strong classifier** = 所选 weak classifier 的加权投票，权重 $\alpha_t$ 由 error rate 决定（error rate 越小 → $\alpha_t$ 越大 → 该 classifier 话语权越大）。
+- **Overfitting 警告**：feature 数量过多会导致 training accuracy = 100% 但 test accuracy 下降，需适量。
+- **Cascade classifier** 利用 detection 问题的类别不平衡（non-face 远多于 face），逐级用少量 feature 快速拒绝多数 non-face 窗口，只有极少数"疑似 face"窗口走完全部 feature → real-time 检测。
+- **Viola-Jones** = Haar-like feature + integral image + AdaBoost + cascade，是深度学习前最经典的 real-time face detection 方法。
+
+### 9. Quiz 1 考务信息（本周课堂）
+
+- **Quiz 1**：25 题，30 分钟，占 10%。通过 NTULearn 进入，老师现场给 password。
+- 不使用 lockdown browser，但**严禁打开其他程序**（10 个 invigilator 监考，违规记零分）。
+- 只能开 NTULearn；**21:00 前不得离开教室**。
+- 题目随机推送（每次只看到 1 题，相邻同学题目不同；选择题选项也随机排列）。
+- 可多次 attempt，但**每次从头开始**，且只记最后一次成绩 → 建议只做一次。
+- 计分：最终只看到 letter grade（不知道 raw score）；及格线 40%；75% 对应 A-（GPA 4.5）；若最高分 < 100% 会做 normalization。
+
+### 10. 下一周预告
+
+转写末尾老师明确说明：**recess week 后还有两周课**，内容为：
+1. **Traditional neural network（MLP，多层感知机）**
+2. **Convolutional Neural Network（CNN）**——如何 revolutionize machine learning；CNN 发明者 Professor Hinton 因此获 Nobel Prize（待课件确认具体奖项表述）。
+3. 之后再讲 **Transformer**——聚焦 transformer 解决了什么 limitation、为何现代大模型（GPT 等）都基于 transformer。
+
+> ⚠️ 由于本周是 Quiz 1 + recess week 前，下周（recess week 后）将进入 neural network / deep learning 部分。具体从 MLP 还是 CNN 开始、详细进度待课件确认。
+

@@ -1121,3 +1121,357 @@ $$x' = \frac{x - \mu}{\sigma}$$
 > **下一周（Week 7）预告**：本周结束老师明确说 "next week we will just use this well prepared data to learn different types of models"，即 Week 7 正式进入 **classifier design（分类器设计）**——预计从 Linear Discriminant Analysis (LDA)、Support Vector Machine (SVM) 等 supervised classifier 开始，含公式推导与实现。本周的数据类型、feature scaling、hyperparameter 等概念是直接前置。具体以 Week 7 课件为准。
 
 ---
+
+## Week 7 — Classifier Design：Bayesian Decision Theory、GMM/EM 与 Naïve Bayes
+
+> **权威来源说明**：本周转写 `week7/week7.txt` 噪声极多（整段无标点），以下内容以官方课件 `week7/ML-Slides3.pdf`（52 页）与 `week7/Python_Implementation.pdf`（8 页代码示例）为权威来源修正。转写中 "pyro"/"p probability"→prior、"livelihood"→likelihood、"po zero/pus probability"→posterior probability、"dismal/desimal/dial function"→discriminant function、"gau mist/gauche/gai mission"→Gaussian mixture、"question Mr"→Gaussian mixture model、"chronometris/cron matrix/cent matrix"→covariance matrix、"Bani/bul/binno/nu base"→Naïve Bayes 等，均按 PDF 修正。
+>
+> **本周主题**：正式进入 classifier design（分类器设计）。本周从 **Bayesian Decision Theory（贝叶斯决策理论）** 入手，建立 probability-based classifier 的完整框架：prior、class-conditional density、posterior、discriminant function → Gaussian 假设下的 parameter estimation（maximum-likelihood）→ 多模态数据用 **GMM + EM algorithm** → 简化假设下的 **Naïve Bayes**（Gaussian/Bernoulli/Multinomial 三型）。课件 `ML-Slides3.pdf` 共 52 页覆盖以上内容；`Python_Implementation.pdf` 给出 SVM、LDA、GaussianNB、DecisionTree 的 sklearn 实现代码。
+
+### 1. ⭐ Bayesian Decision Theory——概率框架下的分类
+
+#### 1.1 鱼分类问题引入（PDF p.1）
+
+课件以经典 fish classification（鱼分类）为例：sea bass（鲈鱼）vs salmon（鲑鱼），需开发 ML classifier 自动分类。人眼可凭 length、lightness（颜色深浅）、width 等特征区分，但机器需通过 probability-based decision rule 实现。
+
+#### 1.2 四个核心概率概念
+
+⭐ 本周最重要的一组概念——**四个概率**，必须能区分：
+
+| 概念 | 符号 | 含义 | 如何获得 |
+|---|---|---|---|
+| **prior probability（先验概率）** | $P(\omega_j)$ | 在看到任何证据前，样本属于类 $\omega_j$ 的初始概率 | 从训练数据中各类样本占比直接估计 |
+| **class-conditional probability density function（类条件概率密度函数）** | $p(\boldsymbol{x}\mid\omega_j)$ | 已知类别 $\omega_j$ 时，特征 $\boldsymbol{x}$ 的分布 | 从训练数据估计（假设分布族后用 MLE） |
+| **posterior probability（后验概率）** | $P(\omega_j\mid\boldsymbol{x})$ | 看到特征 $\boldsymbol{x}$ 后，样本属于 $\omega_j$ 的概率 | 由 Bayes theorem 计算 |
+| **joint probability（联合概率）** | $p(\boldsymbol{x},\omega_j)=p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)$ | $\boldsymbol{x}$ 与 $\omega_j$ 同时发生的概率 | Bayes theorem 的分子（忽略分母 $p(\boldsymbol{x})$） |
+
+**prior probability 的意义**（PDF p.2）：在考虑新证据前，基于已有知识（如训练数据中各类比例）对事件概率的初始信念。
+
+例：EE6407 课堂 60% 男生、40% 女生 ⇒ $P(\text{male})=0.6,\;P(\text{female})=0.4$。若不看任何特征仅凭 prior 决策，则所有样本都判为 male（prior 大的类），40% 女生被错分——说明**仅靠 prior 不足**，需引入 class-conditional density。
+
+#### 1.3 ⭐ Bayes Theorem 与决策规则（PDF p.5-6）
+
+$$P(\omega_j\mid\boldsymbol{x})=\frac{p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)}{p(\boldsymbol{x})}$$
+
+其中分母 $p(\boldsymbol{x})=\sum_{k}p(\boldsymbol{x}\mid\omega_k)\,P(\omega_k)$ 为 **evidence**（scale factor），对所有类别相同，决策时可忽略。
+
+**Bayes decision rule（贝叶斯决策规则）**：
+
+$$\text{Decide }\omega_1\text{ if }P(\omega_1\mid\boldsymbol{x})>P(\omega_2\mid\boldsymbol{x});\quad\text{Decide }\omega_2\text{ otherwise.}$$
+
+⭐ **关键理解**：决策应基于 **posterior probability**（融合了 prior + 新证据 $\boldsymbol{x}$），而非仅靠 prior。忽略 $p(\boldsymbol{x})$ 后，等价于用 **joint probability** $p(\boldsymbol{x},\omega_j)=p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)$ 做 decision。
+
+#### 1.4 推广：多特征 + 多类（PDF p.8-10）
+
+- **多特征**：$\boldsymbol{x}=(x_1,x_2,\dots,x_d)^T$ 为 $d$ 维 feature vector。
+- **多类**：$\omega_1,\omega_2,\dots,\omega_C$ 共 $C$ 个类。
+- posterior 推广为：
+$$P(\omega_j\mid\boldsymbol{x})=\frac{p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)}{\sum_{k=1}^{C}p(\boldsymbol{x}\mid\omega_k)\,P(\omega_k)}$$
+
+#### 1.5 ⭐ Discriminant Function（判别函数，PDF p.9-10）
+
+**一般化分类架构**：对每个类 $\omega_j$ 定义 discriminant function $g_j(\boldsymbol{x})$，classifier 将 $\boldsymbol{x}$ 分入 $g_j(\boldsymbol{x})$ 最大的类：
+
+$$\text{Assign }\boldsymbol{x}\text{ to }\omega_j\text{ if }g_j(\boldsymbol{x})=\max_{k}g_k(\boldsymbol{x})$$
+
+在 Bayes classifier 中，discriminant function 可取以下**三种等价形式**：
+
+| 形式 | $g_j(\boldsymbol{x})=$ | 说明 |
+|---|---|---|
+| posterior probability | $P(\omega_j\mid\boldsymbol{x})$ | 最直接，但需算 $p(\boldsymbol{x})$ |
+| joint probability | $p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)$ | 省略 $p(\boldsymbol{x})$，最常用 |
+| log-joint probability | $\ln p(\boldsymbol{x}\mid\omega_j)+\ln P(\omega_j)$ | 乘法→加法，数值更稳定，避免下溢 |
+
+⭐ discriminant function 是**通用概念**——不同 classifier 有不同 $g_j$，Bayes classifier 只是一种（用 posterior/joint）。后续其他 classifier（LDA、SVM）有各自的 discriminant function 形式。
+
+### 2. Gaussian 假设下的 Parameter Estimation
+
+#### 2.1 Univariate Normal Density（PDF p.11-12）
+
+$$p(x\mid\omega_j)=\frac{1}{\sqrt{2\pi}\,\sigma_j}\exp\!\left(-\frac{(x-\mu_j)^2}{2\sigma_j^2}\right)$$
+
+参数：$\mu_j$（mean）、$\sigma_j^2$（variance），完全由这两个参数确定。
+
+#### 2.2 ⭐ Multivariate Normal Density（PDF p.13-14）
+
+$$p(\boldsymbol{x}\mid\omega_j)=\frac{1}{(2\pi)^{d/2}\lvert\boldsymbol{\Sigma}_j\rvert^{1/2}}\exp\!\left[-\frac{1}{2}(\boldsymbol{x}-\boldsymbol{\mu}_j)^T\boldsymbol{\Sigma}_j^{-1}(\boldsymbol{x}-\boldsymbol{\mu}_j)\right]$$
+
+参数：
+- $\boldsymbol{\mu}_j$：$d$ 维 mean vector
+- $\boldsymbol{\Sigma}_j$：$d\times d$ covariance matrix（对称正定）
+- $\lvert\boldsymbol{\Sigma}_j\rvert$ 为 determinant，$\boldsymbol{\Sigma}_j^{-1}$ 为 inverse
+
+⭐ 两个参数确定后，density function 完全确定。
+
+#### 2.3 ⭐ Maximum-Likelihood Parameter Estimation（PDF p.15-21）
+
+实际中 prior 和 class-conditional density 均未知，需从 training samples 估计。
+
+**思路**：假设各类样本独立同分布（IID），参数 $\boldsymbol{\theta}=(\boldsymbol{\mu},\boldsymbol{\Sigma})$ 的 likelihood 为：
+
+$$p(\mathcal{D}\mid\boldsymbol{\theta})=\prod_{k=1}^{n}p(\boldsymbol{x}_k\mid\boldsymbol{\theta})$$
+
+**log-likelihood**：
+
+$$\ell(\boldsymbol{\theta})=\ln p(\mathcal{D}\mid\boldsymbol{\theta})=\sum_{k=1}^{n}\ln p(\boldsymbol{x}_k\mid\boldsymbol{\theta})$$
+
+⭐ 因 logarithm 单调递增，最大化 $\ell(\boldsymbol{\theta})$ 等价于最大化 likelihood。取 log 后指数变加法，计算更简便。
+
+**必要条件**：$\frac{\partial \ell}{\partial \boldsymbol{\theta}}=0$
+
+**Case 1: 仅 $\boldsymbol{\mu}$ 未知（$\boldsymbol{\Sigma}$ 已知）**（PDF p.19-20）
+
+对 log-likelihood 求 $\boldsymbol{\mu}$ 的偏导并令其为零，得：
+
+$$\hat{\boldsymbol{\mu}}=\frac{1}{n}\sum_{k=1}^{n}\boldsymbol{x}_k$$
+
+即样本均值——MLE 估计与直觉公式一致。
+
+**Case 2: $\boldsymbol{\mu}$ 和 $\boldsymbol{\Sigma}$ 均未知**（PDF p.21）
+
+$$\hat{\boldsymbol{\mu}}=\frac{1}{n}\sum_{k=1}^{n}\boldsymbol{x}_k,\qquad \hat{\boldsymbol{\Sigma}}=\frac{1}{n}\sum_{k=1}^{n}(\boldsymbol{x}_k-\hat{\boldsymbol{\mu}})(\boldsymbol{x}_k-\hat{\boldsymbol{\mu}})^T$$
+
+⭐ 对每个类 $\omega_j$，用该类的样本单独估 $\hat{\boldsymbol{\mu}}_j$ 和 $\hat{\boldsymbol{\Sigma}}_j$（各类独立处理）。
+
+#### 2.4 ⭐ 完整 Bayes Classifier 设计流程（PDF p.22-26，Example 1）
+
+200 个训练样本（class 1、class 2 各 100），步骤：
+
+1. 估 prior：$P(\omega_1)=n_1/N=100/200=0.5$，$P(\omega_2)=0.5$
+2. 估 class 1 参数：$\hat{\boldsymbol{\mu}}_1=\frac{1}{n_1}\sum_{\boldsymbol{x}\in\omega_1}\boldsymbol{x}$，$\hat{\boldsymbol{\Sigma}}_1=\frac{1}{n_1}\sum(\boldsymbol{x}-\hat{\boldsymbol{\mu}}_1)(\boldsymbol{x}-\hat{\boldsymbol{\mu}}_1)^T$
+3. 同理估 class 2 的 $\hat{\boldsymbol{\mu}}_2$、$\hat{\boldsymbol{\Sigma}}_2$
+4. 构造 class-conditional density $p(\boldsymbol{x}\mid\omega_j)$（代入 multivariate normal 公式）
+5. 构造 discriminant function $g_j(\boldsymbol{x})=p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)$
+6. 对 test sample $\boldsymbol{x}$：若 $g_1(\boldsymbol{x})>g_2(\boldsymbol{x})$ → class 1；$g_1<g_2$ → class 2；$g_1=g_2$ → decision boundary（无法判定）
+
+⭐ **decision boundary**：$g_1(\boldsymbol{x})=g_2(\boldsymbol{x})$ 的点的集合。此例中 boundary 为**曲线（non-linear）**——因 density function 含指数项，故 Bayes classifier 本质是 non-linear classifier。
+
+### 3. ⭐ Gaussian Mixture Model 与 EM Algorithm（PDF p.27-51）
+
+#### 3.1 动机：多模态数据（PDF p.27-28）
+
+若某类（如 class 2）的数据分布为**多模态（multimodal）**——由多个 Gaussian 分布叠加而成——则单个 Gaussian 无法拟合，需用 **GMM**。
+
+#### 3.2 GMM 定义（PDF p.29）
+
+$$p(\boldsymbol{x}\mid\omega_j)=\sum_{i=1}^{M}\alpha_i\,\mathcal{N}(\boldsymbol{x}\mid\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i)$$
+
+- $M$：Gaussian components 数量
+- $\alpha_i$：第 $i$ 个 component 的 weight，$\sum_{i=1}^{M}\alpha_i=1$
+- $\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i$：第 $i$ 个 component 的参数
+
+⭐ GMM 可逼近任意密度函数（universal approximator），但 $M$ 是 **hyperparameter**——需 trial and error 确定。
+
+#### 3.3 Parameter Estimation 与 EM Algorithm（PDF p.30-35）
+
+对 GMM，MLE 无 closed-form 解——因参数互相依赖（chicken-egg problem）。引入 **EM algorithm（Expectation-Maximization）**。
+
+**隐变量**：$\gamma_{ik}=P(\omega_i\mid\boldsymbol{x}_k)$ 表示样本 $\boldsymbol{x}_k$ 属于第 $i$ 个 Gaussian component 的概率（responsibility）。
+
+$$\gamma_{ik}=\frac{\alpha_i\,\mathcal{N}(\boldsymbol{x}_k\mid\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i)}{\sum_{m=1}^{M}\alpha_m\,\mathcal{N}(\boldsymbol{x}_k\mid\boldsymbol{\mu}_m,\boldsymbol{\Sigma}_m)}$$
+
+⭐ **EM 迭代两步**：
+
+| 步骤 | 内容 |
+|---|---|
+| **E-Step（Estimation Step）** | 给定当前 $\alpha_i^{(j-1)},\boldsymbol{\mu}_i^{(j-1)},\boldsymbol{\Sigma}_i^{(j-1)}$，计算所有 $\gamma_{ik}$ |
+| **M-Step（Maximization Step）** | 用 $\gamma_{ik}$ 更新参数：$\boldsymbol{\mu}_i=\frac{\sum_k\gamma_{ik}\boldsymbol{x}_k}{\sum_k\gamma_{ik}}$，$\boldsymbol{\Sigma}_i=\frac{\sum_k\gamma_{ik}(\boldsymbol{x}_k-\boldsymbol{\mu}_i)(\boldsymbol{x}_k-\boldsymbol{\mu}_i)^T}{\sum_k\gamma_{ik}}$，$\alpha_i=\frac{1}{n}\sum_k\gamma_{ik}$ |
+
+⭐ 与单 Gaussian MLE 的区别：每个样本对 $\boldsymbol{\mu}_i$ 的贡献不再是等权重（1），而是按 $\gamma_{ik}$ 加权——样本属于该 component 的概率越大，贡献越大。
+
+**EM Algorithm 流程**（PDF p.34-35）：
+1. **Initialization**（$j=0$）：随机初始化 $\alpha_i^{(0)},\boldsymbol{\mu}_i^{(0)},\boldsymbol{\Sigma}_i^{(0)}$
+2. **E-Step**（$j\geq 1$）：算 $\gamma_{ik}$
+3. **M-Step**：更新 $\alpha_i,\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i$
+4. 重复 2-3 直到收敛（参数稳定或达最大迭代次数，如 1000 次）
+
+#### 3.4 GMM Example（PDF p.36-51，Example 2）
+
+class 2 由 2 个 Gaussian component 生成，用 EM 估计参数后：
+- GMM（2 components for class 2 + 1 for class 1）→ **14 misclassifications**
+- 单 Gaussian for class 2 → **15 misclassifications**（欠拟合）
+
+⭐ **确定 $M$ 的方法——分析 $\alpha_i$**：
+- $M=3$（多猜 1 个）：$\alpha=[0.05,0.05,0.5,0.44]$ → 一个 component 的 $\alpha$ 很小 → 该 component 不重要，可删
+- $M=5$（多猜 3 个）：$\alpha=[0.46,0.42,0.03,0.05,0.02]$ → 3 个小 $\alpha$ → 这些 component 不重要
+
+⭐ **Overfitting 问题**（PDF p.51）：
+- $M$ 过多 → decision boundary 过于复杂 → 训练集表现好但测试集差（**overfitting**）
+- 小 $\alpha$ 值可指示冗余 component → 删去后重新估计参数以缓解 overfitting
+
+### 4. ⭐ Naïve Bayes Classifier（PDF p.52-71）
+
+#### 4.1 核心假设——Feature Independence（PDF p.53-54）
+
+对 $d$ 维 feature vector $\boldsymbol{x}=(x_1,\dots,x_d)$，Bayes theorem 给出：
+
+$$P(\omega_j\mid\boldsymbol{x})=\frac{p(\boldsymbol{x}\mid\omega_j)\,P(\omega_j)}{p(\boldsymbol{x})}$$
+
+**Naïve 假设**：各 feature 相互独立（conditionally independent given class）：
+
+$$p(\boldsymbol{x}\mid\omega_j)=\prod_{i=1}^{d}p(x_i\mid\omega_j)$$
+
+⭐ 因此 posterior 简化为：
+
+$$P(\omega_j\mid\boldsymbol{x})\propto P(\omega_j)\prod_{i=1}^{d}p(x_i\mid\omega_j)$$
+
+**为何"Naïve"**：假设 feature 间独立在实际中很少成立，但即便如此 Naïve Bayes 在实际中表现良好（尤其 text classification、spam filtering）。
+
+**优势**：
+- 只需估计各 feature 的 1D 分布（无需估 $d\times d$ covariance matrix）→ 大幅简化、缓解 curse of dimensionality
+- 训练数据需求少、计算极快
+
+#### 4.2 ⭐ 三种 Naïve Bayes（PDF p.55）
+
+| 类型 | 适用数据 | 特征分布 |
+|---|---|---|
+| **Gaussian Naïve Bayes** | continuous data | 每个特征假设服从 normal distribution，估 $\mu_{ij},\sigma_{ij}$ |
+| **Bernoulli Naïve Bayes** | discrete/binary data | Bernoulli distribution（0/1，yes/no） |
+| **Multinomial Naïve Bayes** | text classification | 用 word count 表示文本，估各词频率 |
+
+#### 4.3 Gaussian Naïve Bayes（PDF p.56）
+
+每个 continuous feature $x_i$ 在类 $\omega_j$ 下假设服从 normal distribution：
+
+$$p(x_i\mid\omega_j)=\frac{1}{\sqrt{2\pi}\,\sigma_{ij}}\exp\!\left(-\frac{(x_i-\mu_{ij})^2}{2\sigma_{ij}^2}\right)$$
+
+其中 $\mu_{ij}$、$\sigma_{ij}$ 为 feature $i$ 在类 $\omega_j$ 下的 mean 和 standard deviation，用 MLE 从类 $\omega_j$ 的样本中估计。
+
+⭐ 与完整 Bayes classifier 的区别：Gaussian Naïve Bayes 假设各 feature 独立 → covariance matrix 变为对角阵 → 只需估各 feature 的 1D 参数，不估 off-diagonal 元素。
+
+#### 4.4 Bernoulli Naïve Bayes（PDF p.57-63）
+
+**Bernoulli distribution**：$P(x_i=1)=p$，$P(x_i=0)=1-p$。
+
+⭐ **考试例题（PDF p.58-63）**：5 个训练样本，3 个 feature（Confident, Studied, Sick，均 Yes/No），label 为 Pass/Fail。分类新样本 Confident=Yes, Studied=Yes, Sick=No。
+
+**步骤**：
+1. 估 prior：$P(\text{Pass})=3/5=0.6$，$P(\text{Fail})=2/5=0.4$
+2. 估各 feature 的 class-conditional probability（从训练样本中数频次）：
+   - $P(\text{Confident=Yes}\mid\text{Pass})=2/3$（3 个 Pass 中 2 个 Confident=Yes）
+   - $P(\text{Studied=Yes}\mid\text{Pass})=2/3$
+   - $P(\text{Sick=No}\mid\text{Pass})=1/3$
+   - 同理算 $P(\cdot\mid\text{Fail})$
+3. 算 joint probability（discriminant function）：
+   - $g_{\text{Pass}}=P(\text{Pass})\times P(\text{Conf=Yes}\mid\text{Pass})\times P(\text{Stud=Yes}\mid\text{Pass})\times P(\text{Sick=No}\mid\text{Pass})$
+   - $g_{\text{Fail}}=P(\text{Fail})\times\cdots$
+4. 比较 $g_{\text{Pass}}$ vs $g_{\text{Fail}}$，取大者 → 分类为 **Pass**
+
+⭐ $p(\boldsymbol{x})$ 是公共分母，可忽略——直接比较分子（joint probability）即可。
+
+#### 4.5 ⭐ Multinomial Naïve Bayes 与 Laplace Smoothing（PDF p.64-70）
+
+用于 **text classification**：将文本表示为 word count vector。
+
+**例题（PDF p.64-70）**：5 个训练样本（Sports / Not sports），分类 "A very close game"。
+
+**class-conditional probability 估计**：
+
+$$p(x_i\mid\omega_j)=\frac{N_{x_i,\omega_j}}{N_{\omega_j}}$$
+
+其中 $N_{x_i,\omega_j}$ 为词 $x_i$ 在类 $\omega_j$ 的所有文本中出现的次数，$N_{\omega_j}$ 为类 $\omega_j$ 的文本总词数。
+
+⭐ **零概率问题**：若词 $x_i$ 在训练数据中未出现于类 $\omega_j$，则 $p(x_i\mid\omega_j)=0$ → 整个乘积为零 → 后验为零。
+
+**Laplace smoothing（Add-1 smoothing）**：
+
+$$p(x_i\mid\omega_j)=\frac{N_{x_i,\omega_j}+1}{N_{\omega_j}+V}$$
+
+- $V$：所有训练数据中 **unique words（唯一词）** 的总数
+- 分子加 1 确保不为零；分母加 $V$ 保证概率和为 1
+
+例（PDF p.68-70）：词 "close" 在 Sports 类出现 0 次 → 无 smoothing 为 $0/11=0$；Laplace smoothing 后为 $1/(11+14)=1/25$。最终 "A very close game" 分为 Sports（joint probability > Not sports 的 joint probability）。
+
+#### 4.6 Naïve Bayes 要点（PDF p.71）
+
+1. 尽管 independence 假设过于简化，Naïve Bayes 在 document classification、spam filtering 等实际任务中效果很好，且只需少量训练数据。
+2. 计算极快：各 feature 的 class-conditional distribution 可独立估计为 1D distribution，缓解 curse of dimensionality。
+
+### 5. ⭐ 各分类器对比总结
+
+| 分类器 | 核心原理 | 假设 | 参数 | 优势 | 劣势 |
+|---|---|---|---|---|---|
+| **Bayes classifier（单 Gaussian）** | posterior → discriminant function | 数据服从 single multivariate Gaussian | $\boldsymbol{\mu}_j,\boldsymbol{\Sigma}_j$ per class | 理论最优（若假设成立） | 多模态数据不适用 |
+| **Bayes classifier + GMM** | GMM 拟合多模态 density | 数据为多个 Gaussian 的混合 | $\alpha_i,\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i$ per component | 可逼近任意分布 | $M$ 需 trial and error；易 overfit |
+| **Gaussian Naïve Bayes** | feature 独立 → 1D 估计 | feature 间独立 + 各 feature Gaussian | $\mu_{ij},\sigma_{ij}$ per feature per class | 快、简单、少数据 | 独立假设常不成立 |
+| **Bernoulli Naïve Bayes** | binary feature 独立 | binary feature + 独立 | $p_{ij}$ per feature per class | 适合 0/1 特征 | 仅适用 binary feature |
+| **Multinomial Naïve Bayes** | word count 独立 | 词频独立 + Laplace smoothing | 词频 $p(x_i\mid\omega_j)$ | text classification 首选 | 不适合 continuous |
+
+⭐ **assignment 信息**（转写末尾，老师口述）：
+- **Assignment 1** 已在 NTULearn 发布——feature 均为 continuous，用 normal function 建 class-conditional density
+- **Assignment 2** 将在 **Week 8（recess 后）** 发布
+- 两次 assignment 合并为**一份 PDF**提交（不含代码，只写 class label 值和预测结果）
+- **截止日期：10 月 19 日**（约 3 周时间）
+- 两次 assignment 合计占 **20%**（CA Part 2 的 30% 中的一部分）
+
+### 6. Python 实现要点（Python_Implementation.pdf）
+
+`Python_Implementation.pdf` 给出 5 个分类器的 sklearn 实现示例，数据均为 `np.random.normal` 生成的两类 2D 数据（各 100 样本）。
+
+**通用数据生成模式**：
+```python
+np.random.seed(2)
+x1 = np.random.normal(50, 10, 100); y1 = np.random.normal(50, 7, 100)   # Class 1
+x2 = np.random.normal(60, 12, 100); y2 = np.random.normal(10, 10, 100)  # Class 2
+X = np.vstack((np.column_stack((x1, y1)), np.column_stack((x2, y2))))
+y = np.array([0]*100 + [1]*100)
+```
+
+⭐ **五个分类器 API 对比**：
+
+| 分类器 | sklearn API | 关键参数 | 代码要点 |
+|---|---|---|---|
+| **SVM** | `svm.SVC(kernel="linear")` | `kernel`（linear/rbf/poly） | `clf.coef_[0]` 得 $w$，`clf.intercept_[0]` 得 $b$，决策线 $w_0 x+w_1 y+b=0$ → $y=-(w_0 x+b)/w_1$ |
+| **LDA** | `LinearDiscriminantAnalysis()` | — | `lda.fit(X, y)` → `lda.predict(new_points)` |
+| **Gaussian Naïve Bayes** | `GaussianNB()` | — | `gnb.fit(X, y)` → `gnb.predict(new_points)` |
+| **Decision Tree** | `DecisionTreeClassifier(max_depth=3)` | `max_depth`（控制树深度防 overfitting） | `tree.fit(X, y)` → `tree.predict(new_points)` |
+
+**数据可视化三种图**（复习 Week 6）：
+- **Box plot**：`plt.boxplot([data1, data2], labels=[...], patch_artist=True)`，展示 Q1/median/Q3/IQR/outlier
+- **Histogram**：`plt.hist(data, alpha=0.5, label=...)`，展示分布形态
+- **Scatter plot**：`plt.scatter(x, y, c='blue', marker='x', label=...)`，展示 feature↔feature 关系
+
+⭐ SVM 决策线绘制（常考）：
+```python
+w = clf.coef_[0]       # (w1, w2)
+b = clf.intercept_[0]  # bias
+xx = np.linspace(x_min, x_max, 200)
+yy = -(w[0] * xx + b) / w[1]   # 从 w1*x + w2*y + b = 0 解出 y
+```
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **四个概率概念区分** | prior $P(\omega_j)$ / class-conditional $p(\boldsymbol{x}\mid\omega_j)$ / posterior $P(\omega_j\mid\boldsymbol{x})$ / joint $p(\boldsymbol{x},\omega_j)$ |
+| **Bayes decision rule** | 选 posterior 最大的类；$p(\boldsymbol{x})$ 是公共 scale factor 可忽略 |
+| **discriminant function** | $g_j(\boldsymbol{x})$ 三种形式：posterior / joint / log-joint；取最大值对应的类 |
+| **MLE 估计 $\boldsymbol{\mu},\boldsymbol{\Sigma}$** | $\hat{\mu}=\frac{1}{n}\sum x_k$；$\hat{\Sigma}=\frac{1}{n}\sum(x_k-\hat{\mu})(x_k-\hat{\mu})^T$；对数似然求偏导令为零 |
+| **Bayes classifier 设计流程** | 估 prior → 估 class-conditional density → 构造 $g_j$ → 比较 $g_1$ vs $g_2$ → 分到大者 |
+| **GMM 定义** | $p(\boldsymbol{x}\mid\omega_j)=\sum_{i=1}^M\alpha_i\mathcal{N}(\boldsymbol{x}\mid\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i)$，$\sum\alpha_i=1$ |
+| **EM 两步** | E-Step 算 $\gamma_{ik}$（responsibility）；M-Step 用 $\gamma_{ik}$ 加权更新 $\alpha_i,\boldsymbol{\mu}_i,\boldsymbol{\Sigma}_i$ |
+| **GMM 过拟合** | $M$ 过大 → decision boundary 复杂 → overfitting；用小 $\alpha_i$ 判定冗余 component |
+| **Naïve Bayes 独立假设** | $p(\boldsymbol{x}\mid\omega_j)=\prod_i p(x_i\mid\omega_j)$，无需估 covariance |
+| **三种 Naïve Bayes** | Gaussian（continuous）/ Bernoulli（binary）/ Multinomial（text） |
+| **Laplace smoothing** | $p(x_i\mid\omega_j)=\frac{N+1}{N_{\omega_j}+V}$，解决零概率问题 |
+| **Bernoulli NB 手算** | 数频次估 prior 和 class-conditional，乘积比较，忽略公共分母 |
+| **Multinomial NB 手算** | word count → 频率估计 → Laplace smoothing → joint probability 比较 |
+| **sklearn API** | `SVC(kernel=)` / `LinearDiscriminantAnalysis()` / `GaussianNB()` / `DecisionTreeClassifier(max_depth=)` |
+| **Assignment 1** | continuous feature，用 normal function 建 density；与 Assignment 2 合并为一份 PDF，10/19 截止，共 20% |
+
+### 8. 本周要点小结
+
+- **本周主题**：从 Bayesian Decision Theory 出发建立概率分类框架，展开 classifier design 的第一部分。
+- **四个概率**：prior（初始信念）、class-conditional density（类内特征分布）、posterior（融合证据后的概率）、joint probability（决策直接用的量）。
+- **Bayes decision rule**：分到 posterior 最大的类；可用 joint probability 或 log-joint 作 discriminant function（省略公共分母 $p(\boldsymbol{x})$）。
+- **Gaussian 假设 + MLE**：假设数据服从 multivariate normal → 用 maximum-likelihood 估 $\boldsymbol{\mu}_j,\boldsymbol{\Sigma}_j$（各类独立估）→ 构造 density → 设计 Bayes classifier。
+- **GMM + EM**：多模态数据用 Gaussian Mixture Model 拟合；参数估计无 closed-form → EM 迭代（E-Step 算 responsibility $\gamma_{ik}$，M-Step 加权更新参数）；$M$ 是 hyperparameter，过多 → overfitting，用小 $\alpha$ 判冗余。
+- **Naïve Bayes**：假设 feature 间独立 → 1D 估计替代高维 covariance 估计 → 三型（Gaussian/Bernoulli/Multinomial）适配不同数据类型；Laplace smoothing 解决零概率。
+- **Python 实现**：sklearn 中 `SVC`、`LinearDiscriminantAnalysis`、`GaussianNB`、`DecisionTreeClassifier` 的 API 与决策线绘制方法。
+- **Assignment**：Assignment 1（continuous feature + Gaussian density）已发布，Assignment 2 在 Week 8 发布，合并提交，10/19 截止，共 20%。
+
+---
+
+> **下一周（Week 8）预告**：本周课件覆盖到 Naïve Bayes 结束。`Python_Implementation.pdf` 中已出现 SVM、LDA、Decision Tree 的代码示例，但课件 `ML-Slides3.pdf` 未展开其理论推导。转写末尾老师提到 Assignment 2 在 Week 8（recess 后）发布。推测 Week 8 可能展开 **LDA（Linear Discriminant Analysis）的理论推导**（Fisher criterion、within-class/between-class scatter matrix）与 **SVM（Support Vector Machine）的 maximum margin、hinge loss、kernel trick、soft margin**，或进入 **Decision Tree / 其他 classifier**。具体以 Week 8 课件确认。
+
+---

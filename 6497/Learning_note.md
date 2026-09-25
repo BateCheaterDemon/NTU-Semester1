@@ -1876,3 +1876,273 @@ acceptance probability 恒为 1 → 每步都接受 → 等于直接从 $\pi$ �
 ---
 
 > **下一周预告**：Week 7 是 **Quiz 1**（覆盖 Week 1–4，60 分钟，lockdown browser，填空题）+ **Summary Review**。Quiz 后老师会讲解 past exam questions 并复习 Week 1–4 的重点。Week 5–6 内容（sampling + MCMC）不在 Quiz 1 范围内，但**会在期末考**。Quiz 1 之后进入 recess week，后半学期（Week 8–13）由 Wang Lipo 讲授 Neural Networks / Deep Learning。
+
+---
+
+## Week 7 — Quiz 1 + Half-Semester Recap（前半学期回顾）
+
+本周为 **Quiz 1 + recap week**，没有新知识点。前半节进行 Quiz 1，后半节老师系统回顾 Week 1–6 的逻辑框架，并讲解 past year exam questions。以下按老师 recap 的框架整理。
+
+### 0. ⭐ Quiz 1 行政信息
+
+| 项目 | 说明 |
+|---|---|
+| 形式 | **60 分钟**，fill-in-the-blank（填空题），使用 lockdown browser |
+| 范围 | **Week 1–4**（概率复习 + MLE/MAP + EM/Mixture + Markov/HMM） |
+| 不含 | Week 5–6（Sampling + MCMC）不在 Quiz 1 范围，但**会在 final exam** |
+| 技术问题 | 登录失败可到前排取 paper quiz；passcode 会更换以防泄题 |
+| 结束后 | 可自行提交，交卷后不要打扰同学，可离开教室 |
+
+> ⭐ 老师明确提示：**final exam 覆盖全部内容**，包括 sampling/MCMC 部分。不要因为 Quiz 1 不考就忽略 Week 5–6。
+
+### 1. ⭐ Machine Learning Pipeline（机器学习流水线总框架）
+
+这是老师 recap 的核心——前半学期所有内容可纳入以下三阶段框架（对应 `_overview.pdf`）：
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  1. Choose model M ∈ 𝓜  →  根据应用场景和数据类型选模型      │
+│  2. Infer parameters θ   →  从 training set 估计最优参数      │
+│  3. Utilize trained model →  在 inference time 应用并评估     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### 阶段 1：Choose Model（选模型）
+
+模型分为两大类：
+
+| 类型 | 模型举例 | 特点 |
+|---|---|---|
+| **Probabilistic models** | Standard distributions（Bern, Exp, Normal）、Mixture models（GMM）、Markov models、HMM | 可解释性强，用概率解释模型 |
+| **Loss models**（后半学期） | MLP / DNN、CNN、RNN / LSTM | 现代深度学习模型，minimize loss/risk |
+
+- 模型 $M$ 由参数 $\theta$ 定义，即 $M$ 给出 $p(\cdot \mid \theta)$。
+- 典型参数化形式：
+
+| 模型 | $p(x \mid \theta)$ 的形式 |
+|---|---|
+| Bernoulli | $\text{Bern}(x \mid \theta)$ |
+| Gaussian | $\mathcal{N}(x \mid \mu, \Sigma)$ |
+| GMM（mixture） | $p(x \mid \theta) = \sum_{k=1}^{K} \pi_k\, p(x \mid \eta_k)$ |
+| Markov chain | $p(x_0, \ldots, x_t \mid \pi, T) = \pi(x_0)\, T(x_0, x_1)\, T(x_1, x_2) \cdots T(x_{t-1}, x_t)$ |
+| HMM | 参数 $\theta = (\pi, T, \phi)$ |
+| DNN（后半学期） | network weights $\theta$ |
+
+> ⭐ 老师强调：probabilistic models 在很多应用中仍是首选，因为**可解释**（interpretable）——能用概率解释模型行为。后半学期的 neural networks 是更"黑箱"的现代方法。
+
+#### 阶段 2：Infer Parameters $\theta$（参数估计）
+
+从 training set 学习最优参数 $\theta^*$。前半学期覆盖的方法按递进逻辑排列：
+
+| 方法 | 适用场景 | 核心思想 |
+|---|---|---|
+| **MLE** | 有完整数据、likelihood 可直接优化 | 最大化 $\log p(\mathcal{D} \mid \theta)$ |
+| **MAP** | 有 prior belief / 领域知识 | 最大化 $\log p(\mathcal{D} \mid \theta) + \log p(\theta)$ |
+| **EM algorithm** | 隐变量 / incomplete data（如 GMM） | E-step 算 conditional expectation，M-step 更新 $\theta$ |
+| **Baum-Welch** | HMM（EM 的特化版本） | EM 专门用于 HMM 的参数估计 |
+| **Sampling / MCMC** | 分布太复杂、无 closed form | 通过采样近似 posterior，算 expectation、confidence interval |
+| **SGD**（后半学期） | 通用优化，minimize loss/risk | stochastic gradient descent，适用于所有模型但可能慢 |
+
+递进逻辑：
+1. **简单分布** → 直接 MLE/MAP（Week 2）。
+2. **Mixture models**（GMM）→ likelihood 中 log 与 summation 不能交换，解析不可行 → **EM**（Week 3）。
+3. **HMM** → 隐变量 + 时序结构 → **Baum-Welch**（EM 特例）（Week 4）。
+4. **更复杂的分布** → 连 closed form 都写不出 → **Sampling / MCMC**（Week 5–6）。
+
+> ⭐ 老师提示：SGD（stochastic gradient descent）是另一种通用方法，后半学期详讲。虽然 SGD 理论上可用于 mixture models 等所有模型，但 **EM 对特定问题更高效**——SGD 在 mixture model 上收敛很慢。通用方法不等于万能方法，**针对性方法在合适场景下更优**。
+
+#### 阶段 3：Utilize Trained Model（应用与评估）
+
+用训练好的 $p(\cdot \mid \theta^*)$ 在 inference time 做 prediction / inference，并评估泛化能力：
+
+- **Goodness of fit**（拟合优度）
+- **Classification metrics**：Accuracy、Precision、Recall、F1、AUC
+- **Regression metrics**：RMSE、MAE
+
+### 2. ⭐ Past Year Exam Questions 回顾
+
+老师现场带做了几道 past year exam questions（AY24-25 和 AY23-24），以下是题目要点和解题思路。
+
+#### Q1（AY24-25）：MLE / MAP — Pedestrian & Cyclist Vulnerability
+
+**题设**：
+- 行人（pedestrian）为 vulnerable 的概率 $\theta_0$（未知），骑车人（cyclist）为 vulnerable 的概率 $\theta_1$（未知）。
+- 调查 100 个行人（20 vulnerable）、50 个骑车人（5 vulnerable），数据独立。
+- (a) 求 MLE of $\theta_0, \theta_1$。
+- (b) 加 Beta prior $\theta_k \sim \text{Beta}(a, b)$（$a=2, b=1$），求 MAP。
+- (c) 另一人只记录 vulnerable 与否、不记录身份 → mixture distribution，需用 EM。
+
+**解**：
+
+**(a) MLE**：因数据独立，行人和骑车人可分开处理。
+
+$$
+\hat{\theta}_k^{\text{MLE}} = \frac{r_k}{n_k}
+$$
+
+- $\hat{\theta}_0^{\text{MLE}} = 20/100 = 0.2$
+- $\hat{\theta}_1^{\text{MLE}} = 5/50 = 0.1$
+
+**(b) MAP**：$\log \text{likelihood} + \log \text{prior}$，对 $\theta_k$ 求导置零：
+
+$$
+\hat{\theta}_k^{\text{MAP}} = \frac{r_k + a - 1}{n_k + a + b - 2}
+$$
+
+- $\hat{\theta}_0^{\text{MAP}} = \frac{20+1}{100+1} = \frac{21}{103}$
+- $\hat{\theta}_1^{\text{MAP}} = \frac{5+1}{50+1} = \frac{6}{51}$
+
+**(c) Mixture + EM**：不记录身份时，$x_i \sim \frac{4}{5}\text{Bern}(\theta_0) + \frac{1}{5}\text{Bern}(\theta_1)$（混合比来自 Part 1 的 4:1 比例）。
+
+$$
+\log p(x_i \mid \theta) = \log\left[\frac{4}{5}\theta_0^{x_i}(1-\theta_0)^{1-x_i} + \frac{1}{5}\theta_1^{x_i}(1-\theta_1)^{1-x_i}\right]
+$$
+
+log 与 summation 不能交换 → 直接求导 intractable → **用 EM algorithm**。
+
+> ⭐ 考试要点：遇到 mixture distribution 时，**必须说明为什么用 EM**——log-likelihood 中 log 包裹 summation，无法直接求导。
+
+#### Q2（AY24-25）：Metropolis-Hastings Acceptance Probability
+
+**题设**：target $\tilde{\pi}(x) = e^{-|x|}$（unnormalized Laplace），proposal $q(x,y) = \mathcal{N}(y \mid x, 1)$（Gaussian random walk），当前 $x=1$，提议 $y=2$，求 acceptance probability。
+
+**解**：
+
+$$
+A(x,y) = \min\left(1, \frac{\tilde{\pi}(y)\, q(y,x)}{\tilde{\pi}(x)\, q(x,y)}\right)
+$$
+
+代入 $\tilde{\pi}(1) = e^{-1}$，$\tilde{\pi}(2) = e^{-2}$；$q$ 对称（Gaussian，$\sigma^2=1$），$q(x,y) = q(y,x)$，指数部分 $e^{-(x-y)^2/2}$ 上下相同可消去。
+
+$$
+A = \min\left(1, \frac{e^{-2}}{e^{-1}}\right) = \min(1, e^{-1}) = e^{-1} \approx 0.3679
+$$
+
+> ⭐ 老师提示：**acceptance probability 公式要写在 reference sheet 上**，不需死记。
+
+#### Q3（AY24-25）：HMM + Gibbs Sampling — Damaged Manuscript
+
+**题设**：手稿由字符序列组成，真实状态 $z_i \in \{D, U\}$（damaged/undamaged，latent），观测 $x_i \in \{D, U\}$（observed）。这是一个 **HMM**。
+
+- **Emission probabilities**：
+
+| 真实状态 $z_i$ | $P(x_i=D \mid z_i)$ | $P(x_i=U \mid z_i)$ |
+|---|---|---|
+| $D$ | $\alpha$ | $1-\alpha$ |
+| $U$ | $\beta$ | $1-\beta$ |
+
+- **Transition（Markov chain on $z$）**：$z_i$ 仅依赖 $z_{i-1}$ 和 $z_{i+1}$（Markov property），条件概率：
+
+$$
+p(z_i \mid z_{-i}) \propto \gamma^{\mathbf{1}[z_i = z_{i-1}] + \mathbf{1}[z_i = z_{i+1}]}
+$$
+
+即邻居一致时乘 $\gamma$。
+
+- **任务**：用 **Gibbs sampling** 估计 $z$ 的 posterior。
+
+**解**：用 Bayes rule 求 full conditional $p(z_i \mid z_{-i}, x_i)$：
+
+$$
+p(z_i = D \mid z_{-i}, x_i) \propto p(z_i = D \mid z_{i-1}, z_{i+1}) \cdot p(x_i \mid z_i = D)
+$$
+
+$$
+= \gamma^{\mathbf{1}[z_{i-1}=D] + \mathbf{1}[z_{i+1}=D]} \cdot \alpha^{\mathbf{1}[x_i=D]} (1-\alpha)^{\mathbf{1}[x_i=U]}
+$$
+
+同理 $p(z_i = U \mid z_{-i}, x_i)$ 将 $D$ 换成 $U$、$\alpha$ 换成 $\beta$。
+
+**Gibbs sampling 步骤**：
+1. 初始化所有 $z_1, \ldots, z_n$。
+2. 第 $k$ 次迭代：
+   - 采样 $z_1^{(k)} \sim p(z_1 \mid z_2^{(k-1)}, z_n^{(k-1)}, x_1)$（边界 wrap-around：$z_0 \equiv z_n$）。
+   - 采样 $z_2^{(k)} \sim p(z_2 \mid z_1^{(k)}, z_3^{(k-1)}, x_2)$（用已更新的 $z_1^{(k)}$）。
+   - 依次类推至 $z_n^{(k)}$（用 $z_{n-1}^{(k)}$ 和 $z_1^{(k)}$）。
+3. 丢弃 burn-in 样本。
+
+> ⭐ 考试要点：此题与 lecture 中的 image denoising（2D Ising model）**结构完全相同**，只是 1D 序列而非 2D 图像。核心是**写出 full conditional 并描述 Gibbs 步骤**，注意区分 $z_i^{(k)}$（已更新）与 $z_i^{(k-1)}$（未更新）。
+
+#### Q4（AY23-24）：Exponential MLE / MAP / EM — Non-Line-of-Sight
+
+**题设**：信号反射路径 $R = D + \epsilon$（$D$ = direct line-of-sight 距离，$\epsilon$ = 额外路径长度，恒非负）。
+
+**(a) 为什么用 Exponential 而非 Gaussian 建模 $\epsilon$？**
+
+$\epsilon \ge 0$ 恒成立（反射路径 ≥ 直射路径）。Gaussian 的 support 是 $(-\infty, \infty)$，可能产生负值，**物理不合理**。Exponential 的 support 是 $[0, \infty)$，与约束一致。
+
+> ⭐ **模型选择原则**：选分布时必须考虑数据的物理约束（support、非负性等），不能盲目用 Gaussian。
+
+**(b) MLE of $\lambda$**（4 个观测值 $\epsilon_1, \ldots, \epsilon_4$）：
+
+$$
+\log L = \sum_{i=1}^{4} \log(\lambda e^{-\lambda \epsilon_i}) = 4\log\lambda - \lambda \sum_{i=1}^{4} \epsilon_i
+$$
+
+$$
+\hat{\lambda}^{\text{MLE}} = \frac{4}{\sum \epsilon_i}
+$$
+
+**(c) MAP**（prior $p(\lambda) \propto \lambda \, e^{-\lambda}$，即 Gamma(2,1)）：
+
+$$
+\log L + \log p(\lambda) = 4\log\lambda - \lambda \sum \epsilon_i + \log\lambda - \lambda + \text{const}
+$$
+
+$$
+\hat{\lambda}^{\text{MAP}} = \frac{5}{\sum \epsilon_i + 1}
+$$
+
+**(d) 只观测 $R$、不观测 $D$ → incomplete data → EM**：
+
+E-step：计算 conditional expectation $E[\log p(R, D \mid \lambda) \mid R, \lambda^{(t-1)}]$，即对 complete data log-likelihood 关于 $D \mid R, \lambda^{(t-1)}$ 取条件期望。
+
+> ⭐ **EM 的本质**：当 observed data 是 incomplete data（缺少部分变量）时，用 EM 估计 MLE。E-step 算 $Q(\theta \mid \theta^{(t-1)}) = E[\log p(\text{complete} \mid \text{observed}, \theta^{(t-1)})]$，M-step 最大化 $Q$。
+
+### 3. ⭐ 前半学期逻辑链总结
+
+老师 recap 的递进逻辑：
+
+```
+Week 1: 概率论基础（Bayes rule, distributions）
+  ↓
+Week 2: MLE / MAP — 有完整数据 + 简单分布
+  ↓
+Week 3: EM algorithm — 隐变量 / mixture models（log ∑ 不可分）
+  ↓
+Week 4: HMM — 隐变量 + 时序 → Baum-Welch（EM 特例）+ Viterbi
+  ↓
+Week 5: Sampling — 标准分布采样 / Rejection / Importance（低维有效）
+  ↓
+Week 6: MCMC — Metropolis-Hastings / Gibbs（高维 posterior 近似）
+  ↓
+Week 7: Quiz 1 (Week 1-4) + Recap
+  ↓
+Week 8-13: Neural Networks / Deep Learning（Wang Lipo）
+```
+
+### 4. ⭐ 考试相关提示
+
+| 要点 | 说明 |
+|---|---|
+| **Final exam 覆盖全部内容** | 包括 sampling / MCMC（Week 5–6），不要遗漏 |
+| **Reference sheet** | acceptance probability 公式等应写在 reference sheet 上，不需死记 |
+| **Past year papers** | 应能在 NTULearn / NTU library website 找到近 3–5 年 past paper；老师提到有同学反映找不到，会去确认 |
+| **概念题写法** | 简答题只需几句话说明，不要写整段/整页（如 burn-in / thinning 解释） |
+| **计算题** | 代入公式即可，注意 proposal 对称时 $q$ 项可消去 |
+
+### 5. 本周要点小结
+
+- **本周性质**：Quiz 1 + half-semester recap，无新知识点。
+- **总框架**：Machine learning pipeline = Choose model → Infer $\theta$ → Utilize & evaluate。前半学期聚焦 probabilistic models + 参数估计方法（MLE → MAP → EM → Baum-Welch → MCMC）。
+- **模型分类**：Probabilistic models（可解释）vs Loss models（后半学期的 DNN/CNN/RNN，黑箱但 powerful）。
+- **方法递进**：简单分布直接 MLE/MAP → mixture/隐变量用 EM → 更复杂分布用 MCMC → 通用优化用 SGD（后半学期）。
+- **EM 使用场景**：incomplete data / 隐变量 / log-likelihood 中 log 包裹 summation 无法直接求导时。
+- **MCMC 使用场景**：分布无 closed form、高维 posterior，通过采样近似期望与不确定性。
+- **考试提醒**：final exam 覆盖全部内容；acceptance probability 等公式写 reference sheet；概念题简答即可。
+
+---
+
+### 下一周预告
+
+Recess week 后，**Week 8 起由 Wang Lipo 教授讲授 Neural Networks / Deep Learning**（Week 8–13），进入课程后半段。内容将涵盖 MLP / DNN、CNN、RNN / LSTM 等 loss-based models，以及 stochastic gradient descent 等训练方法。probabilistic models 部分（前半学期）到此结束，但 final exam 会覆盖全部内容。

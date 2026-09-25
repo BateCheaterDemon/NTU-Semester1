@@ -1528,3 +1528,551 @@ $$
 > **下周（Week 7）预告**：本周未讲完 Part 4（Generalized Framework 的 data transformation 细节），老师明确说"next week we have a bit of time, we can continue remaining just a few more slides"。预计 Week 7 补完 TAUC/FLD/LSE 关系的剩余 slides 后进入 **Lecture 7 — Analytic Methods for Penalized Learning**（Toh 的 Part 1 收尾段，penalized/regularized learning 的解析方法，对应课程大纲 L7）。本周的 TER/AUC closed-form 解与 quadratic approximation 是直接前置。具体以 Lecture 7 课件为准。
 
 ---
+
+## Week 7 — Lecture 6 收尾（TAUC Generalized Framework）+ Lecture 7: Analytic Methods for Penalized Learning
+
+> **材料**：转写 `week7/week7.txt`（ASR 噪声多），官方课件 `week7/EE6406-Lecture7-TKA-v1.pdf`（权威，67 slides）。本周前半补完 Lecture 6 末尾的 generalized framework（TAUC → AUC/TER/FLD/Regression 的 data transformation 关系），后半正式进入 Lecture 7。
+>
+> **CA2 重要通知**（转写开头）：CA2 在 **Week 8（recess week 后两周）** 举行，online quiz 形式，与 CA1 相同规则（lockdown browser，closed-book，in-class）。**CA2 占 15%**（比 CA1 的 10% 高），final exam 60%。**CA2 考试范围：Lecture 5–7**（regression/classification learning methods + penalized learning），concept 为主 + 少量 basic calculation（参考 lecture slides 的 examples，不需做书末难题）。Week 9 起 **Simon Liu** 接手 Ensemble Learning 部分，CA3 在 Week 12。
+
+### 0. ⭐ CA2 考试信息（Week 8，recess 后）
+
+| 项目 | 详情 |
+|---|---|
+| **时间** | Week 8（recess week 后，即本周后两周） |
+| **占比** | **15%**（CA1=10%, CA2=15%, CA3=15%, Final=60%） |
+| **范围** | **Lecture 5–7**：L5 regression learning、L6 TER/AUC learning、L7 penalized learning |
+| **形式** | online quiz，in-class，lockdown browser，closed-book |
+| **题型** | concept 为主 + basic calculation（类似 CA1），不做书末复杂计算题 |
+| **准备** | 重点 lecture slides 中的 examples + 书中基础练习；recess week 有较多准备时间 |
+
+- 转写中 TKA 原话："concept holds more mass than calculations, similar to CA one"——概念题占比高于计算题。
+- "do some practice based on those examples given in the lecture slides, and also those behind the book would be enough, but don't worry about those computational or more difficult problems"——以 slides 上的 example 和书后基础题为主，不做复杂计算。
+
+---
+
+### 1. Lecture 6 收尾：TAUC Generalized Framework 补完
+
+> 上周（Week 6）已记录 TAUC 的统一框架与 Table 1（FLD/LSE/TER/AUC 作为 TAUC 特例）。本周开头的转写补完了 data transformation 的直觉和 TAUC → AUC/TER/FLD 的参数退化路径，以及 Bayesian 对应关系。以下为补充要点。
+
+#### 1.1 Data Transformation 的直觉
+
+- **核心思想**："changing algorithm = changing data"——通过 data manipulation（scaling、translation、duplication）改变数据，使不同分类器的解可以统一在 TAUC 框架下。
+- **两层变换**：
+  1. **Feature 变换** $p(\mathbf{x})$：如 polynomial 或 kernel transformation（Lecture 3/5 已述）。
+  2. **Data 变换** $\tilde{p}=Tp+\mathbf{a}$：$T$ 为 scaling matrix，$\mathbf{a}$ 为 translation vector；可 duplicate 数据 $K$ 组（不同 $(T^k,\mathbf{a}^k)$），扩大训练池。
+- **动机**：更多变换数据 → 更多 training restriction → 更好 generalization（类似 data augmentation / noise injection 的思想）。
+
+#### 1.2 ⭐ TAUC → 各分类器的退化路径
+
+| 退化路径 | 操作 | 结果 |
+|---|---|---|
+| **TAUC → AUC** | 令 $T=I$（identity），$\mathbf{a}=0$（无 translation），或令 $\beta_1=\beta_2=\gamma_1=\gamma_2=1$ | 回到标准 AUC |
+| **TAUC → TER** | 通过设置部分 $\beta,\gamma=0$，移除一个 summation（double→single） | 双重求和退化为单重求和 → TER |
+| **TAUC → FLD** | 在 TER 基础上加 mean-centering：$u_1=\boldsymbol{\mu}^-$, $v_2=\boldsymbol{\mu}^+$ | FLD = centered TER |
+| **TER → Regression** | 加权合并 $m^+,m^-$ → weighted LS | TER = class-specific weighted least squares |
+| **Regression → Bayesian MLE** | Gaussian likelihood + Gaussian prior | MAP = regularized regression |
+
+- ⭐ **关键概念**：$\beta,\gamma$ 控制 scaling（乘或不乘），$u,v$ 控制 translation（mean-centering 或不 centering）。设置不同的 $\beta,\gamma,u,v$ 值即可在 AUC/TER/FLD/Regression 之间转换——"like a periodic table, we link up everything together"。
+- **FLD vs TER**：FLD 是 TER 的 **mean-centered** 版本——数据减去类均值后做同样的 TER。结果几乎相同，仅差 centering offset。
+- **TER vs Regression**：TER 是 class-specific weighted LS（$m^+/m^-$ weighting）；regression 是单一 Gaussian 假设下的 MLE。
+
+#### 1.3 ⭐ Bayesian 对应（补充 Week 6 内容）
+
+- **Regression ↔ single Gaussian MLE**：线性 regression 的 closed-form 解等价于假设所有 noise 为 $\mathcal{N}(0,\sigma^2)$ 的 maximum likelihood 估计。covariance 矩阵中的 regularization diagonal 项对应 Gaussian prior。
+- **TER ↔ dual-Gaussian MAP**：TER 把正负两类分开，每类用一组 Gaussian noise $\mathcal{N}(0,\sigma_\pm^2)$，target 分别为 $\tau\pm\eta$。likelihood 为两组 Gaussian 乘积 → 加 Gaussian prior $\mathbf{w}\sim\mathcal{N}(0,\Sigma_p)$ → posterior mean $\bar{\mathbf{w}}$ 结构与 TER solution 一致。
+- **AUC ↔ pairwise Gaussian process**：AUC 的 quadratic approximation 可视为以 pairwise data $(p_j^- - p_i^+)$ 为输入的 Gaussian process。
+
+---
+
+### 2. Lecture 7 Introduction：Penalized Learning 的动机
+
+#### 2.1 What Is Penalized Learning?
+
+Penalized learning（惩罚学习）是在学习目标中添加 penalty term 的建模框架，目标是平衡 data fit 与 model complexity：
+
+$$
+\min_\theta\;L(\theta)+\lambda P(\theta) \tag{7.1}
+$$
+
+完整的学习目标（learning components）：
+
+$$
+\arg\min_\mathbf{w}\;J(\mathbf{w})=\arg\min_\mathbf{w}\left[\sum_{i=1}^m L\bigl(g(\mathbf{x}_i,\mathbf{w}),y_i\bigr)+\lambda R(\mathbf{w})\right] \tag{7.2}
+$$
+
+| 符号 | 含义 |
+|---|---|
+| $J(\mathbf{w})$ | Learning cost function（optimization criterion） |
+| $L(\cdot)$ | Loss function |
+| $g(\mathbf{x}_i,\mathbf{w})$ | Learning model |
+| $\mathbf{x}_i$ | Learning model input vector |
+| $\mathbf{w}$ | Learning parameter vector |
+| $y_i$ | Learning target |
+| $m$ | Sample size |
+| $R(\mathbf{w})$ | Regularization function |
+| $\lambda$ | Regularization factor |
+
+#### 2.2 ⭐ Why Do We Need Penalization?
+
+- **Overfitting**：仅最小化 training error 会导致 overfitting——复杂模型拟合 noise 而非 structure。
+- 特别在 **under-determined system**（参数多于数据，$m<D+1$）时，训练误差可降到零，但对 unseen data 预测极差。
+- **Penalization = regularization**：限制参数大小 → 更好 generalization（泛化能力）。
+- **Overfitting vs Regularization 示意图**：
+  - Training error 随 model complexity 单调下降（可到零）。
+  - Test error 先降后升，在 **optimal complexity** 处最低。
+  - Penalization 鼓励模型停留在 optimal complexity 附近。
+- ⭐ **稳定性直觉**（转写补充）：参数值大 → $\mathbf{w}^T p(\mathbf{x})$ 对 $p$ 的微小变化敏感 → 输出 swing 大；参数值小 → 输出稳定。"data change quite smoothly, like temperature, it will not suddenly go to 1000 degrees"——penalization 使预测不剧烈波动。
+
+#### 2.3 三大应用
+
+**Application 1: Penalized Linear Regression**
+
+| 方法 | Penalty | 特点 |
+|---|---|---|
+| **Ridge regression** | $L_2$: $\|\mathbf{w}\|_2^2$ | 所有系数均匀缩小，不压到零 |
+| **LASSO** | $L_1$: $\|\mathbf{w}\|_1$ | 系数可压到零 → feature selection |
+| **Bridge regression** | $L_p$: $\|\mathbf{w}\|_p^p$ | $p$ 在 0–2 之间，generalization of Ridge/LASSO |
+
+- **$L_1$ vs $L_2$ geometry**：$L_2$ penalty 的 constraint region 是圆球（smooth），$L_1$ 是菱形（有 sharp corners）。cost function 的等高线与 $L_1$ 的 corner 相交时，部分系数恰为零 → sparsity。
+
+**Application 2: Feature Selection**
+
+- 高维数据（genomics、text mining、finance）中，$L_1$ penalization 鼓励 sparse solution → automatic feature selection + interpretability。
+- 只有少数 feature 的系数非零，其余被压零。
+
+**Application 3: Neural Networks and Inverse Problems**
+
+- Neural network 的 **weight decay** 就是 $L_2$ penalization，防止 overfitting。
+- Inverse problem（逆问题）依赖 penalty 保证 stable solution（矩阵可能 singular，需 regularization）。
+- Penalization 可将 prior knowledge 融入学习。
+
+#### 2.4 Key Takeaways
+
+- Penalized learning 扩展了 standard empirical risk minimization。
+- 控制 complexity → 改善 generalization。
+- 支持 sparsity、stability、interpretability。
+- 现代统计学习的 foundational concept。
+
+---
+
+### 3. Coefficient Shrinkage：Regularization 与 Least-Norm 两种途径
+
+#### 3.1 两种 problem formulation
+
+Coefficient shrinkage（系数收缩）可通过两种对偶的 formulation 实现：
+
+| 途径 | Formulation | 名称 |
+|---|---|---|
+| **Regularization approach**（primal） | $\min_\mathbf{w}\;\text{SSE}$ subject to $\|\mathbf{w}\|_2^2\le t$ | Penalized learning / regularization |
+| **Least-norm approach**（dual） | $\min_\mathbf{w}\;\|\mathbf{w}\|_2^2$ subject to $\mathbf{y}=P\mathbf{w}$ | Minimum-norm solution |
+
+- 两者本质上是对偶的：一个以 error 为主目标、norm 为约束，另一个以 norm 为主目标、error 为约束。
+- ⭐ **Primal** 对应 **over-determined system**（$m>D+1$），**Dual** 对应 **under-determined system**（$m<D+1$）——与 Lecture 3/5 的 primal/dual regression 一致。
+
+#### 3.2 Regularization Approach（Primal）
+
+**Ridge regression**（$L_2$ penalty）：
+
+$$
+J_{\text{SSE}_r}(\mathbf{w})=\frac{1}{2}\sum_{i=1}^m\bigl(y_i-\mathbf{p}_i^T\mathbf{w}\bigr)^2+\frac{\lambda}{2}\|\mathbf{w}\|_2^2 \tag{6.1}
+$$
+
+- 等价于：minimize SSE subject to $\|\mathbf{w}\|_2^2\le t$, $t\in\mathbb{R}^+$。
+- $\lambda$ 是 regularization factor，控制 error term 与 weight term 的权重。
+
+**LASSO**（$L_1$ penalty）：
+
+$$
+J_{\text{lasso}}(\mathbf{w})=\sum_{i=1}^m\bigl(y_i-\mathbf{p}_i^T\mathbf{w}\bigr)^2+\lambda\|\mathbf{w}\|_1 \tag{6.2}
+$$
+
+- $\|\mathbf{w}\|_1=\sum_{j=0}^D|w_j|$。
+- 等价于：minimize SSE subject to $\|\mathbf{w}\|_1\le c$, $c\in\mathbb{R}^+$。
+- ⭐ $L_1$ penalty 有 sharp corners（菱形 constraint），解倾向于落在角上 → 部分系数恰为零 → feature selection。
+
+**Bridge regression**（$L_p$ penalty，generalization）：
+
+$$
+\text{SSE}_{\text{bridge}}(\mathbf{w})=\sum_{i=1}^m\bigl(y_i-\mathbf{p}_i^T\mathbf{w}\bigr)^2+\lambda\|\mathbf{w}\|_p^p \tag{6.4}
+$$
+
+$$
+\|\mathbf{w}\|_p=\left(\sum_{j=0}^D|w_j|^p\right)^{1/p} \tag{6.3}
+$$
+
+- $0\le p<2$ 是关注范围：
+  - $0\le p\le 1$：parametric subset selection，部分系数压到零。
+  - $1<p<2$：parametric compression（缩小但不一定到零）。
+- $p=2$ → Ridge；$p=1$ → LASSO；$p\to 0$ → pure subset selection（只选不压缩）。
+
+#### 3.3 Least-Norm Approach（Dual）
+
+将参数 norm 作为主目标：
+
+$$
+\min_\mathbf{w}\;\|\mathbf{w}\|_2^2 \quad\text{subject to}\quad \mathbf{y}-P\mathbf{w}=0 \tag{6.5}
+$$
+
+解析解（right pseudoinverse）：
+
+$$
+\hat{\mathbf{w}}=P^T(PP^T)^{-1}\mathbf{y} \tag{6.6}
+$$
+
+- 当 $PP^T$ non-singular 时成立。
+- ⭐ 这里 $P^T(PP^T)^{-1}$ 是 **right pseudoinverse**，取代了 LSE 的 left pseudoinverse $(P^TP)^{-1}P^T$。
+- 适用于 **under-determined system**（$m<D+1$）。
+
+推广到 $L_p$ norm：
+
+$$
+\min_\mathbf{w}\;\|\mathbf{w}\|_p^p \quad\text{subject to}\quad \mathbf{y}-P\mathbf{w}=0 \tag{6.7}
+$$
+
+Lagrangian form：
+
+$$
+\min_\mathbf{w}\;\|\mathbf{w}\|_p^p+\boldsymbol{\alpha}^T(\mathbf{y}-P\mathbf{w}) \tag{6.8}
+$$
+
+- $\boldsymbol{\alpha}$ 是 Lagrange multipliers，每个对应一个 data sample。
+- ⭐ 这里的 $\boldsymbol{\alpha}$ 与 Lecture 5 under-determined system 中的 dual variable 结构一致。
+
+---
+
+### 4. Ridge Regression：Primal 与 Dual 推导
+
+#### 4.1 回顾（Lecture 5 结果）
+
+$$
+\text{Primal ridge:}\quad\hat{\mathbf{w}}=(P^TP+\lambda I)^{-1}P^T\mathbf{y},\;\lambda>0 \tag{6.9}
+$$
+
+$$
+\text{Dual ridge:}\quad\hat{\mathbf{w}}=P^T(PP^T+\lambda I)^{-1}\mathbf{y},\;\lambda>0 \tag{6.10}
+$$
+
+#### 4.2 ⭐ Dual Ridge 的 Lagrangian 推导（从 constrained optimization 出发）
+
+**出发点**（least-norm formulation）：
+
+$$
+\min_\mathbf{w}\;\|\mathbf{w}\|_2^2 \quad\text{subject to}\quad \mathbf{y}=P\mathbf{w} \tag{6.12}
+$$
+
+**Step 1**：Lagrangian form（引入 Lagrange multipliers $\boldsymbol{\alpha}$）：
+
+$$
+\min_\mathbf{w}\;\frac{1}{2}\|\mathbf{w}\|_2^2+\boldsymbol{\alpha}^T(\mathbf{y}-P\mathbf{w}) \tag{6.13}
+$$
+
+**Step 2**：对 $\mathbf{w}$ 求导令零：
+
+$$
+\mathbf{w}=P^T\boldsymbol{\alpha} \tag{6.14}
+$$
+
+**Step 3**：代入 (6.13) 消去 $\mathbf{w}$，加入 $\boldsymbol{\alpha}$ 的 norm term（sign 可任意，因 $y-Pw=0$ 或 $Pw-y=0$ 均可）：
+
+$$
+\min_\boldsymbol{\alpha}\;\frac{1}{2}\boldsymbol{\alpha}^T PP^T\boldsymbol{\alpha}+\boldsymbol{\alpha}^T(\mathbf{y}-PP^T\boldsymbol{\alpha})-\frac{\lambda}{2}\boldsymbol{\alpha}^T\boldsymbol{\alpha} \tag{6.16}
+$$
+
+**Step 4**：对 $\boldsymbol{\alpha}$ 求导令零：
+
+$$
+PP^T\boldsymbol{\alpha}+\mathbf{y}-2PP^T\boldsymbol{\alpha}-\lambda\boldsymbol{\alpha}=0$$
+$$\mathbf{y}=(PP^T+\lambda I)\boldsymbol{\alpha}$$
+$$\hat{\boldsymbol{\alpha}}=(PP^T+\lambda I)^{-1}\mathbf{y},\;\lambda>0 \tag{6.17}
+$$
+
+**Step 5**：代回 (6.14)：
+
+$$
+\hat{\mathbf{w}}=P^T(PP^T+\lambda I)^{-1}\mathbf{y}
+$$
+
+即 dual ridge regression (6.10)。
+
+#### 4.3 ⭐ 放松精确拟合假设（Error Term Formulation）
+
+**问题**：(6.12) 要求 $\mathbf{y}=P\mathbf{w}$ 精确成立，实际中模型不可能完美拟合。放松为：
+
+$$
+\min_\mathbf{w}\;\|\mathbf{w}\|_2^2+\gamma\|\boldsymbol{\epsilon}\|_2^2 \quad\text{subject to}\quad \mathbf{y}=P\mathbf{w}+\boldsymbol{\epsilon},\;\gamma>0 \tag{6.18}
+$$
+
+- 引入 error term $\boldsymbol{\epsilon}$ 吸收 model inaccuracy。
+
+**Lagrangian**：
+
+$$
+J(\mathbf{w},\boldsymbol{\alpha},\boldsymbol{\epsilon})=\mathbf{w}^T\mathbf{w}+\gamma\boldsymbol{\epsilon}^T\boldsymbol{\epsilon}+\boldsymbol{\alpha}^T(\mathbf{y}-P\mathbf{w}-\boldsymbol{\epsilon}) \tag{6.19}
+$$
+
+**推导步骤**（三步消元）：
+
+1. 对 $\mathbf{w}$ 求导 → $\mathbf{w}=\frac{1}{2}P^T\boldsymbol{\alpha}$ (6.20)
+2. 代入消 $\mathbf{w}$ → 对 $\boldsymbol{\epsilon}$ 求导 → $\boldsymbol{\epsilon}=\frac{1}{2\gamma}\boldsymbol{\alpha}$ (6.22)
+3. 代入消 $\boldsymbol{\epsilon}$ → 对 $\boldsymbol{\alpha}$ 求导：
+
+$$
+\hat{\boldsymbol{\alpha}}=\frac{1}{2}(PP^T+\lambda I)^{-1}\mathbf{y},\quad\lambda=\frac{1}{\gamma},\;\gamma>0 \tag{6.24}
+$$
+
+代回 (6.20)：
+
+$$
+\hat{\mathbf{w}}=P^T(PP^T+\lambda I)^{-1}\mathbf{y},\quad\lambda=\frac{1}{\gamma},\;\gamma>0 \tag{6.25}
+$$
+
+⭐ **结论**：即使放松精确拟合假设（加入 error term），最终仍得到相同的 dual ridge regression 解，只是 $\lambda=1/\gamma$。说明 ridge regression 解对 model imperfection 具有鲁棒性——"no matter how you start off, it goes back to the same solution"。
+
+- **实践意义**：(6.18) 的 formulation 更合理（不假设模型完美），但推导结果与 (6.12) 一致 → ridge regression 是 robust 的。
+
+---
+
+### 5. Bridge Regression：$L_p$ Norm 的解析方法
+
+#### 5.1 ⭐ Smooth 近似：k-measure Operator
+
+**问题**：$L_p$ norm 的绝对值 $|w_j|$ 在 $w_j=0$ 处不可微，无法直接求导。
+
+**解决**：用 smooth approximation 替换绝对值：
+
+$$
+f(w_i)=\sqrt{w_i^2+\epsilon},\quad\epsilon>0\;\text{small}
+$$
+
+$$
+|o\;\mathbf{w}\;o|_k:=\left(\sum_{j=0}^{D-1}f(w_j)^k\right)^{1/k} \tag{6.27}
+$$
+
+- $\lim_{\epsilon\to 0}f(w_i)=|w_i|$，即近似随 $\epsilon\to 0$ 趋于精确。
+- ⭐ $|o\cdot o|_k$ 不构成 normed vector space（违反 absolute homogeneity axiom），故称为 **k-measure operator** 而非 norm。
+- **Contour plots 对比**（Fig. 8）：
+  - $p$-norm contour（top row）：$p=2$ → 圆，$p=1$ → 菱形，$p<1$ → 内凹星形。
+  - $k$-measure contour（bottom row）：smooth 近似，形状相似但角圆滑。
+
+| $p$ / $k$ 值 | Contour 形状 | 特性 |
+|---|---|---|
+| $p=2$ | 圆（smooth） | Ridge，无 sparsity，均匀缩小 |
+| $p=1$ | 菱形（sharp corners） | LASSO，解在角上 → sparsity |
+| $p<1$ | 星形（更尖锐） | 更强 sparsity，纯 subset selection |
+| $1<p<2$ | 圆与菱形之间 | compression，部分系数缩小但不为零 |
+
+⭐ **Sparsity 规律**（转写重点强调）：
+- $p\le 1$：解倾向于落在 corner/axis 上 → feature selection（部分系数恰为零）。
+- $p>1$：contour smooth 无角 → 系数被不等程度缩小但不到零 → compression only。
+- $p=2$：完全对称，所有维度等概率缩小，无 sparsity。
+
+#### 5.2 Proximal Bridge Regression — Primal Form（Over-determined）
+
+对 $m>D+1$（over-determined system）：
+
+$$
+J(\mathbf{w})=(\mathbf{y}-P\mathbf{w})^T(\mathbf{y}-P\mathbf{w})+\lambda|o\;\mathbf{w}\;o|_k^k \tag{6.28}
+$$
+
+**解**：
+
+$$
+\hat{\mathbf{w}}=\left[\frac{\lambda k}{2}\text{diag}\{|\mathbf{w}|\circ(k-2)\}+P^TP\right]^{-1}P^T\mathbf{y} \tag{6.29}
+$$
+
+- $\circ$ 表示 element-wise operator（如 $A\circ k$ 表示对 $A$ 的每个元素取 $k$ 次幂）。
+- $\text{diag}(\mathbf{a})$ 表示以 $\mathbf{a}$ 为对角线的对角矩阵。
+- ⭐ **注意**：此解中 $\mathbf{w}$ 出现在等式两边（$|\mathbf{w}|\circ(k-2)$），需 **迭代求解**：先用初始 $\mathbf{w}$ 代入，计算新的 $\hat{\mathbf{w}}$，再循环。通常 **4–5 次迭代** 即可收敛。
+- 当 $\frac{\lambda k}{2}\text{diag}\{|\mathbf{w}|\circ(k-2)\}+P^TP$ non-singular 时成立。
+- **Reference**：K.-A. Toh, G. Molteni, Z. Lin, "Deterministic bridge regression for compressive classification", *Information Sciences*, vol. 648, pp. 1–22, Nov 2023.
+
+#### 5.3 Proximal Bridge Regression — Dual Form（Under-determined）
+
+对 $m<D+1$（under-determined system）：
+
+$$
+\min_\mathbf{w}\;|o\;\mathbf{w}\;o|_k^k \quad\text{subject to}\quad \mathbf{y}=P\mathbf{w} \tag{6.30}
+$$
+
+Lagrangian form：
+
+$$
+\min_\mathbf{w}\;|o\;\mathbf{w}\;o|_k^k+\boldsymbol{\beta}^T(\mathbf{y}-P\mathbf{w}) \tag{6.31}
+$$
+
+**解**：
+
+$$
+\hat{\mathbf{w}}=\text{sgn}(\boldsymbol{\theta})\circ\left[P^T(PP^T)^{-1}P\boldsymbol{\theta}\circ(k-1)\right]^{1/(k-1)} \tag{6.32}
+$$
+
+其中：
+
+$$
+\hat{\boldsymbol{\theta}}=\left[|P^T|\circ(k-1)\;P|P^T|\circ(k-1)\right]^{-1}\mathbf{y} \tag{6.33}
+$$
+
+- ⭐ **Dual form 是真正的 closed-form**：一旦知道 $P$ 即可计算 $\boldsymbol{\theta}$，取 sign，代幂运算，无需迭代（不像 primal form 需要 4–5 次迭代）。
+- $1<k\le 2$ 时有效（under-determined case 中 $k$ 不能等于 1，否则不可逆）。
+- $\text{sgn}(\cdot)$ 为 sign function，$\circ$ 为 element-wise 运算。
+
+#### 5.4 ⭐ Primal vs Dual Bridge 对比
+
+| 特性 | Primal p-bridge | Dual p-bridge |
+|---|---|---|
+| **系统类型** | Over-determined（$m>D+1$） | Under-determined（$m<D+1$） |
+| **$k$ 取值** | $k$ 可取 1（$=1$ 时类似 LASSO） | $k$ 必须 $>1$（$k=1$ 不可逆） |
+| **求解方式** | **迭代**（4–5 次收敛） | **Closed-form**（单步计算） |
+| **矩阵求逆** | $(D+1)\times(D+1)$ | $m\times m$ |
+| **适用场景** | 样本多于参数 | 参数多于样本（高维稀疏） |
+
+#### 5.5 Multiple Outputs 扩展
+
+当有 $C$ 个独立输出 $\{\mathbf{y}_1,\dots,\mathbf{y}_C\}$，且各输出独立时，可将各输出的解 stacked：
+
+- **Primal**（over-determined）：
+
+$$
+\hat{\mathbf{w}}_l=\left[\frac{\lambda k}{2}\text{diag}\{|\mathbf{w}_l|\circ(k-2)\}+P^TP\right]^{-1}P^T\mathbf{y}_l,\quad l=1,\dots,C \tag{6.34}
+$$
+
+- **Dual**（under-determined）：
+
+$$
+\hat{\mathbf{w}}_l=\text{sgn}(\hat{\boldsymbol{\theta}}_l)\circ\left[P^T(PP^T)^{-1}P\hat{\boldsymbol{\theta}}_l\circ(k-1)\right]^{1/(k-1)},\quad l=1,\dots,C \tag{6.35}
+$$
+
+- $\hat{W}=[\hat{\mathbf{w}}_1,\dots,\hat{\mathbf{w}}_C]$，预测 $\hat{G}=P\hat{W}$。
+- 假设各输出独立 → 同一 regressor matrix $P$ 可复用，与 least squares 的 multi-output stacking 方法一致。
+
+---
+
+### 6. Coefficient Profiles：实验示例
+
+#### 6.1 ⭐ Example 6.1：Polynomial Fitting with p-bridge（Over-determined）
+
+- **数据**：16 个 training samples，单输入 $x$，target $y=10x^2-x^3$。
+- **模型**：10th-order polynomial（含 intercept，共 11 个参数）。
+- **设置**：$\lambda=1$, $k=1.1$（接近 LASSO）。
+- **结果**：$\hat{\mathbf{w}}\approx[0.017, 0, 9.944, -0.978, 0.009, -0.001, -0.0004, 0.0001, 0, 0, 0]^T$
+  - ⭐ 仅 $x^2$（$\approx 9.94$）和 $x^3$（$\approx -0.98$）的系数显著非零，其余被压到接近零。
+  - 完美恢复真实模型 $y=10x^2-x^3$ → **bridge regression 的 compressive classification 能力**。
+- **Python 代码要点**：
+  ```python
+  P = np.hstack([x ** i for i in range(11)])  # polynomial features
+  w = pbridge(P, y, k, lambda_, Primal)       # Primal=1 for over-determined
+  y_est = PP @ w  # prediction
+  ```
+
+#### 6.2 ⭐ Example 6.2：Prostate Cancer Data（Over-determined）
+
+- **数据集**：67 training samples，30 test samples，8 input variables + intercept = 9 coefficients。
+- **系统类型**：over-determined（$m=67 > D+1=9$）。
+- **Coefficient profiles**：随 $\lambda$ 变化的系数轨迹，以 effective degrees of freedom $df(\lambda)=\text{tr}[P(P^TP+\lambda I)^{-1}P^T]$ 为横轴。
+  - **Ridge**（Fig. 10）：所有系数渐变缩小，无一提前到零。
+  - **p-bridge at $k=1$**（Fig. 11a）：类似 LASSO，系数逐个到零（gleason、lcp 先被淘汰）。
+  - **LASSO**（Fig. 11b）：与 p-bridge $k=1$ 形状相似（log scale plotting）。
+
+**Prediction 结果对比**（Table 1）：
+
+| Method | Tuned Parameter(s) | Test MSE | Variables Selected |
+|---|---|---|---|
+| OLS | – | 0.520 (0.174) | All |
+| Ridge regression | $\lambda=1$ | 0.516 (0.175) | All |
+| LASSO (Alpha=1) | $\lambda=0.02$ | **0.483 (0.160)** | (1,2,3,4,5,6,8) |
+| Elastic-net | $\lambda=0.06$, $\alpha=0.11$ | 0.492 (0.164) | (1,2,3,4,5,6,8) |
+| p-bridge ($k=1$) | $\lambda=2$ | 0.494 (0.167) | (1,2,3,4,5,6,8) |
+
+- ⭐ **关键观察**：
+  - LASSO 最低 MSE（0.483），p-bridge 次之（0.494），均优于 OLS（0.520）和 Ridge（0.516）。
+  - LASSO、elastic-net、p-bridge 都选了相同的 7 个变量（排除 variable 7 = gleason）。
+  - Ridge 和 OLS 保留所有变量（Ridge 无 sparsity）。
+  - **最重要变量**：lcavol（最后才被压零）；**最不重要**：gleason、lcp（最早到零）。
+
+#### 6.3 ⭐ Example 6.3：XOR Problem（Under-determined）
+
+- **数据**：XOR 的 4 个 training points $(x_1,x_2)\in\{(0,1),(2,1),(1,0),(1,2)\}$，$y\in\{0,0,1,1\}$。
+- **模型**：3rd-order polynomial，10 个参数（$\alpha_0,\dots,\alpha_9$）→ under-determined（$m=4<D+1=10$）。
+- **Test data**：200 samples，4 个 Gaussian 中心（各 50 samples，identity covariance × 0.3）。
+
+**Coefficient profiles**：
+
+| Method | 特点 |
+|---|---|
+| **Kernel ridge** ($k=2$, Fig. 12) | 所有系数渐变缩小，无 sparsity |
+| **Dual p-bridge** ($k=1.05$, Fig. 13a) | ⭐ 仅 $x_1^3$（$\alpha_6$）和 $x_2^3$（$\alpha_7$）存活，其余快速到零 |
+| **LASSO** (Fig. 13b) | $x_1, x_2$ 也存活较久，但最终 $x_1^3, x_2^3$ 最重要 |
+
+**Prediction 结果**（Table 3）：
+
+| Method | Tuned Parameter(s) | Test MSE | Variables Selected |
+|---|---|---|---|
+| OLS | – | 0.513 (0.089) | All |
+| Ridge | $\lambda=6$ | 0.503 (0.047) | (0,1,2,3,4,6,7,8,9) |
+| LASSO ($\alpha=1,\lambda=0.1$) | – | **0.225 (0.011)** | (0,6,7) |
+| Elastic-net | $\lambda=0,\alpha=0.01$ | 0.799 (0.189) | All |
+| p-bridge ($k=1.05$) | $\lambda=30$ | 0.504 (0.040) | (6,7) |
+| p-bridge | $\lambda=0,k=2$ | 0.513 (0.089) | All |
+
+- ⭐ **Dual p-bridge** 选取最少变量（仅 $\alpha_6=x_1^3$, $\alpha_7=x_2^3$），对应 XOR 的三阶项——最 sparse 解。
+- LASSO 的 MSE 最低（0.225），但保留了 intercept（$\alpha_0$）；p-bridge 更 sparse（仅 2 项）但 MSE 稍高。
+- **Decision contours**（Fig. 14）：dual p-bridge 和 LASSO 的决策边界高度相似，都主要依赖 $x_1^3, x_2^3$。
+
+#### 6.4 ⭐ p-bridge vs LASSO 总结
+
+| 对比维度 | p-bridge | LASSO |
+|---|---|---|
+| **求解方式** | Primal: 迭代 4–5 次；Dual: closed-form | 数值优化（coordinate descent 等） |
+| **Under-determined $k$ 限制** | $k>1$（$k=1$ 不可逆） | 无限制 |
+| **Sparsity** | $k$ 接近 1 时高度 sparse | $L_1$ 天然 sparse |
+| **计算效率** | 高维时矩阵求逆开销大 | 通常更高效（MATLAB glmnet） |
+| **MSE** | 略高于 LASSO | 通常最低 |
+
+---
+
+### 7. ⭐ 考点速查表
+
+| 考点 | 要点 |
+|---|---|
+| **Penalized learning 一般形式** | $\min_\theta L(\theta)+\lambda P(\theta)$，balance data fit 与 model complexity |
+| **Overfitting 动机** | training error 可到零（under-determined），test error 先降后升 |
+| **$L_1$ vs $L_2$ geometry** | $L_1$ 菱形有角 → sparsity；$L_2$ 圆球 → uniform shrinkage |
+| **Ridge primal 解** | $(P^TP+\lambda I)^{-1}P^T\mathbf{y}$ |
+| **Ridge dual 解** | $P^T(PP^T+\lambda I)^{-1}\mathbf{y}$ |
+| **Dual ridge 推导** | Lagrangian → $\mathbf{w}=P^T\boldsymbol{\alpha}$ → 对 $\boldsymbol{\alpha}$ 求导 → $(PP^T+\lambda I)\hat{\boldsymbol{\alpha}}=\mathbf{y}$ |
+| **Error term relaxation** | $\mathbf{y}=P\mathbf{w}+\boldsymbol{\epsilon}$ → 同样的 dual ridge 解，$\lambda=1/\gamma$ |
+| **Least-norm solution** | $P^T(PP^T)^{-1}\mathbf{y}$，right pseudoinverse，under-determined |
+| **Bridge regression** | $L_p$ norm，$0<p<2$；$p\le1$ → subset selection；$1<p<2$ → compression |
+| **k-measure operator** | $|o\mathbf{w}o|_k$，$f(w_i)=\sqrt{w_i^2+\epsilon}$ smooth 近似，非真 norm |
+| **Primal p-bridge 解** | 迭代求解，$[\frac{\lambda k}{2}\text{diag}\{|\mathbf{w}|\circ(k-2)\}+P^TP]^{-1}P^T\mathbf{y}$ |
+| **Dual p-bridge 解** | closed-form，$\text{sgn}(\boldsymbol{\theta})\circ[\cdots]^{1/(k-1)}$，$k>1$ |
+| **$k$ 取值限制** | Primal: $k$ 可取 1；Dual: $k$ 必须 $>1$ |
+| **Sparsity 规律** | $p\le1$ → sparse（corner solution）；$p>1$ → compression only；$p=2$ → no sparsity |
+| **Example 6.1** | 10th-order poly + p-bridge $k=1.1$ → 仅 $x^2,x^3$ 存活，恢复 $y=10x^2-x^3$ |
+| **Prostate example** | Over-determined；LASSO MSE 最低；p-bridge 与 LASSO 选相同变量 |
+| **XOR example** | Under-determined；dual p-bridge 仅选 $x_1^3,x_2^3$（最 sparse） |
+| **Effective $df$** | $df(\lambda)=\text{tr}[P(P^TP+\lambda I)^{-1}P^T]$，$\lambda$ 越大 $df$ 越小 |
+| **Primal/Dual 选择** | Over-determined → Primal（$P^TP$，$D+1$ 维求逆）；Under-determined → Dual（$PP^T$，$m$ 维求逆） |
+
+---
+
+### 8. 本周要点小结
+
+- **Lecture 6 收尾**：TAUC generalized framework 通过 data transformation（scaling $\beta,\gamma$ + translation $u,v$）统一了 AUC/TER/FLD/Regression——"changing algorithm = changing data"。FLD = centered TER，TER = weighted LS，Regression = single-Gaussian MLE，TER = dual-Gaussian MAP。不需记复杂公式，重点是 data manipulation 的概念和各方法间的退化关系。
+
+- **Lecture 7 核心概念**：
+  - **Penalized learning** = data fit + penalty term，平衡 model complexity 与 generalization。
+  - **两种 formulation**：Regularization approach（primal，min SSE s.t. $\|\mathbf{w}\|\le t$）与 Least-norm approach（dual，min $\|\mathbf{w}\|$ s.t. $\mathbf{y}=P\mathbf{w}$），两者对偶。
+  - **Ridge regression**（$L_2$）：primal $(P^TP+\lambda I)^{-1}P^T\mathbf{y}$，dual $P^T(PP^T+\lambda I)^{-1}\mathbf{y}$。Dual 推导通过 Lagrangian + 消元。放松精确拟合假设后解不变（$\lambda=1/\gamma$）。
+  - **Bridge regression**（$L_p$）：用 k-measure operator 做 smooth 近似。Primal 需迭代 4–5 次；Dual 为 closed-form。$k\le1$ → sparsity（feature selection），$1<k<2$ → compression，$k=2$ → Ridge（无 sparsity）。
+  - **$L_1$ vs $L_2$**：$L_1$（LASSO）菱形有角 → sparse solution；$L_2$（Ridge）圆球 → uniform shrinkage，无 sparsity。
+  - **实验验证**：Example 6.1（polynomial）恢复真实模型；Prostate（over-determined）中 LASSO/p-bridge 选相同变量且 MSE 优于 OLS/Ridge；XOR（under-determined）中 dual p-bridge 最 sparse（仅 $x_1^3,x_2^3$）。
+
+- **考试重点**（CA2）：concept 为主（$L_1$ vs $L_2$ 特性、sparsity 规律、primal/dual 选择、over/under-determined 判断）+ basic calculation（ridge regression 解、dimension 判断、coefficient profile 解读）。不需推导 bridge regression 公式，但需知道 form 和功能。
+
+---
+
+### 下一周预告
+
+> **Week 8 = Lecture 8 + CA2 Quiz**。CA2 在 Week 8 课上举行（recess week 后），范围 Lecture 5–7，online lockdown browser，closed-book，占比 15%。Lecture 8 内容 TKA 未明确说明，但从 Lecture 7 PDF 末尾的 summary 和课程大纲来看，Lecture 8 可能是 **Part 1 的收尾**（model selection / cross-validation / 正则化参数选择 $\lambda$ 的方法），或进入 penalized classification（penalized SVM / hinge loss + regularization 的解析方法）。转写中 TKA 提到 "O Part one is coming towards the final two lectures, including today"，Week 9 起由 **Simon Liu** 接手 Ensemble Learning。具体以 Lecture 8 课件为准。

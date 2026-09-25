@@ -606,3 +606,110 @@ model.train() → optimizer.zero_grad() → output=model(x) → loss=criterion(o
 > **笔记约定补充**：本周新增保留英文术语（sequential data, RNN, hidden state, vanilla RNN, parameter sharing, sequence-to-one/one-to-sequence/sequence-to-sequence, sigmoid, tanh, vanishing gradient, exploding gradient, LSTM, cell state, forget gate, input gate, output gate, GRU, reset gate, update gate, Bi-RNN, bidirectional, hyperparameter, K-fold cross-validation, GridSearchCV, cross_val_score, optimizer, Gradient Descent, SGD, Adam, RMSprop, momentum, bias correction, Binary Cross Entropy, Categorical Cross Entropy, softmax, batch size, learning rate, epoch, early stopping, gradient clipping, clipping by value / by norm, nn.Embedding, nn.RNN, nn.LSTM, nn.GRU, optimizer.zero_grad, optimizer.step, model.train/eval 等）。
 >
 > **说明**：本周无录播转写，基于课件/notebook/MCQ/tasks 整理。Neural Language Models 课件署名 Dr. Simon Liu，HPT 课件署名 Dr. S. Supraja。完整知识点见 `week5/Week5_Notes.md`。
+
+---
+
+## Week 7 — Coding Quiz #3 + ML CA Team Project + NLP Applications 预习
+
+> **本周材料**（`week7/`）：`Week 7 tasks.pdf`（ML CA team project 说明）、`EE6405_W10_ A survey of NLP applications across diverse industries_For Students.pdf`（Dr. Simon Liu，NLP 行业应用 survey）、`EE6405_W11_ Deep-dive into NLP_For Students.pdf`（Dr. Simon Liu，NLP 应用深度案例）、`Week 10.ipynb` / `Week 11(1).ipynb`（对应 notebook）、`Week10MCQ.md`（练习题）。本周无录播转写，基于课件与 tasks 整理。
+
+### 1. ⭐ Coding Quiz #3（本周唯一线下考核）
+
+- **形式**：15 分钟，5 题单选，**负分制**（瞎猜倒扣）。
+- **范围**：**只考 Week 6 Transformer 代码**（seq2seq / Attention / BahdanauAttention / MultiHeadAttention / PositionalEncoding / Encoder-Decoder / Transformer）。
+- **缩放公式**：`(((score*2)+20)/120)*100`。
+- **复习材料**：已备 `quiz1/Week6_Quiz_Prep.md`（5 道预测题 + 复习清单 + 应试策略）。必跑 `week6/Week 7.ipynb` 全部 cell，重点背：
+  - `MultiHeadAttention`：4 个投影 `W_q/W_k/W_v/W_o: Linear(d_model, d_model)`，scaled dot-product `softmax(QK^T/sqrt(d_k))V`。
+  - `BahdanauAttention`：`Wa/Ua: Linear(hidden,hidden)`，`Va: Linear(hidden,1)`。
+  - `PositionalEncoding`：`pe[:,0::2]=sin`，`pe[:,1::2]=cos`，`forward: x + self.pe[:, :x.size(1)]`。
+  - `AttnDecoderRNN`：`GRU(2*hidden_size, hidden_size, batch_first=True)`，`torch.cat((embedded,context))`。
+  - `DecoderRNN`：返回 `None`（for consistency in the training loop）。
+
+### 2. ⭐ ML CA Team Project（`Week 7 tasks.pdf`）
+
+本周发布 **ML CA team project** 任务说明（占 ML CA 30% 的一部分，与 Quiz 2 共 30%）：
+
+- **核心要求**：用 **ChatGPT**（或类似 LLM）构建一个 innovative NLP project。
+- **Topic 要求**：除 ChatGPT 外，项目须包含 6 个 NLP topic 中的**至少 2 个**：
+  - Language Translation
+  - Automated Text Summarization
+  - Text Completion
+  - Question Answering
+  - Content Generation
+  - Sentiment Analysis
+- **工具建议**：强烈建议结合课程中学过的其他 tools/packages（sklearn、torch、transformers 等）。
+- **展示要求**：准备 3–5 分钟 short presentation，分享：
+  1. 项目目标（the goal）
+  2. ChatGPT 如何帮助达成目标
+  3. 代码快速 review + highlight 任何有趣的 key components
+
+### 3. NLP Applications Survey（`EE6405_W10`，Dr. Simon Liu）
+
+课件概览 NLP 在各行业的应用，每行业列出典型用例与所涉 NLP algorithm：
+
+| 行业 | 典型应用 | NLP 算法/技术 |
+|---|---|---|
+| **Healthcare** | 医疗文本处理 | text parsing、extraction |
+| **Finance & Banking** | Financial report automation、fraud detection | ML、language models、text analytics |
+| **Retail & Commerce** | Sentiment analysis for product reviews | sentiment analysis、deep learning |
+| **Legal** | Contract analysis、key term extraction | text mining、predictive analytics |
+| **Automotive** | Speech recognition、language understanding | voice recognition、NLU |
+| **Publishing** | Content curation、automated content generation | NLG、transformer models |
+| **Education** | Content personalization | text comparison、similarity scoring |
+| **Travel & Hospitality** | Booking chatbot、language translation | chatbot、intent recognition、semantic search |
+| **Media & Entertainment** | Content recommendation、social media sentiment | recommendation、sentiment analysis |
+| **Government / Public sector** | 文本挖掘、预测分析 | text mining |
+
+> **要点**：这是一张 survey 表，了解 NLP 应用广度即可，不必逐行业深记。核心 takeaway：NLP 应用横跨 finance、retail、legal、automotive、publishing、travel、media 等行业，所用技术主要是 sentiment analysis、text mining、NLG、chatbot、semantic search、transformer models。
+
+### 4. NLP Applications Deep-dive（`EE6405_W11`，Dr. Simon Liu）
+
+课件深入讲解 4 个真实 NLP 项目（2 个 NLP-based + 2 个 ChatGPT-based）：
+
+#### 4.1 Fraud Detection Model（电商欺诈检测）
+
+- **场景**：e-commerce platform 上的 fraudulent seller，两种 fraud：
+  - **Fulfilment Fraud**（履约欺诈）：数据源 = buyer 的 product review。
+  - **Off-platform Fraud**（平台外欺诈）：数据源 = seller 发给 buyer 的 messages。
+- **Fulfilment Fraud Model pipeline**：
+  1. 收集 product review（文本）。
+  2. **Sentence Model**：对每条 review 的每句生成 **sentence embedding**（用 Transformer，如某 popular model）。
+  3. **Aggregated at seller level**：把同一 seller 的所有 sentence embedding 聚合。
+  4. **XGBoost Model**：用聚合后的 embedding 训练 **XGBoost** 分类器，判定该 seller 是否欺诈。
+  5. 疑似 fraud seller 送人工审核（human investigator），确认后施加不同等级 punishment。
+- **技术栈**：Transformer（sentence embedding）+ XGBoost（分类）。
+
+#### 4.2 Human Trafficking Model（人口贩卖检测）
+
+- **场景**：human trafficking 是年值约 $150M USD 的暗色产业；利用 bank 数据 + AI/ML 检测 sex trafficking 活动。
+- **Pipeline**：transactions（交易数据）→ NLP/ML Model → Segmentation（分段）→ Score（评分）。
+- 专注于 sex trafficking 的交易模式检测。
+
+#### 4.3 Content Moderation（ChatGPT-based，prompt engineering）
+
+- 用 ChatGPT + prompt engineering 做 content moderation（内容审核）。
+
+#### 4.4 Product Recommendation Chatbot（ChatGPT-based）
+
+- 用 ChatGPT + prompt engineering 构建商品推荐 chatbot。
+
+### 5. Week 10 Notebook + MCQ（`Week 10.ipynb` / `Week10MCQ.md`）
+
+`Week10MCQ.md` 两道练习题，围绕用 HuggingFace `transformers` 调用 chat model（Qwen）：
+
+- **Q1**：`model.generate(**model_inputs, max_new_tokens=0)` —— `max_new_tokens=0` 表示不生成新 token，只返回 prompt 本身（或空），考察对 generation 参数的理解。
+- **Q2**：`messages[1]["content"] = ""`（user content 为空字符串）—— 空输入能否运行 / 报什么错（AttributeError / ValueError / IndexError）。
+
+> ⚠️ 这些 MCQ 对应 Week 10 的 notebook 内容（调用 chat model），与 ML CA team project 的 ChatGPT 使用直接相关。
+
+### 6. 本周要点小结
+
+- **Coding Quiz #3**：只考 Week 6 Transformer 代码，15min 5 题单选负分制，已备 `Week6_Quiz_Prep.md`。
+- **ML CA Team Project**：用 ChatGPT 做 NLP project，须含 6 topic 中 ≥2 个（translation/summarization/completion/QA/generation/sentiment），3–5min presentation。
+- **NLP Applications**（W10 survey）：NLP 横跨 healthcare/finance/retail/legal/automotive/publishing/travel/media/government，核心技术 sentiment analysis、text mining、NLG、chatbot、semantic search、transformer。
+- **NLP Deep-dive**（W11）：Fraud Detection（Transformer embedding + XGBoost）、Human Trafficking（交易数据 + ML）、Content Moderation（ChatGPT prompt engineering）、Product Recommendation Chatbot（ChatGPT）。
+- **Week 10 notebook**：HuggingFace `transformers` 调用 chat model（`apply_chat_template`、`model.generate`、`tokenizer.batch_decode`）。
+
+---
+
+> **下一周（Week 8）预告**：进入课程后半段——**New NLP Trends / Business perspective**（Dr. Simon Liu 主讲），围绕 NLP 在真实项目中的应用与 ChatGPT-based 应用开发。ML CA team project 持续进行（Assignment 在 Week 7&8 发布、Week 10 提交）。具体以 Week 8 课件为准。
