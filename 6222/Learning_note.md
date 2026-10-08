@@ -1958,7 +1958,7 @@ $$
 
 - 用 PCA 和 LDA 降维到不同维度，画出 **classification accuracy vs. dimension** 曲线。
 - 观察并解释曲线形状：一般 dimension 减少时 accuracy 下降；但若降维方法好（去除了 misleading info），低维可能不降甚至略升。
-- 老师给了 3 篇参考论文（待课件确认具体论文）。
+- 老师给了 3 篇参考论文（已确认，见 §9 官方要求）。
 - ⚠️ 老师批评：很多研究者在低维下比较 PCA vs LDA 得出"LDA 更好"的结论，但若只看低维段，结论可能错误——LDA 只是让 accuracy 下降慢，真正提升来自去除 misleading info 的步骤。
 
 ### 5. 降维后的分类流程总结
@@ -2061,6 +2061,46 @@ $$
 - **PCA vs LDA for classification**：PCA 最大化 total variance，不保证分类好；LDA 最大化 discriminative information。但老师强调：降维提升 accuracy 的真正原因是**去除 misleading information**，而非保留 discriminative info——很多研究者未深究此问题。
 - **Viola-Jones**：face detection 经典。Haar-like feature（矩形 average gray value 差）+ integral image（任意矩形和 3 次运算）+ AdaBoost（从 ~180,000 feature 中选 ~100 个）→ 极快检测。
 - **Assignment**：用 PCA / LDA 降维到不同维度，画 classification accuracy vs dimension 曲线，观察并解释。
+
+### 9. ⭐⭐ Assignment 1 官方要求（权威：`assignment1/Assignment.pdf`）
+
+> 标题：**Assignment 1: Dimensionality Reduction for Classification（15%）**。以下是官方 PDF 的完整要求（2026-09-14 版），与老师课上的口头说明一致。
+
+**任务**：
+
+- 写一个 **mini-computer program**：实现 dimensionality reduction + classification + classification accuracy / error rate 计算。
+- 画出 **classification accuracy（或 error rate） vs. dimensionality** 曲线（降维到不同维数分别做 classification 后绘图）。
+- 编程语言不限（**Python、Matlab 或其他均可**）。
+
+**数据**：
+
+- 任选**公开高维数据集**（images or others，从网上下载），或用程序生成的 **synthetic data**。
+- 可能需要 **pre-processing**：alignment、normalization，使数据适合 classification。
+- ⭐⭐ **必须正确划分 training / testing dataset**；**dimensionality reduction 与 classification 的所有参数只能由 training data 确定**；testing data **只能**用于生成 classification accuracy / error rate（不得参与任何调参）。
+
+**方法**：
+
+- 可用 **PCA、LDA、两者结合、或任何其他方法**，把数据降到多个不同 dimensionality 分别做 classification，画 accuracy vs. dimensionality 曲线。
+- 推荐分类器：**minimum Mahalanobis distance classifier**、linear classifier、**nearest neighbor classifier**。
+
+**报告**：
+
+- **4–5 页**（含 figures、tables、references，但**不含**程序代码）。
+- 须记录：experimental process / settings、results、analysis and comparison of results、conclusions drawn from the experiments。
+- 程序代码作为 **appendix** 放在报告末尾。
+
+**提交**：
+
+- **PDF 提交到 NTULearn**，截止 **Week 10 结束：2026 年 10 月 25 日**。
+- 文件名 = 学生证上的姓名 + matric number，例如 `HOEJIUNTIAN-U2203856C`。
+
+**3 篇参考论文（Reference）**：
+
+1. X. Jiang, "Linear Subspace Learning-Based Dimensionality Reduction," *IEEE Signal Processing Magazine*, vol. 28, no. 2, pp. 16–26, March 2011.
+2. X. Jiang, "Asymmetric Principal Component and Discriminant Analyses for Pattern Classification," *IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)*, vol. 31, no. 5, pp. 931–937, May 2009.
+3. X. Jiang, B. Mandal and A. Kot, "Eigenfeature Regularization and Extraction in Face Recognition," *IEEE TPAMI*, vol. 30, no. 3, pp. 383–394, March 2008.
+
+> ⚠️ AI 使用规则（Week 1 声明）：允许用 generative model 生成报告，但须逐字审阅、理解并**纠正 AI 的错误**；原样照搬会被判 wrong。
 
 ---
 
