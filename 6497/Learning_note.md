@@ -2146,3 +2146,718 @@ Week 8-13: Neural Networks / Deep Learning（Wang Lipo）
 ### 下一周预告
 
 Recess week 后，**Week 8 起由 Wang Lipo 教授讲授 Neural Networks / Deep Learning**（Week 8–13），进入课程后半段。内容将涵盖 MLP / DNN、CNN、RNN / LSTM 等 loss-based models，以及 stochastic gradient descent 等训练方法。probabilistic models 部分（前半学期）到此结束，但 final exam 会覆盖全部内容。
+
+---
+
+## Week 8 — Part 2.1: Introduction to Neural Networks and Deep Learning（神经网络与深度学习导论）
+
+本周是**下半学期第一讲**，任课教师由 **Tay Wee Peng** 换成 **Wang Lipo**。内容对应官方课件 `Part 2.1_Intro_NN_DL(1).pdf`（Wang Lipo，50 页）：从生物神经元到 artificial neuron model、decision boundary 的几何、OR/AND 单神经元设计、single-layer perceptron 的局限（**XOR 线性不可分**）、多层解法，以及 universal approximation（万能逼近）。
+
+> **权威来源说明**：本节先由 `week8/week8.txt` 录播转写整理，再以 `week8/Part 2.1_Intro_NN_DL(1).pdf`（官方课件，Wang Lipo，50 页）核对修正，并参考配套 notebook `week8/mlp_mnist_tf.ipynb`。**注意：本周起老师换人，人名与术语在转写中错拼极多**："depo/Wang Li Po"→**Wang Lipo**、"School of tb / School of Trip E"→School of EEE、"new network / near network / neo network / nan / miron / irons"→neural network / neuron、"perception / precept"→perceptron、"sycmoid / sigmo / sikmoi"→sigmoid、"Rosenblad"→Rosenblatt、"Minsk and Pepper / pets"→Minsky and Papert、"Rumor Hart / Ruma Hart"→Rumelhart、"Hot field / Half field / H field / Hock"→Hopfield、"SL state / Sul State / SR state / S State"→solid state、"boards Mnuchin / boards Mnuche / bold M"→Boltzmann machine、"mycolic pz / mycolic pizza"→McCulloch-Pitts、"Jeffrey Hinto / Hint"→Geoffrey Hinton、"Alex at"→AlexNet、"alpha goal"→AlphaGo、"L D"→Lee Sedol、"CBT / CPT / GBT / CGP / cheat TPT / GPD"→ChatGPT / GPT、"PSOE / P SLE / PSE"→PSLE、"walk club / w clap / walk clock"→**Wooclap**、"cancel flow"→TensorFlow、"Pyka"→PyPI、"syne / synapsis"→synapse、"denis / dentoi / dendros / dentid"→dendrite，"nuclus / anuclus"→nucleus、"typ / typo / tiger"→dipole、"image net"→ImageNet。人名、公式、网络结构一律以 PDF 与 notebook 为准。
+
+### 0. ⭐ 换老师 + 下半学期行政信息（Wang Lipo 亲述）
+
+下半学期的一切安排由新老师重新交代，以下是完整行政信息。
+
+| 项目 | 内容 |
+|---|---|
+| 任课教师 | **Wang Lipo**（School of EEE，information engineering 方向） |
+| Email | `elpwang@ntu.edu.sg`（老师自述**最方便的答疑方式**；"you can draw some graph and take a picture and send to me"） |
+| 办公室 | **S1-B1C-98**；电话 6916 3162 ext.3013（老师打趣：搬到新号码后"no one has called me yet"） |
+| 答疑方式 | 发 email / 预约时间 / **随时 drop by**——"you're welcome to just come in and we can discuss"；但"sometimes I'm not there"，要保证有人在就预约；建议与意见"the earlier the better"（学期末才提只能改进到下个学期） |
+| 讲座时长 | 本时段为 **3 × 50 min**；课上投票决定：**只休息一次**，约 1.5 小时后休息 **10 分钟** |
+| 课程结构（Week 8–13） | 三块：① **NN/DL 导论**（本周）② **训练**——"how do you train a shallow neural network, how you train a deep neural network. So they're very similar" ③ **CNN**（convolutional neural network） |
+| 其他网络结构 | RNN/LSTM 等**课上不覆盖**——"I put them in a supplementary folder. So if you want, you can read about them" |
+| **Python 编程** | **不考**——"We're not going to test you Python programming in the final exam or in the quiz, **not even in the quiz**." 但 **homework 会包含编程** |
+| 用 AI 写作业程序 | **不禁止**——"unless you're going to use AI, you're going to use ChatGPT to do the program, I can't stop you. If you want to do that, that's fine... Well, that's a skill as well." |
+| 出勤（Wooclap） | **本周老师忘记开 Wooclap**——下课才想起："I forgot... Maybe next time. Next time, we'll do Wooclap." 出勤仍按 Wooclap 记录（Class Participation **5%**，共 13 次讲座需参加 **≥9 次**，attempt 即得分），下次补上 |
+
+> ⭐ 关于"为什么讲得慢"：老师明确说这三块会讲得"reasonably slowly"，重点在**原理**而非 API。理由是——如果不关心原理，neural network 就是一个 **black box**（黑箱），输入进、输出出，"you can probably learn it in a few minutes... everything now is packaged in Python, you just use this library"；但只有懂原理，才能像当年那些"smart guys"一样**发明新的网络结构**。他也用亲身经历说明：EE School 六个 division 的老师现在都会答"yes"说自己懂 AI，"because everybody now can do it"——差别就在原理。
+
+### 1. Deep learning 是什么
+
+老师给的最简定义：
+
+> "What basically deep learning is, is a neural network. **It's just a deeper neural network.** If you have a small neural network, you can call it network training, but if it's very deep, then it's called deep learning."
+
+所以 "deep learning" 并不是新物种，只是层数多的 neural network——这也解释了后半学期为什么把 shallow 与 deep 的训练放在一起讲（"they're very similar"）。
+
+### 2. 从 biological neuron（生物神经元）到 artificial neuron model（人工神经元模型）
+
+#### 2.1 Biological neuron 的结构
+
+| 生物结构（英文） | 作用 | 对应人工神经元 |
+|---|---|---|
+| **dendrite**（树突） | "impulses carried toward cell body"，接收其他神经元的输入 | 输入 $x_1, \ldots, x_m$ |
+| **cell body / nucleus**（胞体/细胞核） | 对输入做处理（整合、判断） | summing function + activation function |
+| **axon**（轴突） | "impulses carried away from cell body"，把输出送给别的神经元 | 输出 $y$ |
+| **synapse**（突触） | presynaptic terminal 与其他神经元接触的部位，信息经化学方式传递 | 权重 $w_j$（synaptic weights） |
+
+规模（PDF 首页数据）：**人脑约有 $10^{11}$ 个 neuron 与 $10^{15}$ 个 synaptic connections**。老师课上的一手见闻：做脑实验时要把染料（ink）注入单个 neuron 才能看清它的一棵树状结构，"it's very hard for the ink to travel to a different neuron"，所以对脑的认识极其有限。
+
+#### 2.2 Artificial neuron model（人工神经元模型）
+
+人工神经元只保留"线性组合 + 非线性阈值"两步：
+
+$$
+v = \sum_{j=0}^{m} w_j x_j, \qquad w_0 = b,\ x_0 = +1
+$$
+
+$$
+y = f(v)
+$$
+
+其中：
+
+- $x_1, \ldots, x_m$：**input signal**（输入信号）；
+- $w_1, \ldots, w_m$：**synaptic weights**（突触权重）；
+- $b = w_0$：**bias**（偏置），实现方式是**加一个恒为 $+1$ 的输入 $x_0$**，于是 bias 被吸收进加权和里，形式统一；
+- $v$：**local field**（局部场，即加权和）；
+- $f(\cdot)$：**activation function**（激活函数），非线性；
+- $y$：output。
+
+> ⭐ **bias 与 threshold 的关系**（老师口述）：bias 就是一个常数项，即使没有输入，neuron 仍"有某种 level of excitation"。若把它看成负的（$-b$），那么输入必须**超过这个 threshold** 才能让 $v > 0$、输出为正。所以"bias"和"threshold"讲的是同一件事的两面。
+
+#### 2.3 Activation function（激活函数）
+
+课件给出的第一个例子是 **sigmoid activation function**，一个非线性的 S 形映射：
+
+$$
+\sigma(x) = \frac{1}{1 + e^{-x}}
+$$
+
+其导数为（补充，训练部分要用）：
+
+$$
+\frac{d\sigma(x)}{dx} = \sigma(x)\bigl(1 - \sigma(x)\bigr)
+$$
+
+常见的 activation function 对比：
+
+| 名称 | 表达式 | 值域 | 特点 |
+|---|---|---|---|
+| **step function**（阶跃/阈值函数） | $f(v) = \mathbf{1}[v \ge 0]$ | $\{0, 1\}$ | McCulloch-Pitts 原始模型用的就是这个；不可导，无法梯度训练 |
+| **sigmoid** | $\sigma(v) = \dfrac{1}{1+e^{-v}}$ | $(0, 1)$ | 连续可导，把 $v$ 的符号"软化"成 0/1 之间的概率式输出 |
+| **tanh** | $\tanh(v) = \dfrac{e^{v}-e^{-v}}{e^{v}+e^{-v}}$ | $(-1, 1)$ | 零中心化版本 |
+| **ReLU**（rectified linear unit） | $\text{ReLU}(v) = \max(0, v)$ | $[0, \infty)$ | 分段线性、计算便宜，现代深层网络最常用（见 §11 notebook） |
+
+老师强调：$f$ 可以有很多种，但"the inside of which is a **linear combination** process"，非线性只作用在这一步之后——这正是后面 XOR 与 universal approximation 的关键。
+
+#### 2.4 课件里的 PyTorch 示例（不考编程，但看结构）
+
+课件用一段 PyTorch 片段说明"一个 layer 加上一个 activation 就是几行代码"，并明确标注 **"You will not be tested with Python programming"**：
+
+```python
+import torch
+in_dim, out_dim = 100, 200          # Input and output dimensions
+linear = torch.nn.Linear(in_dim, out_dim)
+relu = torch.nn.ReLU()              # Activation function
+x = torch.randn(50, in_dim)         # Input tensor (50 samples, 100 features)
+x = linear(x)                       # Linear transformation (50, 200)
+x = relu(x)                         # Apply ReLU activation
+```
+
+即：`Linear` 做 $Wx + b$，`ReLU` 做非线性，两层叠起来就是一个 hidden layer。
+
+### 3. Biological vs. Artificial Neural Networks（生物 vs. 人工神经网络）
+
+#### 3.1 结构与速度的差异
+
+| 维度 | Biological | Artificial |
+|---|---|---|
+| **connectivity**（连接方式） | 极其复杂、看似无序，"you can't really tell who's connected to whom, where is the input and where's the output" | **organized into regular layers**，神经元等大同形状、连接规整 |
+| 组织原因 | 生物演化结果 | **设计上的 simplicity**——只有规整才能用数学描述。"If you want to use mathematics to describe a total mess, that is very hard" |
+| 响应速度 | 约 $10^{-3}$ s（毫秒级） | 约 $10^{-9}$ s（纳秒级），快约 **$10^6$ 倍** |
+| 并行性 | **massively parallel**，$10^{11}$ neurons × 约 $10^4$ connections/neuron；任一时刻约 20% 神经元在 firing | 逐层串行（layer by layer）；只有**同一层内**的 neuron 是并行计算的 |
+| 已知程度 | 单颗 neuron 已知的 process 就要用 supercomputer 模拟 | 数学上完全可控 |
+
+> ⭐ 老师反复强调第一点：人工网络"organized into layers for **design simplicity**"，是为了能用数学描述、能设计、能训练——不是因为它更接近真实大脑。
+
+#### 3.2 GPT 的参数量：从 $10^8$ 到 $10^{12}$
+
+课件用 GPT 系列的参数量做对比（注意：这里的"参数（connections）"就是 §2.2 里的 weights + biases 总数）：
+
+| 模型 | 年份 | 约参数（Approx. Parameters） |
+|---|---|---|
+| GPT-1 | 2018 | $10^8$ |
+| GPT-2 | 2019 | $10^9$ |
+| GPT-3 | 2020 | $10^{11}$ |
+| GPT-3.5（first ChatGPT） | 2022 | $10^{11}$ |
+| GPT-4 | 2023 | $10^{12}$（estimated） |
+| GPT-5 | 2026 | $10^{12}$（estimated） |
+
+对比人脑的 $10^{15}$ connections：$10^{12}$ 仍比人脑少约 **1000 倍**——但老师说，我们并没有因此比 AI"聪明 1000 倍"（见 §3.4）。
+
+#### 3.3 ⭐ 为什么 2023 年之后参数量不再快速增长
+
+课件给出三条原因（老师课上逐条讲，并据此论证"要学原理"）：
+
+1. **Diminishing returns（收益递减）**：达到 trillion-parameter 规模（如 GPT-4）后，单纯继续加参数带来的性能提升越来越小。老师原话很直白："you add more parameters... they have tried, adding more and more and more, and it's **not that much better**." 2018–2023 那几年的做法是"**very brute force**——he just used money money money money"，规模一年涨 10 倍。
+2. **More efficient architectures（更高效的架构）**：如 **Mixture-of-Experts（MoE）**，"activate only part of the model for each token"，能力提升而**激活参数**不增。老师："they got no choice. Probably they got no choice."
+3. **Algorithm and data improvements（算法与数据改进）**：进步转而来自**更好的训练数据、alignment methods（对齐方法）、reasoning strategies（推理策略）、更长的 context window**。
+
+> ⭐ 老师的结论直接指向本课程的价值："They go back to the basics... they have to figure out how the neural network works." 只靠堆规模的路子走到头了，"This is why I'm suggesting that it's very important to learn the basic principles. Then you can think of something." 他还鼓励在座学生：年轻、脑子有创造力，"one day you become famous"，而他会说"this guy is my student"。
+
+#### 3.4 人脑仍然占优的地方
+
+老师逐条评估，并**当场划掉已经失守的条目**：
+
+| 任务 | 现状 |
+|---|---|
+| **Speech production**（生成逼真人声） | **老师划掉**——"now not anymore... AI generates very human speech, very hard to tell." |
+| **Speech recognition under certain noisy conditions**（噪声下的语音识别 + contextual understanding） | 人仍占优；安静环境下人甚至可能比 AI 错得多 |
+| **Cocktail party effect**（鸡尾酒会效应：嘈杂环境锁定单一说话人） | **人明显占优**——"a very noisy party... I think AI maybe not so good. Human can follow a conversation." |
+| **Vision in complex situations**（复杂场景视觉/驾驶） | 人仍占优，但优势在缩小——特斯拉召回、自动驾驶仍受限（"only in the city... he cannot get out of the city and drive in the countryside"，例如泰国的农田路况） |
+
+由此引出课件结论：
+
+- "A **long (long) way to go** before we (if ever) build a computer that truly mimics the human brain"——"very little is known about the human brain"、"the human brain seems to be **too complex to model**"、"even the known processes a single biological neuron requires a **supercomputer** to simulate"。
+- 但**是否需要模仿人脑才能达到（超）人类智能？"Probably not."** 老师的类比：飞机不必模仿鸟的扇翅也能飞得更快；汽车跑得比任何动物快。"We don't really need to mimic the human brain to be smarter than the human brain."
+
+### 4. Neural networks 的历史（Historical Sketch）
+
+老师专门讲历史，理由是①有趣，②"you may get some **inspiration** for future development"。
+
+| 时期 | 人物 | 贡献 |
+|---|---|---|
+| **1940s** | **McCulloch and Pitts** | 第一个 neuron 的**数学模型**，把 neuron 视为 **all-or-none device**（用 step function，而非 sigmoid） |
+| **1940s** | **Hebb** | 生物神经元**学习机制**——Hebbian learning rule |
+| **1950s** | **Rosenblatt** | **Single-layer perceptron**（单层感知机，见 §6–§7） |
+| **1960s** | **Minsky and Papert**（MIT） | 出版专书讨论 single-layer network 的**局限**；书末用**一段话（one-paragraph conjecture）**断言 multi-layer network 有同样局限——**这是错的** |
+| **1980s** | **Hopfield** | 关于 **spin-like neural networks** 的论文，把 **solid state physics** 的数学搬进神经网络，引来研究者与经费；获 **2024 Nobel Prize in Physics** |
+| **1980s** | **Rumelhart et al.** | **重新发现并普及 backpropagation（BP）**，使 multi-layer perceptron 可训练；其基本思想可追溯到 Bryson and Ho (1969) 的书 *Adaptive Optimal Control* |
+| **2000s** | — | **Deep learning**（many layers）："**old science, better engineering**" |
+
+#### 4.1 ⭐ Minsky & Papert 的"一段话"与第一次 AI 寒冬
+
+老师对这段历史讲得最细，因为它是本讲 §8（线性不可分）的伏笔：
+
+- 他们对 **single-layer** 的判断是**正确的**："the limitation of a single layer is real, very limited function."
+- 但书末那段 conjecture 的论证是："if one layer cannot do it, what's the use of you putting another layer? One nothing plus another nothing is nothing." → 结论"multi-layer 也一样不行"——**是错的**。
+- 后果：连两位 MIT 名教授都想不到多层可行，"worse than that is that **everybody in the world agree with them**... nobody would do anything about network for a long time. Only maybe **less than ten people** still working." 研究经费枯竭、研究暂停，从 1960s 到 1980s **约 20 年**——这就是所谓的**第一次 AI winter**。
+- 老师感叹：这个反例其实**极其简单**（见 §9 的多层解法，只需 3 个 neuron 分两层），"It's just a PhD problem"，而全世界等到 20–30 年后才发现。
+
+#### 4.2 Hopfield、Hinton 与 2024 Nobel Prize in Physics
+
+课件写作 **2024 Nobel Prize in Physics**（转写中老师口误说成 "2004"，以 PDF 为准），2024 年由 **John Hopfield** 与 **Geoffrey Hinton** 分享。老师的评述（属个人观点，考试不会考这种评论，但有助于理解本课程关注的"什么才是真正有价值的贡献"）：
+
+- **Hopfield**：贡献在于**建立 solid state physics 与 brain 之间的类比**——solid 中相邻 lattice site 的 magnetic dipole 有 up/down 自旋并相互作用，而 neuron 也是 on/off 两态的 all-or-none 器件，结构相似。于是物理学家手里那一整套数学（量子物理等）突然有了新用武之地，"so a whole patch of physicists dived in. **This is what happened to me**——I was doing physics, and then I became a network researcher." 但老师也直言：Hopfield network **本身"next to useless"**（没人用它做 machine learning / computer vision），而且"the model wasn't even new，it was invented ten years ago, maybe 20 years ago by somebody else"。
+- **Hinton**：老师称为 "**godfather of AI**"，因为他做了 CNN，并与学生**第一个把 GPU 用于 deep learning 训练**（见 §5）。至于 Boltzmann machine："again, that thing is useless, because nobody's using Boltzmann machine to do computer vision or speech application"。老师认为 Hinton **deserved a Nobel Prize**，可惜"there was no Nobel Prize in computer science, no Nobel Prize in AI"，所以给了他 physics 奖。
+
+#### 4.3 Rumelhart 与 backpropagation 的"重新发现"
+
+- **Backpropagation（BP）**：训练 neural network（shallow 与 deep 都用）的方法。"If you don't know, it's okay, but we can talk about backprop."
+- Rumelhart（Stanford）在 1980s 以为自己发明了 BP，很高兴，因为它终于能训 multi-layer network 做各种事。
+- 但很快有人指出：**别人比他早约十年**提出过，而且那人因此成名、还进了 National Science Foundation 掌握科研经费（"he would decide the research money"）。Rumelhart 因此非常抑郁，甚至被指责抄袭（他书里没引用对方）——老师替他辩解：1980s 电脑与网络检索都不普及，"he really doesn't know the other guy's work"。
+- 更戏剧的是，若干年后大家又发现：**那个人的工作其实也是 rediscovery**，真正的思想最早出自 **Bryson and Ho (1969)** 的书。老师点评："This kind of thing happens."（这也是为什么课件里 BP 的出处写成 Bryson & Ho。）
+
+#### 4.4 2000s 的 deep learning：old science, better engineering
+
+课件把这轮爆发的三个原因列得极为清楚，并强调"**nothing new scientifically**"：
+
+| 驱动因素 | 内容 | 老师点评 |
+|---|---|---|
+| **Computers got faster** | **GPU** | GPU 早就存在，只是用来打游戏、做图像渲染，"GPU is not new... I don't think anybody will give a Nobel Prize for GPU"；Hinton 与学生**首个想到用 GPU 做 backpropagation**，"that's really good, they're very smart" |
+| **Software environment got better** | **TensorFlow** 等框架、Python 库（老师口语的 "Pyka" 即 PyPI/package index） | "Again, nothing new here. It's just Python." |
+| **Data sets got bigger** | **ImageNet**：一位女研究者整理出的约 **1 million images** 数据集 | "Nobody's going to give you a Nobel Prize for 1 million images" |
+
+> ⭐ 老师的结论："These three things **caused the AI revolution**... none of these is worth a Nobel Prize, because there's no new science. It's just engineering. **Better engineering.**"（他计划去问 ChatGPT 这两位 2024 得主是否真的满足 Nobel 的评选条件——"We see what happens."）
+
+#### 4.5 里程碑：AlexNet → AlphaGo → ChatGPT
+
+| 年份 | 事件 | 关键数据 |
+|---|---|---|
+| **2012** | **AlexNet**（CNN，Hinton 的学生 Alex 提出） | 在 **200 GB 的 ImageNet 数据**上训练；当年 error 仍高于人类 |
+| **~2017** | CNN 超越人类 | **human performance = 5.1% error**；CNN 一路降到人类水平以下 → 老师说"这是 AI 真正起飞的地方" |
+| **2016** | **DeepMind AlphaGo** 击败前世界围棋冠军 **Lee Sedol** | 用 **deep learning + reinforcement learning**；老师说这位也拿了奖 |
+| **2022** | **ChatGPT** | 见下 |
+
+老师强调 2012 年的 CNN 结构"其实只是一堆 neuron"：
+
+> "You can see it's just a bunch of neurons. It's a different layers... you can think of this just a whole bunch of neurons... trained with this stochastic gradient and backpropagation learning rule."
+
+#### 4.6 ChatGPT 的 2022 与"PSLE 难题"
+
+ChatGPT 的传播速度（课件数据）：**5 天 100 万用户**，对比 Netflix 3.5 年、Airbnb / Twitter / Facebook 约 10 个月、Instagram 2.5 个月。
+
+能力清单：写程序代码、写文章与诗、通过 **Michigan Law** 与 **Wharton Business School** 考试（MCQ & essays）、通过美国 **Medical Licensing Exam**。
+
+但反面是——它**过不了新加坡 PSLE（Primary School Leaving Examination，小学离校考试）**：
+
+| 科目 | ChatGPT 得分 |
+|---|---|
+| Mathematics | **16%** |
+| Science | **21%** |
+
+老师当场让 ChatGPT 自陈原因，ChatGPT 的五点解释（课件原文要点）：
+
+1. **Nature of the questions**：law / business / medical 考试测的是 conceptual understanding、reasoning、professional knowledge——"areas where AI trained on vast amount of structured information **excels**"；而 PSLE 的 math 与 English 要求 tricky problem solving、**lateral thinking**、独特的 contextual reasoning。
+2. **Logic and abstract thinking**：PSLE 数学有 logic puzzles、heuristics、non-standard problem solving，需要**创造力**而非 pattern recognition；"AI models are trained on **statistical correlation** rather than true conceptual understanding."
+3. **Ambiguity and cultural context**：PSLE 语言题要求深度 comprehension 与 inference。
+4. **Short and precise answers**：专业考试允许 long-form reasoning，AI 能结构化作答；PSLE 要求 precise 且有时 unconventional 的答案。
+5. **Familiarity of exam type in training data**：PSLE 题型多变，"strains the ability to process"。
+
+老师追问要具体例子，ChatGPT 给了一道"realistic example"：
+
+> *"Jen saw a number on the whiteboard. The number was 30–50 [介乎 30 与 50 之间]. It is a multiple of 7. The sum of its digits is ten. What is this number?"*
+
+**ChatGPT 给了几步推理，但怎么都得不到 digit sum = 10**，最后承认"does not seem to have a valid answer"。老师借此说明 **hallucination（幻觉）**：
+
+- 事实上 30–50 之间 7 的倍数只有 35、42、49，digit sum 分别是 8、6、13，**确实无解**——这题本身就是编造的。
+- 老师："It has this hallucination... why AI hallucinate and give all these kinds of answers." 并补一句"now it's getting better, of course"，还好奇重考一次能否通过 PSLE。
+
+#### 4.7 产业需求（EVERY INDUSTRY WANTS DEEP LEARNING）
+
+| 行业 | 应用 |
+|---|---|
+| Cloud Service Provider | Image/Video classification、Speech recognition、Natural language processing |
+| Medicine | Cancer cell detection、Diabetic grading、Drug discovery |
+| Media & Entertainment | Video captioning、Content based search、Real time translation |
+| Security & Defense | Face recognition、Video surveillance、Cyber security |
+| Autonomous Machines | Pedestrian detection、Lane tracking、Recognize traffic sign |
+
+### 5. Neural network basics：单个 neuron 的数学
+
+#### 5.1 Bias 作为额外输入
+
+见 §2.2 的公式。要点：**bias $b$ 可以建模为一个恒等于 $+1$ 的输入**，于是
+
+$$
+v = \sum_{j=0}^{m} w_j x_j, \qquad x_0 = +1,\ w_0 = b
+$$
+
+这使"bias 项"和"权重项"形式统一，便于写成矩阵/向量形式。
+
+#### 5.2 双输入 single-neuron perceptron（二输入单神经元感知机）
+
+取最简单的情形：两个输入 $p_1, p_2$，权重 $w_1, w_2$，bias $b$。神经元做的是
+
+$$
+W^{T}p + b = w_1 p_1 + w_2 p_2 + b
+$$
+
+然后按符号判类：
+
+| 条件 | 输出 | 类别 |
+|---|---|---|
+| $W^{T}p + b > 0$ | 1 | **Class 1** |
+| $W^{T}p + b \le 0$ | 0 | **Class 2** |
+
+> 课件 Tip："Whether it's $> 0$ or $\ge 0$ doesn't matter **in practice**."（$W^Tp+b=0$ 恰好发生是概率为 0 的事件，不影响结论。）
+
+#### 5.3 Decision boundary（决策边界）的几何
+
+令
+
+$$
+W^{T}p + b = 0 \iff W^{T}p = -b
+$$
+
+几个必须记住的结论（老师逐条推导的那几页）：
+
+1. **边界上所有点与 $W$ 的内积相同** → 因此它们**在 $W$ 上的投影（projection）相同**。（内积 = $|W|\cdot|p|\cos\theta$，投影 = $|p|\cos\theta$。）
+2. 既然投影相同，这些点**必在同一条直线（高维则是 hyperplane）上**，且这条线**正交（orthogonal，即 perpendicular，90°）于 weight vector $W$**。老师反证式解释：若这些点移动时投影保持不变，唯一的可能就是这个方向对 $W$ 的投影不变，即该方向 $\perp W$。
+3. **$W$ 决定 decision boundary 的方向（orientation）**——转动 $W$，与之垂直的边界线跟着转。
+4. **$W$ 与 $b$ 共同决定边界的精确位置（location）**——同一方向的平行线有好几条，由 $b$ 选定是哪一条。
+5. 把 $W$ 与 $b$ **同时乘任意常数**，边界不变（"Any constant factor may be multiplied simultaneously to the weight vector and the bias without changing the boundary location"）——因为方程两边同乘一个数还是同一个方程。这意味着**解不唯一**，只差一个尺度因子（见 §6 的设计过程）。
+
+#### 5.4 Decision region（决策区域）
+
+把边界两边的区域分开看：
+
+- **weight vector 指向（pointed into）的那一侧**：$W^Tp + b > 0$，**正 activation**，输出 $+1$（step function）；
+- **weight vector 背离（pointed away）的那一侧**：$W^Tp + b < 0$，**负 activation**，step function 输出 $0$，sigmoid 则输出**约等于 0**。
+
+至此，神经元"做决定"的全部机制就讲完了：**算出 $W^Tp+b$，看符号**。老师用一个生活化的例子收尾：
+
+> "You want the neural network to tell you this is my bottle / this is not a bottle. How does the neural network make a decision? Well, it just does this calculation. You give me this input, I calculate. Is it positive? Yes... I got a negative. Then I say no. **That's all it does.**"
+
+推论（重要）：**单个 neuron 的能力上限 = 用一条直线（hyperplane）把输入空间切成两半** → 只能解决**线性可分（linearly separable）**问题。
+
+### 6. 课堂例题 1：用单个 neuron 实现 OR
+
+**训练数据**（input-output pair）：
+
+| $p_1$ | $p_2$ | Output |
+|---|---|---|
+| 0 | 0 | **0** |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 1 |
+
+（老师顺带复习逻辑：0 = false，1 = true；false OR false = false，其余皆为 true。）
+
+**设计步骤**（课件三步法）：
+
+1. **画一条 decision boundary**（不唯一）——要让 $(0,0)$ 单独在一侧，另三个点在另一侧。例如取过 $(0, 0.5)$ 与 $(0.5, 0)$ 的那条线。
+2. **weight vector 与 boundary 正交，并指向 activation 为正（输出 1）的那一侧**（不唯一）——这条线斜率 $-1$，法向为 45°，故
+
+$$
+W = \begin{bmatrix} 1 \\ 1 \end{bmatrix}
+$$
+
+3. **在 boundary 上取一点求 bias**——取 $(0, 0.5)$：
+
+$$
+W^{T}p + b = \begin{bmatrix} 1 & 1 \end{bmatrix}\begin{bmatrix} 0 \\ 0.5 \end{bmatrix} + b = 0.5 + b = 0 \Rightarrow b = -0.5
+$$
+
+**答案**：$W = [1, 1]^T,\ b = -0.5$。验证 $(0,1)$：$0+1-0.5 = 0.5 > 0 \to 1$ ✓；$(0,0)$：$-0.5 < 0 \to 0$ ✓。
+
+> ⭐ **关于"解不唯一"与自由度**（老师课上专门讨论）：待定的是 $w_1, w_2, b$ **三个未知数**，而要求边界过 $(0, 0.5)$ 与 $(0.5, 0)$ 只是**两个方程** → 欠定。之所以可解，是因为 $W$ 与 $b$ 同乘常数不改变边界，多出的那个自由度正是**尺度自由度**。所以我们可以任取 $W = [1,1]^T$（也可以用 $[2,2]^T$，对应 $b = -1$，是同一条线）。**这就是"训练"最朴素的形式**：把 weight 和 bias 定下来，"That's all you need. You need the weight and bias."
+
+### 7. 课堂例题 2：用单个 neuron 实现 AND
+
+**训练数据**：
+
+$$
+p_1 = \begin{bmatrix}0\\0\end{bmatrix}, t_1 = 0;\quad
+p_2 = \begin{bmatrix}0\\1\end{bmatrix}, t_2 = 0;\quad
+p_3 = \begin{bmatrix}1\\0\end{bmatrix}, t_3 = 0;\quad
+p_4 = \begin{bmatrix}1\\1\end{bmatrix}, t_4 = 1
+$$
+
+（true AND true = true，其余皆为 false。）
+
+**设计**：只需把 OR 的那条边界**往右上平移**——方向不变，所以
+
+$$
+W = \begin{bmatrix} 1 \\ 1 \end{bmatrix}
+$$
+
+取边界上一点 $(0, 1.5)$：
+
+$$
+W^{T}p + b = \begin{bmatrix} 1 & 1 \end{bmatrix}\begin{bmatrix} 0 \\ 1.5 \end{bmatrix} + b = 1.5 + b = 0 \Rightarrow b = -1.5
+$$
+
+**答案**：$W = [1, 1]^T,\ b = -1.5$。验证 $(1,1)$：$2 - 1.5 = 0.5 > 0 \to 1$ ✓；$(0,1)$：$0 + 1 - 1.5 = -0.5 < 0 \to 0$ ✓。
+
+> ⭐ 课件原文的结论句："**Same decision boundary as in the OR solution, except shifted with a different bias $b$.**" 即：**OR 与 AND 的差别只在 bias（同一条线的平移）**——这就是为什么"bias alone can shift the boundary"，也是 §5.3 第 4 条的具体体现。
+
+### 8. ⭐ Single-layer perceptron 的局限：线性不可分（linearly inseparable）
+
+#### 8.1 结论
+
+Single-layer perceptron 只能给出 **linear decision boundary** $W^Tp + b = 0$，因此**无法处理线性不可分问题**，最著名的反例是 **XOR（Exclusive-OR，异或）**：
+
+| $p_1$ | $p_2$ | XOR Output |
+|---|---|---|
+| 0 | 0 | **0** |
+| 0 | 1 | **1** |
+| 1 | 0 | **1** |
+| 1 | 1 | **0** |
+
+课件点题："But **multi-layer perceptrons can handle linearly inseparable problems!**"
+
+#### 8.2 几何论证：为什么一条线永远不行
+
+把四个点画在 $(p_1, p_2)$ 平面上：输出 1 的是 $(0,1)$ 与 $(1,0)$，输出 0 的是 $(0,0)$ 与 $(1,1)$——两组点落在**两条对角线上**，互相"穿插"。
+
+老师课上把四种可能的放线位置逐一试过：
+
+| 线的位置 | 结果 |
+|---|---|
+| 把 $(0,0)$ 单独划出 | 另一侧混着 0 与 1 → 失败 |
+| 把 $(1,1)$ 单独划出 | 另一侧混着 0 与 1 → 失败 |
+| 把 $(0,0)$ 与 $(1,1)$ 划在一起 | 同上，另一侧仍是混合 → 失败 |
+| 把 $(0,1)$ 与 $(1,0)$ 划在一起 | 同上 → 失败 |
+
+> "It doesn't matter where you put the line. **You cannot separate them.**" 数学上可严格证明：单条直线无法分开这两个集合。
+
+#### 8.3 ⭐ 为什么"同一层多放几个 neuron"也救不了
+
+学生的自然疑问是：一个 neuron 不行，那一层放很多 neuron 呢？老师课上手写了这个论证（他说"虽然我忘记做这一页幻灯片"）：
+
+- 第 $i$ 个 neuron 给出自己的线性式：$W_i^Tp + b_i$；
+- 同一层里所有 neuron **共享同一个输入 $p$**，各自只是不同的 $(W_i, b_i)$；
+- 若把这一层的输出**线性组合**起来（例如作为下一层的一个 neuron 的输入），得到的是
+
+$$
+\sum_i \alpha_i\bigl(W_i^Tp + b_i\bigr) = \Bigl(\sum_i \alpha_i W_i\Bigr)^{T} p + \sum_i \alpha_i b_i = \tilde{W}^{T}p + \tilde{b}
+$$
+
+——**仍然是一个线性式**。
+
+> ⭐ 老师的原话："**Linear plus linear plus linear is still linear.**" 所以"同一层里无论放多少 neuron、多少个 $W$ 和 $b$，decision boundary 仍是一条直线（hyperplane）"，XOR 依然解不了。**这正是 Minsky & Papert 那本书里说的、也确实是正确的部分**："no matter how many neurons you have in a layer, you cannot solve this simple XOR problem."
+
+#### 8.4 翻转：Minsky & Papert 错在哪
+
+- 他们**对**的地方："one layer cannot do it."
+- 他们**错**的地方：由此推出"两层不行、三层不行、四层也不行"——**"which is not true"**。
+- 老师课上明确说："**Can you do with two layers? You can do it. You can do it with multi-layer perceptron.**" 并感叹这题其实不难："It's just a PhD problem... Until 20, 30 years later, they find out: Oh, I can do it like this."
+
+**关键区别**：单层的失败是因为"**输出仍是输入的线性函数**"。一旦在两层之间插入**非线性 activation**，线性就"断"了，表达力随层数指数级增长——见 §9 与 §10。
+
+### 9. Multi-layer 解法：XOR 与一般线性不可分区域
+
+#### 9.1 XOR 的 3-neuron 两层解（课件 Example 2）
+
+结构：**2 个 hidden neuron + 1 个 output neuron**，共 3 个 neuron、两层（老师课上说"One layer with two neurons, one layer with one neuron. Three neurons. You can do it."）。
+
+**两个 hidden neuron 的决策边界**：
+
+$$
+\underbrace{\begin{bmatrix}1\\1\end{bmatrix}^{T} p - 0.5 = 0}_{\text{hidden neuron \#1}: \ p_1 + p_2 = 0.5}
+\qquad
+\underbrace{\begin{bmatrix}-1\\-1\end{bmatrix}^{T} p + 1.5 = 0}_{\text{hidden neuron \#2}: \ p_1 + p_2 = 1.5}
+$$
+
+- neuron #1 触发（输出 1）当 $p_1 + p_2 \ge 0.5$ → 它负责**排除 $(0,0)$**；
+- neuron #2 触发当 $p_1 + p_2 \le 1.5$ → 它负责**排除 $(1,1)$**。
+
+**Output neuron 做 AND**：
+
+$$
+\text{AND operation: weights } 1, 1; \text{ bias } -1.5
+\quad\Longrightarrow\quad
+y = \sigma(h_1 + h_2 - 1.5)
+$$
+
+**逐点验证**（$\sigma$ 为 step function，$\ge 0$ 输出 1）：
+
+| $p$ | $h_1 = [1,1]^Tp - 0.5$ | $h_2 = [-1,-1]^Tp + 1.5$ | $h_1 + h_2 - 1.5$ | $\hat{y}$ | 期望 |
+|---|---|---|---|---|---|
+| $(0,0)$ | $-0.5 \to 0$ | $1.5 \to 1$ | $-0.5 \to 0$ | **0** | 0 ✓ |
+| $(0,1)$ | $0.5 \to 1$ | $0.5 \to 1$ | $0.5 \to 1$ | **1** | 1 ✓ |
+| $(1,0)$ | $0.5 \to 1$ | $0.5 \to 1$ | $0.5 \to 1$ | **1** | 1 ✓ |
+| $(1,1)$ | $1.5 \to 1$ | $-0.5 \to 0$ | $-0.5 \to 0$ | **0** | 0 ✓ |
+
+> ⭐ **逻辑读法**：hidden #1 实现的是 NOT$(0,0)$，hidden #2 实现的是 NOT$(1,1)$，输出层把两者 **AND** 起来 → NOT$(0,0)$ AND NOT$(1,1)$ = XOR。**这就是"hidden layer 先把输入空间切成几块，再在输出层做逻辑组合"的雏形。**
+
+#### 9.2 更一般的设计模式：AND-of-ANDs, OR-of-ANDs（课件 Example 1）
+
+课件给了一个更一般的线性不可分问题（点集分布在**两个互相分离的矩形区域**），其解需要 **3 层、共 7 个 neuron**（4 + 2 + 1）。注意：老师课上展示了这个解与"结果"，但明说 **"I don't have time to show you how you get it, but we can show you next time"**——以下按课件补全。
+
+**第 1 个 hidden layer：4 个 neuron，每 2 个构成一个 AND（切出一个矩形区域）**
+
+| neuron | $W_i^T$ | 边界上的点 | 边界方程 | 解得 bias | 含义 |
+|---|---|---|---|---|---|
+| #1 | $[-1,\ 0]$ | $(0.5,\ 0)$ | $-p_1 + 0.5 = 0$ | $b = 0.5$ | $p_1 \le 0.5$ |
+| #2 | $[0,\ -1]$ | $(0,\ 0.75)$ | $-p_2 + 0.75 = 0$ | $b = 0.75$ | $p_2 \le 0.75$ |
+| #3 | $[1,\ 0]$ | $(1.5,\ 0)$ | $p_1 - 1.5 = 0$ | $b = -1.5$ | $p_1 \ge 1.5$ |
+| #4 | $[0,\ 1]$ | $(0,\ 0.25)$ | $p_2 - 0.25 = 0$ | $b = -0.25$ | $p_2 \ge 0.25$ |
+
+于是：
+
+- **#5 = AND(#1, #2)** → 左下矩形 $\{p_1 \le 0.5,\ p_2 \le 0.75\}$；
+- **#6 = AND(#3, #4)** → 右上矩形 $\{p_1 \ge 1.5,\ p_2 \ge 0.25\}$。
+
+**第 3 层：1 个 neuron 做 OR**
+
+- **#7 = OR(#5, #6)** → 两个矩形的**并集**，即 class 1 的完整区域。
+
+**矩阵形式（课件原文）**：
+
+$$
+W_1^{T} = \begin{bmatrix}-1 & 0\\ 0 & -1\\ 1 & 0\\ 0 & 1\end{bmatrix},\quad
+b_1 = \begin{bmatrix}0.5\\ 0.75\\ -1.5\\ -0.25\end{bmatrix};\qquad
+W_2^{T} = \begin{bmatrix}1 & 1 & 0 & 0\\ 0 & 0 & 1 & 1\end{bmatrix},\quad
+b_2 = \begin{bmatrix}-1.5\\ -1.5\end{bmatrix};\qquad
+W_3^{T} = \begin{bmatrix}1 & 1\end{bmatrix},\quad b_3 = \begin{bmatrix}-0.5\end{bmatrix}
+$$
+
+**前向传播（forward propagation）三步**：
+
+$$
+h_1 = \sigma\bigl(W_1 p + b_1\bigr) \in \mathbb{R}^{4},\qquad
+h_2 = \sigma\bigl(W_2 h_1 + b_2\bigr) \in \mathbb{R}^{2},\qquad
+\hat{y} = \sigma\bigl(W_3 h_2 + b_3\bigr) \in \mathbb{R}^{1}
+$$
+
+> 课件 Tip：$\boldsymbol{x} \in \mathbb{R}^{n}$ 表示 $x$ **有 $n$ 行**（即 $n$ 维列向量）。
+
+**课件给的算例**，取 $p = \begin{bmatrix}0 & 1\end{bmatrix}^{T}$：
+
+$$
+h_1 = \sigma\bigl([0.5,\ -0.25,\ -1.5,\ 0.75]^{T}\bigr) = [1,\ 0,\ 0,\ 1]^{T}
+$$
+$$
+h_2 = \sigma\bigl([-0.5,\ -0.5]^{T}\bigr) = [0,\ 0]^{T}
+$$
+$$
+\hat{y} = \sigma(-0.5) = 0
+$$
+
+（逐步核对：$W_1p = [0,-1,0,1]^T$，$+b_1 = [0.5,-0.25,-1.5,0.75]^T$，过 step 得 $[1,0,0,1]^T$；$W_2h_1 = [1,1]^T$，$+b_2 = [-0.5,-0.5]^T$，得 $[0,0]^T$；$W_3h_2 = 0$，$+b_3 = -0.5 < 0 \to 0$。即 $p=(0,1)$ 不在两个矩形内，与几何判断一致。）
+
+> ⭐ 课件特意指出 **$W_2$ 里的那些 0**："#5 still does an AND for #1 and #2: **the extra 0 weights effectively ignore #3 and #4**. Similarly for #6." 也就是说，每一层的 neuron 只"看"自己需要的那些输入——这正是后面做 CNN 局部连接、稀疏权重时的思想起点。
+
+**对应的 Python 实现（课件给出，NumPy；不考编程但看逻辑）**：
+
+```python
+import numpy as np
+w1 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])   # 4x2
+w2 = np.array([[1, 1, 0, 0], [0, 0, 1, 1]])         # 2x4
+w3 = np.array([[1, 1]])                             # 1x2
+b1 = np.array([0.5, 0.75, -1.5, -0.25])
+b2 = np.array([-1.5, -1.5])
+b3 = np.array([-0.5])
+
+p  = np.array([0, 1]).T
+h1 = (w1 @ p + b1) >= 0     # step function
+h2 = (w2 @ h1 + b2) >= 0
+y  = (w3 @ h2 + b3) >= 0
+```
+
+> 课件 Tip：`@` 是 NumPy 数组 dot product 的简写。
+
+> ⭐ **解的自由度**（呼应 §6）：这套 $W, b$ 显然不是唯一解——每个 neuron 的 $W_i$ 与 $b_i$ 可以整体同乘正常数；而且每条边界线的位置在不改变分类的前提下也能在小范围内挪动。课件自己在 OR/AND/XOR 三处都写了"not unique"。
+
+### 10. ⭐ Universal approximation（万能逼近）
+
+课件用三页把"层数与能表达的决策区域"逐级放大，这是本讲最重要的理论结论。
+
+#### 10.1 层数与决策区域的关系
+
+| 网络 | 能表达的 decision region | 直观 |
+|---|---|---|
+| **1-layer**（只有输入层 + 输出层，无 hidden layer） | 单个 **half-plane**（半平面） | 一条直线切一刀 |
+| **2-layer**（1 个 hidden layer + 输出） | **单个 convex decision region**（凸区域） | 多条直线**取交（AND）**得到的凸多边形 |
+| **3-layer**（2 个 hidden layer + 输出） | **任意（arbitrary）decision region**，包括不连通、非凸 | 先切出多个凸区域，再**取并（OR）** |
+
+> 课件原文："Note that a 2-layer network can generate only a **single convex decision region**."——这也解释了 §9.2 的例子为什么**必须**用 3 层：class 1 是两个分离的矩形，既非凸也非连通。
+
+#### 10.2 3-layer MLP 如何逼近任意决策区域
+
+课件的构造逻辑（从下往上看）：
+
+| 层 | 作用 |
+|---|---|
+| **第 1 个 hidden layer** | 有 $N$ 组、**每组 $2^d$** 个 neuron（用于 class $C_1$ 的 $N$ 个数据点附近，$d$ 为维度）——每组用若干超平面切出一个**凸区域**（在 $d$ 维需 $2^d$ 个半空间，2D 即 4 条边围成一个矩形，正是 §9.2 的 #1–#4） |
+| **第 2 个 hidden layer** | 每个 neuron 做一个 **AND**——把第 1 层的一组 neuron 合成为一个凸区域 |
+| **Output layer** | 做一次 **OR**——把所有凸区域并起来 |
+
+> 课件结论："**Universal Approximation: the accuracy of an MLP can be arbitrarily high, if there are enough hidden neurons.**"（只要 hidden neuron 足够多，MLP 的精度可以任意高。）
+
+#### 10.3 2-layer MLP 逼近任意连续函数
+
+课件把上面的"区域逼近"升级成"函数逼近"：
+
+> "A hidden layer of **nonconstant, bounded, and continuous neurons** (with weights and biases), plus a **linear output neuron** (with weights but **without bias**) can approximate **any continuous function** to any arbitrary accuracy if there are enough hidden neurons."
+
+**Intuitive proof（直觉证明）的思路**——用"阶梯"拼出函数：
+
+1. 权重取得足够大时，sigmoid 型 activation 逼近 **step function**，于是每个 hidden neuron 近似给出一个"从 0 跳到 1 的台阶"；
+2. 取**一对** hidden neuron，权重分别为 $+1$ 与 $-1$，位置稍有错开，两者相减就得到一个**矩形脉冲 / bump**（在某个小区间内为常数，其余为 0）；
+3. 把**许多个**这样的 bump（各自调到需要的高度、放在需要的位置）**加权求和**，就能逼近任意连续曲线——分段常数逼近，段数越多越精确；
+4. "段数足够多"等价于"hidden neuron 足够多"。
+
+> ⭐ 这一页解释了神经网络"为什么什么都能做"（§1 老师说的"why you can do so many things"），也解释了 §8.4 的关键：**是 activation function 的非线性使这一切成为可能**——如果 activation 是线性的，多层叠起来仍是线性，就永远只能画一条直线。
+
+### 11. Notebook：MLP on (Fashion) MNIST with TensorFlow 2
+
+配套文件：`week8/mlp_mnist_tf.ipynb`（来自 **pyprobml**，即 Kevin Murphy《Probabilistic Machine Learning》的配套代码；用 **TensorFlow 2 / Keras**）。它把 §2、§9、§10 的"neuron 堆叠"落到一个真实任务上。
+
+#### 11.1 数据
+
+```python
+train_images, train_labels, test_images, test_labels, class_names = get_dataset(FASHION=False)
+print(train_images.shape)   # (60000, 28, 28)
+```
+
+- 使用原始 **MNIST**（`FASHION=False`，所以是手写数字 0–9 而非 Fashion-MNIST）；
+- 训练集 **60,000** 张 $28\times28$ 灰度图，另有 10,000 张测试图；
+- `plot_dataset` 画出前 25 张并标出 `class_names`。
+
+#### 11.2 模型结构（三层 MLP）
+
+```python
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(28, 28)),
+    keras.layers.Dense(128, activation=tf.nn.relu),
+    keras.layers.Dense(128, activation=tf.nn.relu),
+    keras.layers.Dense(10,  activation=tf.nn.softmax),
+])
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+```
+
+对应 §2.2 的语言：
+
+| Keras 层 | 数学含义 |
+|---|---|
+| `Flatten(28,28)` | 把图像拉平成 $p \in \mathbb{R}^{784}$，即 §5 的 input $p$ |
+| `Dense(128, relu)` | 128 个 hidden neuron，每个算 $W_i^{T}p + b_i$ 再过 **ReLU** |
+| `Dense(128, relu)` | 第 2 个 hidden layer（对应 §10.1 的"3-layer network"） |
+| `Dense(10, softmax)` | 10 个输出 neuron（10 类），softmax 给出类别概率 |
+
+`model.summary()` 的参数量（= §3.2 里说的 "parameters"）：
+
+| Layer (type) | Output Shape | Param # |
+|---|---|---|
+| flatten (Flatten) | (None, 784) | 0 |
+| dense (Dense) | (None, 128) | **100,480** |
+| dense_1 (Dense) | (None, 128) | **16,512** |
+| dense_2 (Dense) | (None, 10) | **1,290** |
+| **Total params** | | **118,282** |
+
+> ⭐ 手算核对（就是 §2.2 的 $w_j x_j$ 堆起来）：$784\times128 + 128 = 100{,}480$；$128\times128 + 128 = 16{,}512$；$128\times10 + 10 = 1{,}290$。**每个 "+" 后面的常数就是 bias $b$**——与 §2.2 把 bias 写成 $x_0=+1$ 的输入完全一致。
+
+#### 11.3 训练与结果
+
+notebook 注释说明为何只训 1 个 epoch："(1) it is faster, and (2) it produces **more errors, which makes for a more interesting plot** :)"。
+
+| 阶段 | loss | accuracy |
+|---|---|---|
+| 第 1 epoch 训练中（1875 步） | 0.2288 | 0.9319 |
+| **Train（1 epoch 后）** | 0.1004 | **0.9700** |
+| **Test（1 epoch 后）** | 0.1162 | **0.9646** |
+| 第 2 epoch 训练中 | 0.0948 | 0.9711 |
+| **Train（2 epochs 后）** | 0.0622 | **0.9810** |
+| **Test（2 epochs 后）** | 0.0896 | **0.9732** |
+
+（1 个 epoch 在 CPU 上约 **2.2 秒**——notebook 同时打印了 "No GPU was detected. DNNs can be very slow without a GPU."，正好呼应 §4.4 里 **GPU 是深度学习爆发的三大驱动之一**。）
+
+#### 11.4 预测与"有意思"的错误样本
+
+```python
+# 单张图：需要 reshape 成 (N,D,D)，N=1
+img = np.expand_dims(test_images[0], 0)   # (28,28) -> (1,28,28)
+predictions_single = model.predict(img)   # (1,10) 类别概率
+
+# 全测试集
+predictions = model.predict(test_images)  # (10000, 10)
+ndx = find_interesting_test_images(predictions, test_labels)
+plot_interesting_test_results(test_images, test_labels, predictions, class_names, ndx)
+```
+
+`find_interesting_test_images` 挑出**预测得最"有意思"的测试样本**（错得离谱或置信度很低的），`plot_interesting_test_results` 把它们画出来（返回 354 个这样的样本）。
+
+#### 11.5 这个 notebook 想说明什么
+
+1. **本讲的概念是真的能跑起来的**：§2 的"linear combination + activation"、§9 的 hidden layer 堆叠，落到代码里就是 4 行 `keras.layers`，参数总量 118,282——比 §3.2 的 GPT-1（$10^8$）还小好几个数量级，却已能识别手写数字。
+2. **universal approximation 的实践意义**（§10）：仅仅是"足够多的 hidden neuron"，1 个 epoch 就达到 **96.46% test accuracy**，2 个 epoch 升到 **97.32%**。
+3. **但离"完美"还差得远**：仍有约 3% 的错误，而且错得很"人类"（`plot_interesting_test_results` 里能看到连人都难以辨认的样本）。**这说明通用的 MLP 不是终点**——对图像这类具有空间结构的数据，需要利用局部性/平移不变性的专门结构，也就是后面的 **CNN**。
+4. 提升方向：训练轮数、网络宽度/深度、optimizer、loss 的选择——正是第二块"训练（training）"要讲的内容（forward propagation 已在本讲出现，backpropagation 与 SGD 在后续讲）。
+
+### 12. 课堂插曲：学生项目答疑（deepfake detection）
+
+课间休息时一位学生（转写作 "Paki"）找老师讨论自己的 project（deepfake/anti-spoofing 方向），要点如下，可作为一个"课堂上讲的东西怎么落地"的例子：
+
+| 项目要点 | 内容（转写） |
+|---|---|
+| 任务 | Deepfake / spoof 检测（"Deepfake detection and spoof"，用于防护目的） |
+| 模型 | 选了 "**ASIS**" 模型（转写拼写不确定，属 anti-spoofing 一类模型），学生自报为 "N Lead Learning"，已训练约 3 个模型 |
+| 硬件 | 尝试部署到 **Raspberry Pi 4**——算力有限，"I can't handle that much compute"，因此只能用较小版本模型 |
+| 训练资源 | 申请到 **MLDA cluster**（NTU 的机器学习/深度学习集群）的使用权限，在集群上训练后与 Raspberry Pi 集成 |
+| 指标 | **EER（equal error rate）= 1.8%** |
+
+老师反馈是正面的（"All right. All right. That's good."），并约了后续讨论 loss 与 metric 的时间。
+
+### 13. 本周要点小结
+
+- **换老师与课程结构**：Week 8–13 由 **Wang Lipo** 讲，分三块——**NN/DL 导论 → 训练（shallow + deep）→ CNN**；其他网络结构（RNN/LSTM 等）放 **supplementary folder** 选读。**Python 编程不考**（"not even in the quiz"），但 homework 含编程；用 AI 写程序不禁止。
+- **人工神经元 = 线性组合 + 非线性**：$v = \sum_{j=0}^{m} w_j x_j$（$x_0=+1$ 吸收 bias），$y = f(v)$；常见 $f$ 有 step、sigmoid $\sigma(x)=1/(1+e^{-x})$（$\sigma' = \sigma(1-\sigma)$）、tanh、ReLU。
+- **decision boundary 的几何**：$W^{T}p + b = 0$ 是一条（高维为 hyperplane）**与 $W$ 正交**的线；$W$ 定**方向**、$W$ 与 $b$ 共同定**位置**；$W,b$ 同乘常数边界不变；$W$ 指向的一侧 activation 为正（输出 1），背离的一侧为负（输出 0）。
+- **单 neuron 只能做线性分类**：OR（$W=[1,1]^T, b=-0.5$）与 AND（同 $W$、$b=-1.5$）都靠"画一条线 + 取线上一点解 bias"完成，二者只差 **bias（平移）**。
+- **⭐ XOR 是分水岭**：**linear separability** 之外的都做不到，而且 **"linear + linear + linear is still linear"**——**同一层里加多少 neuron 都没用**。Minsky & Papert 对单层的判断正确，由此推出的多层也不行**是错的**，却导致了约 20 年的第一次 AI winter。
+- **多层解法**：XOR 只需 **3 个 neuron 分两层**（2 hidden 做 NOT$(0,0)$ 与 NOT$(1,1)$，输出层做 AND）；一般线性不可分区域用 **3 层 7 neuron**（1st hidden 切凸区域 → 2nd hidden 做 AND → output 做 OR）。
+- **⭐ Universal approximation**：1-layer 只能给 half-plane；**2-layer 只能给单个 convex region**；**3-layer 可逼近任意 decision region**；2-layer MLP（非线性 hidden layer + 线性输出 neuron）可**任意精度逼近任意连续函数**。前提都是"**hidden neuron 足够多**"。
+- **历史与现状**：1940s McCulloch-Pitts / Hebb → 1950s Rosenblatt（single-layer perceptron）→ 1960s Minsky-Papert（AI winter）→ 1980s Hopfield（2024 Nobel Prize in Physics）与 Rumelhart（backpropagation，思想可溯至 Bryson & Ho 1969）→ 2000s deep learning = **old science + better engineering**（GPU / TensorFlow / ImageNet）→ 2012 AlexNet → 2016 AlphaGo → 2022 ChatGPT。GPT 参数量 2023 年后基本停在 $10^{12}$：**diminishing returns + MoE 等高效架构 + 算法与数据改进**。
+- **Notebook 实证**：3 层 MLP（Flatten → Dense128 ReLU → Dense128 ReLU → Dense10 softmax，共 118,282 参数）在 MNIST 上 **1 epoch 得 test accuracy 96.46%，2 epochs 得 97.32%**——印证 universal approximation 的实践威力，也说明通用 MLP 之后还需要 CNN。
+
+---
+
+### 下一周预告
+
+**Week 9 继续 Part 2（Neural Network 的 training）**。课件本讲末尾留下两条明说的线索：① 老师课堂上说 §9.2 那套 **3 层 = 4 + 2 + 1 的设计"how to get it"会下次讲**（即"如何系统地设计多个 hidden neuron 的边界"）；② 讲完 §10 的 **universal approximation**（2-layer MLP 逼近任意连续函数）后，自然进入"**这些 weight 和 bias 到底怎么求出来**"——也就是 **forward propagation（本周已出现）+ backpropagation + SGD** 的训练部分。本周只做了"人手工设计权重"（OR/AND/XOR 都是手算出来的），老师已明确预告"in general, we don't train network this way"，训练方法将是后续重点。此外请注意 **Quiz 2 范围是 Week 8–11**，本周内容（neuron 模型、linear separability、XOR 需多层、universal approximation）属于必考基础。

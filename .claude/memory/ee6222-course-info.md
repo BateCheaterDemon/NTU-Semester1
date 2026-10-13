@@ -17,6 +17,11 @@ EE6222 Machine Vision（NTU，AY26-27 Semester1，School of EEE）。注意用�
   - Quiz **10%**：**Week 7**，课堂内 **30 分钟**。
   - Assignment ×2 共 **30%**（各 15%）：take-home mini-project + report（论文形式）；一份来自 Jiang Xudong 部分、一份来自 Cheng Jun 部分。
   - ⭐ Assignment 允许用 generative model（AI）生成报告，但学生须**完全负责**：逐字审阅、理解、**纠正 AI 的错误**；原样照搬不改判为 wrong/作弊。
+  - ⭐ **Assignment 1（Jiang 部分，15%）：Dimensionality Reduction for Classification**。主题 = 降维 + 分类，可用任意公开高维数据集或合成数据、任意语言（Python/Matlab/…），**降维与分类的参数只能由训练数据确定**；报告 4–5 页（含图表与参考文献），程序代码放附录。
+    - **提交**：把报告 PDF 上传 **NTULearn**，**截止 2026-10-25（Week 10 末）**。
+    - **文件名规则**：学生证姓名 + 学号，例如 `HOEJIUNTIAN-U2203856C`。
+    - 原文见 `6222/assignment1/Assignment.pdf`；工作目录 `/home/qwx/NTU/6222assignment1/`（手写 PCA/LDA 人脸识别 pipeline + report）。
+  - Assignment 2（Cheng Jun 部分）**尚未发布**（Week 8 转写中无任何提及）。
 
 **课程布局**：14 Topics。Topic 1–3 图像处理基础（image fundamentals / LSI & transforms / enhancement），4–5 识别决策（matching→classification、MAP decision），6–8 传统机器学习（统计估计→手工特征→特征选择/降维），9–10 深度学习（MLP→CNN→Transformer），11–14 Video + 3D（Cheng Jun）。
 

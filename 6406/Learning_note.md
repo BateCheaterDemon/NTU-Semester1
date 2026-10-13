@@ -2076,3 +2076,590 @@ $$
 ### 下一周预告
 
 > **Week 8 = Lecture 8 + CA2 Quiz**。CA2 在 Week 8 课上举行（recess week 后），范围 Lecture 5–7，online lockdown browser，closed-book，占比 15%。Lecture 8 内容 TKA 未明确说明，但从 Lecture 7 PDF 末尾的 summary 和课程大纲来看，Lecture 8 可能是 **Part 1 的收尾**（model selection / cross-validation / 正则化参数选择 $\lambda$ 的方法），或进入 penalized classification（penalized SVM / hinge loss + regularization 的解析方法）。转写中 TKA 提到 "O Part one is coming towards the final two lectures, including today"，Week 9 起由 **Simon Liu** 接手 Ensemble Learning。具体以 Lecture 8 课件为准。
+
+---
+
+## Week 8 — Lecture 8: Performance Evaluation and Statistical Inference（性能评估与统计推断）
+
+> **材料**：转写 `week8/week8.txt`（ASR 噪声多；有效讲授内容止于 CA2 开考前，其后的考场座位安排与闲聊可忽略），官方课件 `week8/EE6406-Lecture8-TKA-v1.pdf`（Toh Kar-Ann，**权威来源**，41 slides + 封面，AY2026-27 S1）。本周是 **Part 1（Analytic Learning）的最后一讲**，回答的问题只有一个：**"学出来的 predictor/classifier 到底有多好？这个'好'有多可信？"**
+>
+> **课堂安排**：TKA 开场用约 20 分钟补完 Lecture 7 的剩余 slides（原话 "I tried to complete [Lecture 7] a little bit plus"），随后进入 Lecture 8；**7:50 收手机、开始 CA2 quiz**（见 §0）。Lecture 8 本身内容不算多（"the content for today's lecture is a relatively short one"），骨架只有两块：**NHST** 与 **Bayesian Analysis (BA)**，两者都是为"比较多算法实验结果"服务的。
+
+> ⚠️ **权威来源说明 / 本周 ASR 错拼修正**：本周课件有一个重要特点——**McNemar statistic 与 t-test statistic 的公式课件没有列出**（只给 contingency table、假设和定性结论，因为实际使用交给 `statsmodels`/`scipy`）。本笔记中标 **⚠️ 补充** 的公式为标准统计教材内容，课件未给，仅为理解用；标 (1)(2)(3) 的公式才是课件原有编号。典型 ASR 错拼按 PDF 修正如下：
+>
+> | 转写 ASR | 正确术语 |
+> |---|---|
+> | "lecture aid" | Lecture 8 |
+> | "batent / atient / basion / ba 分析 / patient analysis" | **Bayesian Analysis (BA)** |
+> | "no hypothesis / now hypothesis / n hypothesis" | **null hypothesis**（$H_0$） |
+> | "NHSD / NH ST / NHST / HST" | **NHST**（Null Hypothesis Significance Test） |
+> | "magima test" | **McNemar's test** |
+> | "sine rank test / sign rank test / sine test / sin test" | **Wilcoxon signed-ranks test** / **sign test** |
+> | "frag test / Fagan test / F test" | **Friedman test** |
+> | "Miami post hoc test / Nemenyi" | **Nemenyi post-hoc test** |
+> | "confusion metric / computer metrics" | **contingency table**（2×2 列联表） |
+> | "prometric / non prometric / non chiametric / non chromatic" | **parametric / non-parametric** |
+> | "cross ventilation / cross valuation / 24 test / n f cross / n fo" | **cross-validation** / **two-fold test** / **N-fold cross-validation** |
+> | "OCB / PO / NPO / L O OCB" | **LOOCV**（leave-one-out cross-validation） |
+> | "INOVA / NOVA" | **ANOVA** |
+> | "road / robe / rope" | **ROPE**（region of practical equivalence） |
+> | "increase two" | **CA2** |
+> | "dichotomous" | **dichotomous**（二分的） |
+> | "critical value 39 / 38"（Wilcoxon） | **29 / 28**（按 PDF 修正） |
+> | "c fier / cc / class fi" | **classifier** |
+
+---
+
+### 0. CA2 Quiz 信息（当天课上举行）
+
+| 项目 | 详情 |
+|---|---|
+| **时间** | Lecture 8 之后、**同一节课内**（7:50 前回座并收手机，7:50 开始） |
+| **范围** | **Lecture 5–7**（按 Week 7 通知：regression / classification learning + penalized learning） |
+| **占比** | **15%**（CA1=10%, CA2=15%, CA3=15%, Final=60%） |
+| **形式** | online quiz + **lockdown browser**（本次换成"掉线后可重新登录"的版本） |
+| **允许物品** | 只允许 **approved calculator**；手机等电子设备一律收走 |
+| **纪律** | **中途不得离开考场**——"once you leave this room, your results will not be counted" |
+| **后续** | **CA3 在 4 周后（Week 12）**，"the same day, the same time, only four weeks later" |
+
+- TKA 考前提醒：本次 quiz **计算量不小**（"you should be busy like quiz on quite a number of calculations"），建议"just do more rounds of checking"（多轮验算，可擦掉错误）。
+
+---
+
+### 1. Introduction：为什么需要 Performance Evaluation 与 Statistical Inference
+
+#### 1.1 学习三大组件的回顾
+
+| 组件 | 对应 Lecture |
+|---|---|
+| Learning model | Lecture 3（feature transformation $p(\mathbf{x})$ + parameter $\mathbf{w}$） |
+| Learning loss / cost function | Lecture 4（learning score functions） |
+| Optimization procedure | Lecture 5–7（closed-form analytic solutions + penalization） |
+
+- 至此 Part 1（Analytic Learning）的方法已完备；剩下最后一个问题：**"我学到的 predictor/classifier 有多好？这个'好'有统计支撑吗？"**
+- TKA 的现实动机对照：工作中的技术报告、写论文投顶会，都需要**用自己的方法 vs 先前方法**做实验对比，并声明"我的进展有多大"。但**不能只做定性比较**——"many things are quite grey, or quite continuous, not just yes or no"，需要统计工具来支撑"我确实更好"这个 claim。
+
+#### 1.2 两个概念的分工（课件原话）
+
+- **Performance evaluation**（性能评估）：provides a measure upon **how good can a learned predictor or classifier perform**。
+- **Statistical inference**（统计推断）：provides **the confidence of such performance on unseen data**。
+
+⭐ **关键前提：评估必须针对 unseen data（未见数据），而不是 training data。** 真正的 unseen data 不可得，于是做法是**从给定样本中 hold out 一部分作为 test set，用来模拟真实部署前的表现**（"you are simulating the real application before you pull your method out for real test"）。
+
+- ⭐ **Lecture 4 的 learning score functions 直接复用为 performance measure**：你优化的 score（accuracy、precision、AUC、TER…）就是评估用的指标。选哪个**取决于应用场景**：
+  - **Tight accuracy 场景**（banking / 转账验证）：绝不能让人冒名通过 → 极低 false accept。
+  - **Loose accuracy 场景**（手机指纹解锁）：只有本人在用 → 宁可放宽，否则"you will always get rejected by fingerprint, then you get sick of the application"。
+
+---
+
+### 2. Empirical Evaluation（经验评估）
+
+#### 2.1 Hold-Out Test（留出法）
+
+**记号**：数据库含 $M$ 个样本 $(\mathbf{x}_i, y_i),\ i = 1, 2, \dots, M$，其中 $\mathbf{x}_i \in \mathbb{R}^d$ 为第 $i$ 个 **feature sample**，$y_i \in \{0,1\}$ 为对应的 **category indicator / target label**。
+
+把数据库切成两份：
+
+- **training set**：$m$ 个样本 —— 用于 classifier learning；
+- **test set**：$n$ 个样本 —— 用于评估学到的 classifier 的性能；$m + n = M$。
+
+- 若 $m \approx n$，可以做 **two-fold test**：第一轮 train/test 之后**把 training set 与 test set 互换（swap）**再跑一遍，**两个 test 结果取平均**作为最终结果。
+- ⭐ two-fold 的好处：**所有数据既被训练过也被测试过**（"all the points are tested independently"）——每一轮里 classifier **只看到 training set**、完全看不到 test set，因此得到的评估是"诚实"的；两轮下来被评估的数据点翻倍，**statistical support 更强**。
+
+**Transcript 补充（TKA 的实践经验）**：
+
+- **Hold-out test 是当今最常用的做法**，因为深度学习时代数据集大（millions of samples 级别）；常见划分 **70/30 或 80/20**。
+- 反过来，**小数据集（几百个样本量级）hold-out 不够用**：模型很容易 overfit，"hold-out test is not enough"。
+- 即使今天数据多，仍有领域（采集 tedious / costly）只有小样本 → 必须用下面的 cross-validation。
+
+#### 2.2 Cross-Validation Test（交叉验证）
+
+**动机（课件原话）**：hold-out test **没有把所有给定数据都用于 classifier evaluation**；two-fold test 虽然覆盖全部数据，但对**小数据集**而言"may not be statistically informative"。
+
+**Leave-One-Out Cross-Validation（LOOCV，留一法）**：
+
+- 每次留 **1 个**样本做 testing，其余全部用于 training；重复 $M$ 次 → 得到 $M$ 个 test results，通常以**平均值**形式报告。
+- ⭐ 课件原话：**"without re-sampling, the largest possible number of test cases without under-training the system is given by LOOCV."** —— 在不重采样（no re-sampling）的前提下，LOOCV 能给出**最多的测试样本数**，且每次训练都用了**尽可能多**的数据（$M-1$ 个）因而不至于 under-train。
+- 缺点：若 $M$ 很大，需要循环训练 $M$ 次，**computing effort 巨大、不实际**（"nowadays nobody does this, only for small size"）。
+
+**N-fold Cross-Validation（N 折交叉验证）**：
+
+- 把整个数据集分成 **$N$ 个等份（equal portions）**，且**正负两类样本在各 partition 中均匀分布**（即 stratified 分层划分）。
+- 每次取 1 份作 test、其余 $N-1$ 份作 training，重复 $N$ 次 → $N$ 个 test results，取平均报告。
+- **典型 N 值：2、5、10**。
+- ⭐ **two-fold test 就是 $N = 2$ 的特例**——transcript："the two-fold is just standardizing the two-fold to any number of partitions"。
+
+#### 2.3 ⭐ 三种 empirical evaluation 对比
+
+| 方法 | 训练轮数 | 每轮 train / test 规模 | 适用数据量 | 特点 |
+|---|---|---|---|---|
+| **Hold-out test** | 1 | $m$ / $n$（如 70/30、80/20） | 很大（millions） | 最快；小数据不可靠（易 overfit） |
+| **Two-fold test** | 2 | 各约 $M/2$ | 中等 | $N=2$ 的 CV；两轮后覆盖全部数据 |
+| **N-fold CV** | $N$（典型 2/5/10） | $(N-1)M/N$ / $M/N$ | 中等（≤ 数千） | compute 与 statistical support 的平衡点 |
+| **LOOCV** | $M$ | $M-1$ / $1$ | **极小**（< 100） | 不重采样下测试量最大；$M$ 大时不可行 |
+
+- **如何选 N**（transcript）："the choice is basically yours"——取决于你对数据量是否足够的判断；但写论文时还要遵守**领域惯例 / reviewer 设定的 standard**（"if the first person doing it and you want to compare with him, then you have to follow his number of folds"）。这也是"standardizing the testing"的意义。
+
+---
+
+### 3. Null Hypothesis Significance Test (NHST)
+
+#### 3.1 什么是 Statistical Significance Test
+
+- **Hypothesis testing 做 statistical inference** 是一种基于数据的 **confirmatory analysis（验证性分析）**。
+- 用途：判断 experimental results **是否包含足够信息去 challenge conventional wisdom（挑战既有认知）**。
+- 换句话说：assesses **the confidence in the occurrence of an experimental observation** using statistical methods。
+
+**两种处理数据的思路**（transcript 补充，很关键）：
+
+| 类型 | 含义 | 前提 | 优缺点 |
+|---|---|---|---|
+| **Parametric** | 先假设数据服从某个分布模型（如 Gaussian，用 mean 与 variance 描述），再用 model parameters 推断 statistic | 数据量要大到让分布"趋于 normal" | 数据多时更 accurate；数据少时模型不准 |
+| **Non-parametric** | 不依赖某个固定分布模型，改用 **ranking / counting** 这类无分布假设的统计量 | 无需 normal 假设 | 更 flexible；⚠️ "non-parametric" **不等于没有参数**，只是**不 rigid 地绑定某一个特定模型** |
+
+⭐ **NHST 的核心图像**（transcript）：把两组结果各自看成**一个分布**，判断这两个分布**是否 overlap**：
+
+- overlap 大 → 两个方法没有显著差异 → **不拒绝 $H_0$**；
+- overlap 小 → 显著不同 → **拒绝 $H_0$**。
+
+判断依据是两分布的 **mean 与 variance**。
+
+**核心术语**：
+
+- **$H_0$（null hypothesis，零假设）**：默认立场——两个 classifier **没有显著差异**。
+- **$H_1$（alternative hypothesis，备择假设）**：两者有显著差异。
+- **p-value**：支持"拒绝 $H_0$"的强度度量。⭐ **large value of the test statistic → small p value → supports $H_1$ to reject $H_0$**。
+- **Confidence level（置信水平）$\alpha$**：常用 $\alpha = 0.05$（= 95% confidence）。$p < \alpha$ → reject $H_0$。若要求更严格可取 $\alpha = 0.01$（99% confidence）。
+- ⚠️ p-value 只是 **confidence**，**不是"绝对正确"**——这一点是 §7 批评的根源。
+
+**三种比较场景**（本讲的骨架，课件明确分成三类）：
+
+| 场景 | 数据规模 | 方法 | 本笔记章节 |
+|---|---|---|---|
+| (a) Two classifiers on **a single** data set | 1 个数据集 | **McNemar's test** | §4 |
+| (b) Two classifiers over **multiple** data sets | $N$ 个数据集 | averaging / **t-test** / **Wilcoxon signed-ranks** / **sign test** | §5 |
+| (c) **Multiple** classifiers over **multiple** data sets | $N$ 数据集 × $K$ 分类器 | **ANOVA** / **Friedman test** + **Nemenyi post-hoc** | §6 |
+
+- 用多少个数据集取决于**研究领域的数据可得性**（availability / cost of acquiring data）；一般原则是**越多越好**——"nowadays, one dataset is usually not enough"（除非该数据集非常大且覆盖面广）。
+
+---
+
+### 4. 场景 (a)：Two Classifiers on a Single Data Set — McNemar's Test
+
+#### 4.1 方法定位
+
+- **Non-parametric** 方法，适用于 **nominal data（名义数据）**。
+- 在 R、Python 及其他统计软件包中都有实现（Python：`statsmodels.stats.contingency_tables.mcnemar`）。
+- ⭐ 历史注：早年要**手工填表 + 查分布表**；现在直接调库即可。
+
+#### 4.2 2×2 Contingency Table 与假设
+
+检验基于"两次 test 在 $n$ 个 subject 上的结果"构成的 **2×2 contingency table**：
+
+**Table 1: Contingency table for McNemar's test**
+
+| | | (Classifier B) 'Yes' | (Classifier B) 'No' |
+|---|---|---|---|
+| **(Classifier A)** | **'Yes'** | $a$ | $b$ |
+| | **'No'** | $c$ | $d$ |
+
+- $a$、$d$：两个 classifier **agree**（都对 / 都错）。
+- $b$、$c$：**discordances（不一致）**——指对其中一个 classifier 是 'No' occurrence、对另一个却是 'Yes' occurrence。
+- ⭐ **$H_0$：$p_b = p_c$**（两种 disagreement 的出现概率相等）→ 两个 classifier 的 **marginal proportions 没有显著差异**。
+- ⭐ **McNemar's test 只用到 discordant cells $b$、$c$**；agree 的 $a$、$d$ 不进入统计量（但它们决定 $n$）。
+- **判决规则**：test statistic 越大 → p-value 越小 → **支持 $H_1$、拒绝 $H_0$**。
+
+**两个主要假设**：
+
+1. **The classifier pair $(A, B)$ is mutually independent**——两个 classifier 相互独立（若 B 是由 A 派生/改进而来，则假设不成立）。
+2. **Each classifier A and classifier B can be assigned to one of two possible categories**——在每个样本上每个 classifier 都落进两个类别之一。
+
+> ⚠️ **补充（课件未给公式）**：标准 McNemar statistic 为
+>
+> $$\chi^2 = \frac{(b-c)^2}{b+c}, \qquad\text{或（含 Yates 连续性修正）}\qquad \chi^2 = \frac{\left(|b-c|-1\right)^2}{b+c} \tag{8.1}$$
+>
+> 自由度 $\text{df}=1$；当 $b+c$ 很小时应改用 **exact test**（`exact=True`）。
+
+#### 4.3 Example 8.1（Python）
+
+```python
+from statsmodels.stats.contingency_tables import mcnemar
+table = [[15, 4],
+         [25, 6]]
+result = mcnemar(table, exact=False, correction=True)
+print(f"Statistic: {result.statistic:.4f}")
+print(f"P-value:   {result.pvalue:.4f}")
+alpha = 0.05
+if result.pvalue < alpha:
+    print("Reject the null hypothesis: Significant difference exists.")
+else:
+    print("Fail to reject the null hypothesis: No significant difference.")
+```
+
+**读表**：$a=15$，$b=4$，$c=25$，$d=6$，$n = 50$；$b$ 与 $c$ 相差很大。按 (8.1) 含连续性修正：
+
+$$\chi^2 = \frac{(|4-25|-1)^2}{4+25} = \frac{20^2}{29} = \frac{400}{29} \approx 13.79 \;\Longrightarrow\; p \approx 0.0002 < 0.05$$
+
+→ **拒绝 $H_0$**：两个 classifier 存在显著差异。（$p$ 值为按 (8.1) 的自行核算，用于理解 `result.pvalue` 的来源。）
+
+---
+
+### 5. 场景 (b)：Two Classifiers over Multiple Data Sets
+
+#### 5.1 Averaging over Data Sets（最直接，也最容易被批评）
+
+- 做法：在多个数据集上分别算出 classification accuracy，**取平均**，比大小。
+- 适用例子：比较不同 classifier 在"同一类诊断任务、来自不同机构的 medical databases"上的平均准确率。
+- ⭐ **两个被批评的点**：
+   1. **不可比性**：不同数据集的难度与性质差异很大（transcript："some are chemical problems, some are mathematical problems, some are physics problems"），**跨域 average accuracy 可能没有意义**。
+   2. **对 outlier 敏感**：一个数据集上的极好（或极差）表现可以**主导整体结论**——"one excellent performance on one data set can prevail the overall poor performance, or vice versa"。transcript 的具体例子：若某个数据集上两个方法都接近 random guess（~50%），而其余都是 80–90%，这一个数据集会把整体平均整个拉偏。
+
+#### 5.2 t-Test（parametric）
+
+- **前提：数据正态分布**（因此是 parametric 方法）。可用 Matlab（statistics toolbox）与 Python（`scipy.stats`）。
+- ⭐ 历史注：t-test 最初发表时叫 **Student's test**——作者用的是化名/笔名 "Student" 而非真名（"he wanted to hide his identity"）。
+- 分为两类：
+
+| 类型 | 别名 | 假设 | 典型场景 |
+|---|---|---|---|
+| **Unpaired t-test** | independent samples / Student's | 两个**正态总体**的 **mean 相等**（two-sample location test） | treatment 效果：一组人群测"处理前"，**另一组**人群测"处理后" |
+| **Paired t-test** | dependent samples / repeated measures | 两次 response 测在 **same statistical unit** 上 | cancer treatment：对**同一批病人**测肿瘤在治疗前后的 size |
+
+**三个必须满足的假设**（unpaired 情形，课件明确列出）：
+
+1. 被比较总体**服从 normal distribution**；
+2. 两个总体**方差相同**——"as though the distribution for one group was merely a shifted version of the other group, **without changing shape**"（只是平移，形状不变）；若一组很尖、一组很胖，则不可比；
+3. 两组数据**独立采样**（data being sampled independently）。
+
+> ⚠️ **补充（课件未给公式）**：
+>
+> - **Unpaired（equal-variance / pooled）**：
+>
+> $$t = \frac{\bar{x}_1 - \bar{x}_2}{s_p\sqrt{\dfrac{1}{n_1}+\dfrac{1}{n_2}}},\qquad s_p^2 = \frac{(n_1-1)s_1^2+(n_2-1)s_2^2}{n_1+n_2-2},\qquad \text{df}=n_1+n_2-2 \tag{8.2}$$
+>
+> - **Paired**：
+>
+> $$t = \frac{\bar{d}}{s_d/\sqrt{n}},\qquad \bar{d}=\frac{1}{n}\sum_{i=1}^{n}\left(x_i-y_i\right),\qquad \text{df}=n-1 \tag{8.3}$$
+>
+> 其中 $s_p$ 为 **pooled standard deviation**；$s_d$ 为逐对差值的样本标准差。
+
+#### 5.3 ⭐ Wilcoxon Signed-Ranks Test（paired t-test 的非参数替代）
+
+**设置**：$N$ 个数据集，$d_i$ 为第 $i$ 个数据集上两个 classifier 的 accuracy 之差，$i=1,\dots,N$。
+
+**步骤**：
+
+1. 按 **$|d_i|$ 升序**给 rank——**差异越小 rank 越小**（rank 1 表示两方法几乎一样）。
+   > ⚠️ 课件原句 "with the better-performed one having a smaller rank number" 表述含糊；按 Table 2（Example 8.2）的实际编号，**rank 依据 $|d_i|$ 升序**分配，与两个 classifier 谁赢无关。
+2. **Tie（$|d_i|$ 相同，尤其 $d_i=0$）→ assign average rank**。例：$d=0.00$ 出现两次，本应占 rank 1 与 2 → 各得 **1.5**。
+3. 定义两个 rank sum：
+   - $R^+$ = **第二个 algorithm 胜出**（$d_i>0$）的数据集的 rank 之和；
+   - $R^-$ = 相反情况（$d_i<0$）的 rank 之和；
+   - ties（$d_i=0$）的 rank **一半分给 $R^+$、一半分给 $R^-$**；若 tie 数为**奇数**，"one rank is disregarded"（舍弃一个 rank）。
+
+数学形式（课件式 (1)、(2)）：
+
+$$R^{+} = \sum_{d_i>0}\text{rank}(d_i) + \frac{1}{2}\sum_{d_i=0}\text{rank}(d_i) \tag{1}$$
+
+$$R^{-} = \sum_{d_i<0}\text{rank}(d_i) + \frac{1}{2}\sum_{d_i=0}\text{rank}(d_i) \tag{2}$$
+
+4. ⭐ **判决规则**：当 $\min\left(R^{+},R^{-}\right)$ **小于或等于** statistical table 中的 **critical value** 时，**拒绝 $H_0$**。
+
+#### 5.4 ⭐ Example 8.2（Wilcoxon signed-ranks 完整手算）
+
+**Table 2: Classification accuracies of LSE-based and TER-based learning**
+
+| No. | Data | LSE-based Ave（$x$，% acc） | TER-based Ave（$y$，% acc） | Diff（$d=y-x$） | Rank |
+|---|---|---|---|---|---|
+| 1 | Shuttle-l-contr | 99.03 | 99.06 | +0.03 | 7 |
+| 2 | BUPA-liver | 72.17 | 72.16 | −0.01 | 3.5 |
+| 3 | Monk-1 | 89.90 | 90.55 | +0.65 | 15 |
+| 4 | Monk-2 | 66.16 | 68.27 | +2.11 | 16 |
+| 5 | Monk-3 | 90.39 | 91.02 | +0.62 | 13.5 |
+| 6 | Pima-diabetes | 77.73 | 77.73 | 0.00 | 1.5 |
+| 7 | Tic-tac-toe | 98.22 | 98.24 | +0.02 | 5.5 |
+| 8 | Breast-cancer-W | 97.26 | 97.37 | +0.11 | 8.5 |
+| 9 | StatLog-heart | 83.25 | 83.07 | −0.19 | 11 |
+| 10 | Credit-app | 86.65 | 86.64 | −0.01 | 3.5 |
+| 11 | Votes | 94.24 | 94.27 | +0.02 | 5.5 |
+| 12 | Mushroom | 100.00 | 100.00 | 0.00 | 1.5 |
+| 13 | Wdbc | 96.18 | 96.80 | +0.62 | 13.5 |
+| 14 | Wpbc | 79.60 | 79.49 | −0.11 | 8.5 |
+| 15 | Ionosphere | 89.18 | 89.63 | +0.45 | 12 |
+| 16 | Sonar | 81.78 | 81.96 | +0.17 | 10 |
+
+**计算**（注意 $d=y-x$，正值 = TER 更好）：
+
+$$R^{+} = (7+15+16+13.5+5.5+8.5+5.5+13.5+12+10) + (1.5) = 108$$
+
+$$R^{-} = (3.5+11+3.5+8.5) + (1.5) = 28$$
+
+- **自检**：$R^{+} + R^{-} = 108 + 28 = 136 = 1+2+\cdots+16$ ✓（rank 总和守恒）
+- 在 confidence level $\alpha = 0.05$、$N = 16$ 时，Wilcoxon signed-ranks test table 的 **critical value = 29**。
+- 因为较小的那个 rank sum 为 $28 \le 29$，**拒绝 $H_0$**：在 0.05 confidence level 下两个 classifier **不等价** → **TER-based learning 显著优于 LSE-based learning**。
+
+> ⚠️ 转写把临界值念成 "the value in the table was 39, because we had 38"——按 PDF 修正为 **29 / 28**。
+
+**Remark（课件）**：
+
+- Python 实现：`scipy.stats.wilcoxon()`。
+- ⭐ Wilcoxon signed-ranks test **比 paired t-test 更安全（safer）**，因为它**不假设 normal distribution**。
+- 但**当 paired t-test 的假设满足时，Wilcoxon 反而不如 paired t-test 受偏好**（t-test 有更高 statistical power，Wilcoxon 是 less preferred）。
+
+#### 5.5 Sign Test（计数法）
+
+- 做法：**数一数在多少个数据集上某个 algorithm 是 overall winner**。
+- $H_0$ 下两个算法各赢约一半：$N_{\text{win}} \approx N/2$ → 两者被视为 **equivalent**。
+- Wins 的个数服从 **binomial distribution**，**critical number of wins $N_{\text{critical}}$** 从统计表查得（取决于 $N$ 与 $\alpha$）。
+- ⭐ **判决**：某 classifier 只有在**至少 $N_{\text{critical}}$ 个数据集上胜过对手**时，才算 significantly better。
+- ⭐ 注意：不能只看"6 比 5 这样的简单多数"——必须把 $N_{\text{win}}$ 与 **$N_{\text{critical}}$** 比较。
+
+**Example 8.3**：在 Table 2 上做 sign test——TER-based learning 在 16 个数据集中赢了 **11** 个（把两个 tie 数据集中的一个也算作赢），查 sign test 表后 **在 0.05 confidence level 下不能拒绝 $H_0$**。（$N=16$ 时 $N_{\text{critical}} = 12$，11 < 12。）
+
+⭐ **Remark（课件，重要考点）**：
+
+> 若换一个 classifier，它在 16 个数据集中赢了 **12** 个（正好等于 critical value），**但所有 $d_i < 0.01\%$**——虽然 $H_0$ 被拒绝，但"两个 classifier 显著不同"这个结论**仍然值得怀疑**（"remains questionable"）。
+
+→ 因此 **数据集个数少时做 hypothesis testing 必须格外小心**；**statistical significance ≠ practical / engineering significance（效应量 effect size 同样重要）**。
+
+---
+
+### 6. 场景 (c)：Multiple Classifiers over Multiple Data Sets
+
+#### 6.1 为什么不能简单枚举所有 pair
+
+- 上面的 **paired tests 完全可以枚举所有组合对**来比较多个 classifier。
+- 但反对的理由是：**检验次数太多 → 可能纯粹因为随机性而拒绝 $H_0$**（multiple comparisons problem / family-wise error 膨胀）。
+- 解决方案：**Analysis of Variance（ANOVA，parametric，假设数据 normal distribution）**，或它的 **non-parametric counterpart：Friedman test**。
+
+#### 6.2 Friedman Test
+
+- 做法：在**每个数据集内部**给 $K$ 个 classifier 排名——最准确的 rank 1、其次 2、3、…… 最差 rank $K$（tie 取平均 rank）；然后对每个 classifier 求**平均 rank（average rank）**。
+- 用这些 ranks 构造 statistic（课件未给公式）来检验"所有 classifier 表现相同"的 $H_0$。
+- 可用 Matlab（statistics toolbox）与 Python（`scipy.stats`）。
+
+**Example 8.4**
+
+**Table 3: Average accuracy and ranks**
+
+| No. | Database name | RP-FLD | RP-LSE | RP-TER | RP-AUC |
+|---|---|---|---|---|---|
+| 1 | Shuttle-l-contr | 0.9811 (3.0) | 0.9861 (2.0) | 0.9909 (1.0) | 0.9574 (4.0) |
+| 2 | BUPA-liver | 0.7038 (2.0) | 0.6995 (3.0) | 0.7217 (1.0) | 0.6513 (4.0) |
+| 3 | Monks-1 | 0.9171 (1.0) | 0.8959 (4.0) | 0.9016 (3.0) | 0.9161 (2.0) |
+| 4 | Monks-2 | 0.6570 (1.0) | 0.6174 (3.0) | 0.6157 (4.0) | 0.6471 (2.0) |
+| 5 | Monks-3 | 0.9123 (1.0) | 0.8977 (3.0) | 0.9041 (2.0) | 0.8745 (4.0) |
+| 6 | Pima-diabetes | 0.7591 (2.0) | 0.7073 (4.0) | 0.7776 (1.0) | 0.7549 (3.0) |
+| 7 | Tic-tac-toe | 0.9827 (1.0) | 0.9814 (3.0) | 0.9822 (2.0) | 0.8660 (4.0) |
+| 8 | Breast-cancer-W | 0.9720 (3.0) | 0.9695 (4.0) | 0.9740 (1.0) | 0.9725 (2.0) |
+| 9 | Statlog-heart | 0.8324 (1.5) | 0.8255 (4.0) | 0.8318 (3.0) | 0.8324 (1.5) |
+| 10 | Credit-app | 0.8671 (1.0) | 0.8592 (4.0) | 0.8667 (2.0) | 0.8632 (3.0) |
+| 11 | Votes | 0.9414 (3.0) | 0.9408 (4.0) | 0.9424 (2.0) | 0.9439 (1.0) |
+| 12 | mushroom | 1.0000 (2.0) | 1.0000 (2.0) | 1.0000 (2.0) | 0.9945 (4.0) |
+| 13 | wdbc | 0.9654 (2.0) | 0.9445 (4.0) | 0.9650 (3.0) | 0.9716 (1.0) |
+| 14 | wpbc | 0.6722 (2.0) | 0.6218 (4.0) | 0.7961 (1.0) | 0.6591 (3.0) |
+| 15 | ionosphere | 0.8869 (1.0) | 0.8372 (4.0) | 0.8695 (2.0) | 0.8663 (3.0) |
+| 16 | sonar | 0.8162 (2.0) | 0.8071 (4.0) | 0.8152 (3.0) | 0.8238 (1.0) |
+| **Average** | | **0.8667 (1.781)** | **0.8494 (3.500)** | **0.8722 (2.063)** | **0.8497 (2.656)** |
+
+- 读法：括号外是 average accuracy，括号内是**该数据集内的 rank**。例如 dataset 12（mushroom）三个方法都是 1.0000 → 本应占 rank 1/2/3 → **各得 2.0**；dataset 9 中 RP-FLD 与 RP-AUC 打平 → 各得 1.5。
+- ⭐ 注意 average accuracy 的排序（RP-TER 0.8722 最高）与 **average rank** 的排序（RP-FLD **1.781** 最好）**并不一致**——rank-based 方法不被个别数据集的极端值主导，这正是 Friedman/rank 方法的优势。
+
+#### 6.3 ⭐ Nemenyi Post-Hoc Test
+
+- 若 Friedman test **拒绝了 $H_0$**，可进一步做 **post-hoc Nemenyi test** 分析 classifier 两两之间的差异。
+- 若两个 classifier 的 **average ranks 之差**至少达到 **critical difference**：
+
+$$CD = q_{\alpha}\sqrt{\frac{K(K+1)}{6N}} \tag{3}$$
+
+其中 $K$ = classifier 个数，$N$ = 数据集个数，$q_{\alpha}$ 为 studentized range statistic 的分位值（按 $\alpha$ 查表）。
+
+- 则这两个 classifier 的 performance **significantly different**。
+- ⭐ Transcript 重点：图里"**distance between each pair**"就是判据——只有 rank 距离超过 $CD$ 的组合才算真的不同；即便整体排序有先后，也要**逐对**比较才能下结论。
+- **Figure 1** 是 Demšar (2006) 风格的 **CD diagram**：把每个 classifier 按其 average rank 放到坐标轴上，**用横线把彼此之间没有显著差异的 classifier 组连起来**（caption："groups of classifiers that are not significantly different are connected"）。
+- 注意：这个图在常见软件包里**不是现成可用的**（transcript："it's not so available in many"），需按 Demšar (2006) 自己实现。
+
+---
+
+### 7. Bayesian Analysis (BA)
+
+#### 7.1 动机：NHST 与 p-value 被滥用
+
+- 有了 NHST 这一整套工具后，课件紧接着提醒：**p-value 的使用需要 extra care**（Ioannidis, 2005；Amrhein et al., 2019；Nuzzo, 2014）。
+- 这些文献指出：**NHST 在很多场合并未被恰当使用**，可能造成了**研究发现的低可重复率（non-replication of research discoveries）**。
+- ⭐ **两个 fundamental issues**：
+   1. **the bias and the extent of repeated independent testing**——重复独立检验的 bias 与次数问题（检验做得越多，假阳性累积越多）；
+   2. **the use of the p-value in a dichotomous way**——把 p-value 当作**二值判决**：$p<0.05$ 就宣称"我的方法绝对更好"。但 p-value 本质只是 **confidence**，"you only have 95% confidence"，不是 100% 确定。
+
+**Transcript 补充**：
+
+- 医学/论文领域的 over-claim、misrepresent 结果现象严重（"they overclaim their results"）。
+- NHST **只比较两个 mean 的距离**，**完全不关心分布的形状**（"they may not care about the shape of the distribution"）；而分布的形状（胖/瘦）本身携带重要信息。
+- 因此有学者主张**弃用 NHST**（Amrhein et al. 2019 的标题就是 "Retire statistical significance"），改用 Bayesian analysis。
+
+#### 7.2 ⭐ Bayesian Analysis 的思路：不做二元判决，给后验概率
+
+- 回到 Bayesian statistics：不输出"接受/拒绝"，而是**给出完整的 posterior distribution**，直接告诉你三种情形的概率：
+
+$$\bigl\{\,A<B,\qquad A=B\ (\text{within ROPE}),\qquad A>B\,\bigr\}$$
+
+- **ROPE（region of practical equivalence，实际等价区间）**：预先设定的**容差带**；若两方法的差异落在 ROPE 内，就认为它们在**实务上等价**。Example 8.5 中 ROPE 设为 **$\pm 0.01$**。
+  > ⚠️ 课件原文把 ROPE 误印为 "**robe**"；transcript 又念成 "road"。正确术语是 **rope**，来自 Bayesian 分析中的 ROPE 概念。
+
+- ⭐ 核心优势：给出的是**"有多大的信心说 A 比 B 好"的完整图像**，而不是 "A 赢 B" 这种**非黑即白**的结论。
+
+#### 7.3 Example 8.5：Two Classifiers on a Single Data Set
+
+两个 classifier A、B 在**同一数据集的 10 折**上的 accuracy（%）：
+
+$$
+A=\begin{bmatrix}
+95.8707\\ 94.7935\\ 93.5368\\ 96.4093\\ 95.6912\\
+94.2549\\ 94.6140\\ 95.5117\\ 96.2298\\ 95.1526
+\end{bmatrix},
+\qquad
+B=\begin{bmatrix}
+93.5368\\ 92.8187\\ 91.5619\\ 93.8959\\ 93.1777\\
+93.1777\\ 94.7935\\ 91.7415\\ 94.6140\\ 94.0754
+\end{bmatrix}
+$$
+
+调用 Lucy Kuncheva 提供的工具包：
+
+```python
+[probs, plot_data] = two_classifiers_one_dataset(x, rope, cvruns)
+# https://github.com/LucyKuncheva/Bayesian-Analysis-for-Comparing-Classifiers
+```
+
+得到 posterior results：
+
+$$\text{probs} = [\,0.0001,\ \ 0.0549,\ \ 0.9450\,] \quad := \quad [\,A<B,\ \ A=B\ (\text{rope}),\ \ A>B\,]$$
+
+即 $P(A<B)=0.0001$、$P(A=B\ \text{within rope})=0.0549$、$P(A>B)=0.9450$（ROPE $=\pm 0.01$）。
+
+- **自检**：A 的 10 折平均 $\approx 95.21$，B 的 10 折平均 $\approx 93.34$，差约 **+1.87**，远大于 ROPE $\pm0.01$ → $P(A>B)=0.945$ 符合直觉；同时 BA 还额外告诉你"仍有约 5.5% 的概率两者实务等价"。
+- **Figure 2** 画出 $\Delta$Acc（A 与 B 的 accuracy 差）的 **posterior pdf**，峰值落在正区间。
+
+#### 7.4 Example 8.6 / 8.7：Multiple Data Sets 与 effect size 敏感性
+
+**Example 8.6**：用 Table 2 的 **16 个数据集**比较 TER 与 LSE，调用
+
+```python
+[samples, probs] = signed_rank_test_diff(x, rope, prior, T)
+# https://github.com/LucyKuncheva/Bayesian-Analysis-for-Comparing-Classifiers
+```
+
+由于 Table 2 中两方法的 accuracy 差异**极小**（大多是 $0.0x\%$ 量级），分析给出一个**非常窄的分布**：
+
+$$p(\text{Rope}) = 99.834\%,\qquad p(\text{TER}) = 0.166\%,\qquad p(\text{LSE}) = 0.000\%$$
+
+**Figure 3** 中分布几乎压成一条竖线：左端 `p(LSE) = 0.000`，右端 `p(TER) = 0.166`，中间 `p(Rope) = 99.834`。
+
+⭐ **与 NHST 的关键对照（本讲最重要的教学点）**：**同一组 Table 2 数据**——
+
+| 方法 | 结论 |
+|---|---|
+| **Wilcoxon signed-ranks test**（§5.4） | $28 \le 29$ → **拒绝 $H_0$** → "两分类器显著不同（TER 更好）" |
+| **Bayesian Analysis**（Example 8.6） | $p(\text{Rope}) = 99.834\%$ → **两者实务上等价** |
+
+→ NHST 在小差异 + 稳定排序（rank 一致）的情况下会给出**误导性的"显著"**结论；BA 的结论才符合工程直觉。
+
+**Example 8.7**：把 Table 2 的差异值**放大 10 倍**后重做同一分析：
+
+$$p(\text{Rope}) = 38.662\%,\qquad p(\text{LSE}) = 0.004\%,\qquad p(\text{TER}) = 61.334\%$$
+
+- 分布明显变宽，$P(\text{TER better})$ 从 0.166% 跳到 61.334% → 这演示了 **Bayesian Analysis 对 effect size（差异幅度）的敏感性**。
+- ⭐ 对比之下，NHST 的 p-value **只看"是否偏离随机"，不看差异有多大**——这正是 BA 被认为更合理的原因。
+
+#### 7.5 Multiple Classifiers 下的 Bayesian Analysis
+
+- Benavoli et al. (2017) 引用 Gelman et al. (2012) 的论断：
+
+> "in Bayesian analysis we usually do not have to worry about **multiple comparisons**. The reason is that we do not worry about **Type I error**, because the null hypothesis is hardly believable to be true."
+
+- 建议对多分类器采用 **multilevel analysis / hierarchical Bayesian model**——即**逐一评估 classifier pair 的各种组合**。
+- ⭐ 与 NHST 的对照逻辑：NHST 因为"要做二元判决"而害怕 multiple comparisons 导致 **Type I error** 膨胀（所以必须先做 ANOVA / Friedman 这类整体检验）；BA 认为 **point null hypothesis 几乎不可能为真**，不做二元判决也就没有 Type I error 可担心。
+
+---
+
+### 8. Summary Notes（课件结论与 TKA 的推荐做法）
+
+1. **对 NHST 的承认**：承认 **null hypothesis significance testing 有 'black-and-white'（非黑即白）的倾向**，因此在**呈现推断结果（presenting inference results）与下结论时务必谨慎**。
+2. **对 BA 的保留**：支持 BA 的论点是 "point-wise null hypotheses are practically always false"（基于 $H_0$ 存在的假设），但这一论断**比较 intricate（微妙）**——因为**对来自同一个 classifier 的两组不同观测，null hypothesis 未必同样适用**。
+3. ⭐ **课件的推荐做法**：
+   - **比较两个 classifier**（无论单个数据集还是多个数据集）→ **用 Bayesian Analysis**；
+   - **比较多个 classifier** → 保留 **post-hoc Nemenyi test**，主要用于**可视化 classifier 的 ranking order**；
+   - **最重要的一条**：**avoiding absolute 'black-and-white' claims can prevent misrepresentation**——避免绝对的黑白结论，能防止误述结果。
+
+---
+
+### 9. ⭐ 考点速查表
+
+| 考点 | 要点 |
+|---|---|
+| **Performance evaluation vs statistical inference** | 前者给"有多好"的度量（针对 **unseen data**），后者给这份度量的 **confidence** |
+| **Hold-out test** | 切成 training $m$ + test $n$，$m+n=M$；深度学习大数据常用 70/30、80/20；小数据不可靠（易 overfit） |
+| **Two-fold test** | $m\approx n$ 时交换 train/test 再跑一次，两个结果取平均；= $N=2$ 的 CV |
+| **LOOCV** | 每次留 1 个测试，共 $M$ 次取平均；不重采样下 **测试量最大且不 under-train**；$M$ 大时计算上不可行 |
+| **N-fold CV** | 分 $N$ 个**等份**且**正负样本均匀分布**（stratified）；典型 $N=2,5,10$；结果取平均 |
+| **如何选 N** | 数据量 + 领域惯例 / reviewer standard；"the choice is basically yours" |
+| **Parametric vs non-parametric** | Parametric 先假设分布（如 normal，用 mean/variance）；Non-parametric 不绑定分布模型，用 rank / count（≠ 无参数） |
+| **NHST 基本逻辑** | $H_0$：两方法无显著差异；statistic 越大 → p 越小 → 拒绝 $H_0$；$\alpha=0.05$=95% confidence，$\alpha=0.01$=99% |
+| **三大比较场景** | (a) 单数据集 2 分类器；(b) 多数据集 2 分类器；(c) 多数据集 多分类器 |
+| **McNemar's test** | 非参数、nominal data、单数据集；2×2 contingency table；$H_0$: $p_b=p_c$；**只用 discordance $b,c$** |
+| **McNemar 两大假设** | (i) classifier pair $(A,B)$ mutually independent；(ii) 每个 classifier 落在两类之一 |
+| **McNemar 实现** | `statsmodels.stats.contingency_tables.mcnemar(table, exact=False, correction=True)`；大 statistic + 小 p → 拒绝 $H_0$ |
+| **Averaging over data sets** | 最直接但受批评：跨域结果不可比 + 对 outlier 敏感（一个数据集可主导整体） |
+| **t-test 前提** | normal distribution + 两总体**同方差** + 独立采样；unpaired（两组不同 unit）vs paired（同一 unit 前后测） |
+| **Wilcoxon signed-ranks** | paired t-test 的非参数替代：按 $|d_i|$ **升序**给 rank，tie 取 **average rank**，$\min(R^+,R^-) \le$ **critical value** → 拒绝 $H_0$ |
+| **Example 8.2 数字** | $R^+ = 108$，$R^- = 28$，$N=16$、$\alpha=0.05$ 时 critical value $=29$ → $28\le29$ **拒绝 $H_0$**（TER 显著优于 LSE） |
+| **Wilcoxon 建议** | 比 paired t-test **safer**（不假设 normal）；但 t-test 假设满足时 t-test 更好（power 更高） |
+| **Sign test** | 数"赢的数据集个数"；wins ~ **binomial**；需 $\ge N_{\text{critical}}$（$N=16$ 时 = 12）才算显著 |
+| **Sign test 陷阱** | 赢 12/16 但所有 $d_i < 0.01\%$ → 拒绝 $H_0$ 但结论**可疑**；significance ≠ effect size |
+| **多分类器为何不能枚举 pair** | 检验次数过多 → 纯因随机性拒绝 $H_0$ 的概率累积（multiple comparisons） |
+| **Friedman test** | ANOVA 的非参数对应；**每个数据集内部**排名（最好 rank 1），用**平均 rank** 检验；`scipy.stats` 可用 |
+| **Example 8.4 平均 rank** | RP-FLD **1.781**（acc 0.8667）、RP-TER 2.063（0.8722）、RP-AUC 2.656（0.8497）、RP-LSE **3.500**（0.8494）——rank 排序与 accuracy 排序不同 |
+| **Nemenyi post-hoc** | $CD = q_\alpha\sqrt{K(K+1)/(6N)}$；两 classifier **平均 rank 差 $\ge CD$** → 显著不同 |
+| **CD diagram** | 用横线把"彼此无显著差异"的 classifier 组连起来，可视化排序（Demšar 2006） |
+| **NHST 的两大批评** | (i) repeated independent testing 的 bias 与次数；(ii) p-value 的 **dichotomous use**（当作二元判决） |
+| **BA 的输出** | 三个后验概率 $[\,P(A<B),\ P(A=B),\ P(A>B)\,]$，其中 $A=B$ 由 **ROPE** 界定（课件误印 "robe"） |
+| **Example 8.5** | 单数据集 10 折；`probs = [0.0001, 0.0549, 0.9450]`，ROPE = $\pm 0.01$；调用 `two_classifiers_one_dataset(x, rope, cvruns)` |
+| **Example 8.6（关键对照）** | 同一 Table 2：NHST **拒绝 $H_0$**，BA 给 $p(\text{Rope}) = 99.834\%$ → **实务等价** |
+| **Example 8.7** | 差异放大 10× → $p(\text{TER})=61.334\%$、$p(\text{Rope})=38.662\%$ → **BA 对 effect size 敏感** |
+| **BA 与 multiple comparison** | 不做二元判决 → 不担心 Type I error；多分类器建议 **hierarchical Bayesian model** |
+| **课件推荐** | 两分类器比较用 **BA**；多分类器用 **Nemenyi** 可视化排序；**避免绝对黑白结论** |
+
+---
+
+### 10. 本周要点小结
+
+- **本讲定位**：Part 1（Analytic Learning，Lecture 3–8）的**收尾讲**。前面 6 周解决的是"**怎么学**"（model / loss / optimization / penalization），本周解决"**学出来怎么评估、评估结果有多可信**"——这是写报告、投论文、做技术选型都绕不开的一步。
+
+- **Empirical Evaluation（经验评估）**：
+  - 核心：评估必须针对 **unseen data**，用 **hold-out** 模拟真实部署。
+  - 三条路：**hold-out test**（大数据，70/30、80/20）、**N-fold CV**（$N = 2, 5, 10$，正负样本均匀分布）、**LOOCV**（$M$ 小时，不重采样下测试量最大）。
+  - two-fold test = $N=2$ 的特例；$N$ 的选取既看数据量也看领域惯例。
+
+- **NHST（零假设显著性检验）**：
+  - 三种场景对应三套工具：**McNemar's test**（单数据集 2 分类器）→ **t-test / Wilcoxon signed-ranks / sign test**（多数据集 2 分类器）→ **ANOVA / Friedman + Nemenyi**（多数据集多分类器）。
+  - ⭐ **必须记住手算流程的只有 Wilcoxon**：按 $|d_i|$ 升序给 rank（tie 取平均），算 $R^+$、$R^-$，与 critical value 比较（Example 8.2：$R^+ = 108$，$R^- = 28$，临界值 29 → 拒绝 $H_0$）。
+  - 关键概念区分：**parametric（依赖 normal 假设）vs non-parametric（用 rank/count）**；**unpaired vs paired**；**ANOVA vs Friedman**；**只做两两比较会引发 multiple comparisons 问题**。
+  - ⭐ **significance ≠ effect size**：Example 8.3 的 remark（赢 12/16 但差异都 < 0.01%）是核心警示。
+
+- **Bayesian Analysis（BA）**：
+  - 动机：NHST 的 p-value 被 **dichotomous**（二元）滥用 + 重复检验的 bias → 研究结果难以复现。
+  - 做法：给出 **$\{A<B,\ A=B(\text{ROPE}),\ A>B\}$ 三个后验概率**，ROPE 由使用者设定（Example 8.5 为 $\pm 0.01$）。
+  - ⭐ **最重要的对照**：同一组 Table 2 数据，Wilcoxon **拒绝 $H_0$**（显著），而 BA 给出 $p(\text{Rope}) = 99.834\%$（**实务等价**）；把差异放大 10× 后 BA 立刻翻转为 $p(\text{TER}) = 61.334\%$ → **BA 对 effect size 敏感，NHST 不敏感**。
+  - 多分类器下 BA 不担心 Type I error，建议用 **hierarchical Bayesian model** 做 pair 组合评估。
+
+- **Final exam 提醒**：Lecture 8 是 **Part 1 的最后一讲**，final 的 Part 1 考题（60% 中约 2.5 题）会覆盖 Lecture 1–8，本讲的 cross-validation 类型辨析、Wilcoxon rank 手算、Friedman/Nemenyi 概念、NHST vs BA 的对比属于**必考级**内容。
+
+---
+
+### 下一周预告
+
+> **Week 9 = Ensemble Learning 开篇（Simon Liu 接手，Part 2）**。Toh Kar-Ann 的 Analytic Learning（Lecture 3–8）到此**全部结束**；从 Week 9 起由 **Simon Liu**（Trust Decision 首席 DA & AI 官，前 Lazada SVP）讲授 **Ensemble Learning（Lecture 9–13）**，会带行业应用。
+>
+> **考核节奏**：CA2 已于本周课上完成（15%）；**CA3 在 4 周后（Week 12）**，同一天、同一时间、同样形式（online lockdown browser，closed-book，approved calculator，不得中途离开考场）。final exam 60%，其中约 2.5 题来自 Part 1（Lecture 1–8）。
+>
+> Week 9 的具体内容（bagging / boosting / stacking / random forest 等哪个先讲）以 Lecture 9 课件为准。

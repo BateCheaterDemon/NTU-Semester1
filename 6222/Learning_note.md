@@ -2343,3 +2343,768 @@ $$
 
 > ⚠️ 由于本周是 Quiz 1 + recess week 前，下周（recess week 后）将进入 neural network / deep learning 部分。具体从 MLP 还是 CNN 开始、详细进度待课件确认。
 
+## Week 8 — Topic 9：Neural Networks and Deep Machine Learning（MLP → CNN 主线 + Transformer 预告）
+
+> **本周主线**（转写开场原话）："This week we will start neural networks... we will start from the traditional neural networks MLP, to the revolution of the machine learning, it is a CNN convolutional neural network, and finally go to the foundations of the current AI system, the large model AI system, the Transformer."
+> 即 **三代神经网络**：① MLP（传统 neural network）→ ② CNN（deep learning 的 revolution）→ ③ Transformer（当前 large model / ChatGPT 的基础）。
+> ⚠️ 本周课堂**实际只讲到 CNN 为止**（转写末句：*"after next week, I will first [cover] further development of the CNN and then based on that, further go to the current state of the art module of the AI model, it is a Transformer. That's all for today."*）。**Transformer 属于 Topic 10 / 下一周**，本笔记 §12 依据 PDF Topic 10 幻灯片 + 老师本周的口头预告整理，并已明确标注。
+
+> **权威来源说明**：本周官方讲义为 `EE6222_lecturenote1to9.pdf` **第 263–341 页**（**Topic 9** "Neural Networks and Deep Machine Learning: from MLP to CNN" = 第 263–317 页；**Topic 10** "Deep Learning: from CNN to Transformer" = 第 318–341 页）。转写 `week8.txt` 是截至目前**噪声最严重**的一周（"neural" 几乎每次都被错拼），以下内容一律以 PDF 的公式与结构为准。本周典型 ASR 错拼对照（⚠️ **本周新特例**：`nel / nail / nay / nes / neler / yer / mayer / ayer / Myer` 在本周指 **layer（层）**，而非 Week 2–3 中的 color）：
+
+| 转写噪声 | 正确术语 |
+|---|---|
+| near / neon / neo / new network、ner rate work、neontwork、nay | **neural network** |
+| nel / nail / nay / nes / neler / yer / mayer / Mayor / Myer / ayer / el | **layer**（本周特例） |
+| arg model AI system | **large model**（大模型） |
+| fed / fit forward / ft forward | **feedforward** |
+| wed / waged / wet / weak / which sum | **weighted sum** |
+| tris / triso / tic / tre | **threshold** $\theta$ |
+| choice（"a network must have a choice... must have a bias"） | **bias / threshold** |
+| syncod / sycod / schmit / mot / mode function | **sigmoid** |
+| redo / renew / red / anar / n function | **ReLU** |
+| nose / north / moss function | **loss function**（损失函数） |
+| arrow / er / ro / ero / aro / ao | **error** |
+| change / chain zoo / zoos | **chain rule**（链式法则） |
+| greatly / grid / great / gent / cog decent | **gradient descent** |
+| ata / ta / Data（学习率系数） | **$\eta$（eta，learning rate）** |
+| back publication / by prorogation / bipgion / bprolgation | **backpropagation** |
+| pulling / p | **pooling** |
+| fit / field / fetal window、fit size | **filter**（卷积核） |
+| china / china dimension | **channel**（通道） |
+| special size / special index | **spatial**（空间） |
+| phase recognition | **face recognition** |
+| taste data / twining / trending / turning data | **test data / training data** |
+| crotic / atic / aquatic / logic function | **quadratic function** |
+| reganization / regnation / reorganization | **regularization** |
+| overfating / overfting / over fading / al fitting | **overfitting** |
+| under faking / undating | **underfitting** |
+| H O transection on new networks | **IEEE Transactions on Neural Networks** |
+| CPA / IW PAM | **CVPR / TPAMI** |
+| image, minions of the real images | **ImageNet / 数百万张真实图像** |
+| CN / C / the N / the s | **CNN** |
+| L P / ALP / MP / Mop | **MLP** |
+| 1 bar / one by one convolution | **1×1 convolution** |
+| CAT GPT / chat GPT | **ChatGPT** |
+
+### 1. 三代神经网络的地位（本周要回答的问题）
+
+| 代际 | 代表 | 关键问题 | 本课结论 |
+|---|---|---|---|
+| 第 1 代 | **MLP**（multilayer perceptron，多层感知机） | 能学任意非线性映射，但**只对 training data 有效** → overfitting | 传统 neural network，理论上万能，实践中崩 |
+| 第 2 代 | **CNN**（convolutional neural network） | 为什么 CNN 比 MLP 表现好？ | 不是"local structure"，而是 **parameter sharing = 强 regularization**（§10） |
+| 第 3 代 | **Transformer** | 为什么 Transformer 又超过 CNN？ | **attention** 用 test input 生成权重，捕捉 global information（§12 预告） |
+
+- 老师反复强调的**唯一主线**：machine learning 的成败在于**学到 general rule，而非 overfit 到 training data 的 specific details**。三代网络的演进，本质上是**逐步解决 overfitting 问题**的历史。
+- ⚠️ 老师的核心观点（贯穿全周、也是他自己的研究贡献）：很多人认为 "CNN 优于 MLP 是因为 convolution 只捕捉 local information，而图像有 local structure"——**老师明确说"this is not the reason"**。真正的理由是 **参数共享带来的强正则化**（详见 §10）。
+
+### 2. ⭐ Neuron Model（神经元模型）
+
+#### 2.1 结构：weighted sum + threshold + activation
+
+一个 neuron（神经元）做两件事，顺序固定：
+
+1. **weighted sum（加权求和）**：把输入数据 $\mathbf{x}$ 的每个分量乘以对应 weight，再求和。
+2. **减去 threshold**（或加 bias），再送入 **activation function（激活函数）** 得输出。
+
+⚠️ 老师特别强调的两点：
+
+- **weighted sum 是神经网络里唯一"可学习"的部分**。"In this weighted sum, this weight is a network parameter. It is learnable, it is learned from the training data. **Machine learning or training a neural network is just to update these weights.**"
+- **activation function 是固定的、不可学习的（fixed, non-learnable）**，只是一个简单的非线性函数。
+- **网络必须有 bias/threshold**："A network must have a bias. Without the bias, the network cannot work."即使公式里看不出来，也永远不要忘记。
+
+#### 2.2 数学表达（scalar 形式）
+
+$$
+u_k = \sum_{j=1}^{p} w_{kj} x_j, \qquad y_k = f(u_k - \theta_k)
+$$
+
+| 符号 | 含义 |
+|---|---|
+| $x_1, x_2, \ldots, x_p$ | 输入信号（input signals） |
+| $w_{k1}, w_{k2}, \ldots, w_{kp}$ | neuron $k$ 的 synaptic weights（突触权重） |
+| $u_k$ | linear combiner output（加权和） |
+| $\theta_k$ | threshold（阈值，external parameter） |
+| $f(\cdot)$ | activation function |
+| $y_k$ | neuron $k$ 的输出 |
+
+#### 2.3 把 threshold 吸收进输入（bias 技巧）
+
+令**额外输入** $x_0 = 1$，其权重取 $w_{k0} = -\theta_k$，则上式可写成"纯 weighted sum"：
+
+$$
+v_k = \sum_{j=0}^{p} w_{kj} x_j, \qquad y_k = f(v_k)
+$$
+
+- 求和从 $j=1$ 变成 $j=0$，多出来的 $x_0=1$ 项就是 **bias 项**（$-\theta_k$）。
+- ⚠️ 老师提醒："$j$ 从 1 到 $p$ 写，**不代表没有 threshold**"——只是被吸收了。这一技巧后面在 **least square**（§5.2，要求 $\mathbf{x}$ 含一个常数分量 1）与 **CNN 的 bias $b_k$**（§9）中反复出现。
+
+### 3. ⭐ Activation Functions（激活函数）对比
+
+PDF（第 268–269 页）给出四类 activation function：
+
+| 名称 | 表达式 | 特点 | 使用时期 |
+|---|---|---|---|
+| **Binary function**（阶跃） | $f(v)=1\ (v\ge 0),\ 0\ (v<0)$ | 就是 step function，0/1 突变，不可导 | 早期 NN |
+| **Piecewise-linear function** | $f(v)=1\ (v\ge 0.5);\ v\ (-0.5<v<0.5);\ 0\ (v\le -0.5)$ | 在 0 附近加了一段**过渡区**（transition region），让输出从 0 逐渐升到 1 而不是突然跳变 | 早期 NN |
+| **Sigmoid function** | $f(v)=\dfrac{1}{1+\exp(-av)}$ | **光滑、处处可导**（smooth, differentiable everywhere），且 $0\le f\le 1$ | **CNN 之前的 MLP 主力** |
+| **ReLU function** | $f(v)=\max(0,v)=\begin{cases}v & v\ge 0\\ 0 & v<0\end{cases}$ | 正半轴是**恒等（线性）**，负半轴输出 0；计算最简单 | **CNN / Transformer 时代** |
+
+- 为什么 sigmoid 是 MLP 的绝配（老师原话）："This function is very nice. It is smooth and can be differentiable everywhere. **Everywhere we can compute its differentiation.**"——backpropagation 需要对 $f$ 求导（§6.4），sigmoid 的导数可以用**输出本身**表示，计算极省。
+- 为什么 CNN/Transformer 改用 ReLU：深层网络要**从最后一层把 error 逐层 back-propagate 回第一层**；若用复杂的非线性函数，梯度会**越来越弱、几乎变 0**（vanishing gradient）。ReLU 是最简单的非线性函数（正半轴近似线性），因此"facilitates the deep layers' learning"（PDF 原话）。详见 §10.7。
+- ⚠️ 现代网络里 "almost all NN and Transformer use the ReLU function"（老师原话）。
+
+### 4. ⭐ MLP 的三种数学表达（scalar / vector / matrix）
+
+老师用三种等价写法描述网络，**用哪种取决于后续推导哪种更方便**。
+
+#### 4.1 Scalar 形式（两层网络）
+
+**第一层（hidden layer，隐含层）**，$j=1,\ldots,d$：
+
+$$
+z_j = f\!\left(\sum_{i=1}^{n} w_{ji} x_i\right) = f\!\left(\mathbf{w}_j^{T}\mathbf{x}\right)
+$$
+
+**第二层（output layer）**，$k=1,\ldots,c$：
+
+$$
+y_k = f\!\left(\sum_{j=1}^{d} v_{kj} z_j\right) = f\!\left(\mathbf{v}_k^{T}\mathbf{z}\right) = f\!\left(\sum_{j=1}^{d} v_{kj}\, f\!\left(\sum_{i=1}^{n} w_{ji} x_i\right)\right)
+$$
+
+#### 4.2 Vector / Matrix 形式
+
+$$
+\mathbf{z} = f(\mathbf{W}^{T}\mathbf{x}), \qquad \mathbf{y} = f(\mathbf{V}^{T}\mathbf{z}) = f\!\left(\mathbf{V}^{T} f(\mathbf{W}^{T}\mathbf{x})\right)
+$$
+
+记号（PDF 第 270 页）：
+
+- $\mathbf{x} = (x_1,\ldots,x_n)^{T}$：input vector（列向量）
+- $\mathbf{z} = (z_1,\ldots,z_d)^{T}$：hidden layer 输出
+- $\mathbf{y} = (y_1,\ldots,y_c)^{T}$：network 输出
+- $\mathbf{t} = (t_1,\ldots,t_c)^{T}$：**target output / ground truth**（监督训练必须有）
+- $\mathbf{w}_j$ = 第 $j$ 个隐含神经元的 weight **vector**；把 $d$ 个 $\mathbf{w}_j$ 并排 → 矩阵 $\mathbf{W} = [\mathbf{w}_1\ \mathbf{w}_2\ \cdots\ \mathbf{w}_d]$（**一列 = 一个神经元的权重**）
+- 同理 $\mathbf{V} = [\mathbf{v}_1\ \mathbf{v}_2\ \cdots\ \mathbf{v}_c]$
+
+#### 4.3 ⭐⭐ 为什么 activation function 必须非线性
+
+设 $f$ 是线性函数 $f(r)=r$，则
+
+$$
+\mathbf{y} = f\!\left(\mathbf{V}^{T} f(\mathbf{W}^{T}\mathbf{x})\right) = \mathbf{V}^{T}\mathbf{W}^{T}\mathbf{x} = (\mathbf{W}\mathbf{V})^{T}\mathbf{x} = \mathbf{U}^{T}\mathbf{x}, \qquad \mathbf{U} = \mathbf{W}\mathbf{V}
+$$
+
+- ⚠️ **两个 layer 的权重矩阵可以合并成一个** $\mathbf{U}$ → **多层网络完全等价于单层网络**（"Multilayer network will be just the same as a single layer network"）。
+- 结论：**hidden neuron 的 activation function 必须是非线性函数**，否则层数没有意义。这是"为什么要有 activation function"的根本答案。
+- 补充（老师口述）：**单层网络连 activation function 都不需要**——即使加了非线性 $f$，$f(\mathbf{w}^T\mathbf{x})$ 也只是"标量函数的非线性"，输入输出关系仍是线性的，仍只能形成**线性决策边界**。**非线性的作用是"separate two different layers"**，让多层不等价于单层。
+
+### 5. ⭐ 单层网络的学习：MSE → 闭式解 → Gradient Descent
+
+#### 5.1 Error 与 loss function
+
+单层、单输出：$y = \mathbf{w}^{T}\mathbf{x}$，则
+
+$$
+e = t - y = t - \mathbf{w}^{T}\mathbf{x}
+$$
+
+**Mean square error（均方误差）作为 loss function**（老师称"loss function"是目前最流行的叫法，另有 objective/cost function 等名称）：
+
+$$
+J(\mathbf{w}) = E\{e^{2}\} = E\{(t-y)^{2}\} = E\{(t-\mathbf{w}^{T}\mathbf{x})^{2}\}
+= \overline{t^{2}} - 2\mathbf{w}^{T}E\{\mathbf{x}t\} + \mathbf{w}^{T}E\{\mathbf{x}\mathbf{x}^{T}\}\mathbf{w}
+$$
+
+- 为什么要平方：error 有正有负，**平方后恒非负**，最小值 0 才有意义（"then the smallest error is zero"）。
+- 为什么取 $E\{\cdot\}$：期望在训练中就是**对所有 training data 求平均**。
+- ⭐ $J(\mathbf{w})$ 是 $\mathbf{w}$ 的**二次函数（quadratic function，二阶）→ 只有一个 minimum point**（1D 情形是抛物线，最小值在 $w=t/x$）。因此可以**直接求导置零**。
+
+#### 5.2 ⭐ 闭式解：Least Square Method
+
+$$
+\frac{\partial E\{e^{2}\}}{\partial \mathbf{w}} = 0 \;\Longrightarrow\; E\{\mathbf{x}\mathbf{x}^{T}\}\mathbf{w} = E\{\mathbf{x}t\}
+$$
+
+用样本平均近似期望（$q$ 个样本）：
+
+$$
+E\{\mathbf{x}\mathbf{x}^{T}\} \cong \frac{1}{q}\sum_{i=1}^{q}\mathbf{x}_i\mathbf{x}_i^{T}, \qquad E\{\mathbf{x}t\} \cong \frac{1}{q}\sum_{i=1}^{q}\mathbf{x}_i t_i
+$$
+
+把所有样本排成数据矩阵 $\mathbf{X} = [\mathbf{x}_1\ \mathbf{x}_2\ \cdots\ \mathbf{x}_q]$，$\mathbf{t} = [t_1\ t_2\ \cdots\ t_q]$，则 $q\,E\{\mathbf{x}\mathbf{x}^{T}\} \cong \mathbf{X}\mathbf{X}^{T}$，$q\,E\{\mathbf{x}t\} \cong \mathbf{X}\mathbf{t}^{T}$，于是
+
+$$
+\boxed{\;\mathbf{w} = (\mathbf{X}\mathbf{X}^{T})^{-1}\mathbf{X}\mathbf{t}^{T}\;}
+$$
+
+- 这就是 **least square method（最小二乘法）**。
+- ⚠️ 需要求**逆矩阵** $(\mathbf{X}\mathbf{X}^{T})^{-1}$，形式上与 **Mahalanobis distance** 中的 $\boldsymbol{\Sigma}^{-1}$ 极为相似：若 $\mathbf{X}$ 换成"减去均值的数据矩阵"，$\mathbf{X}\mathbf{X}^{T}$ 就是 covariance matrix。
+- 老师提出的**思考题（他本人也未做的研究）**：这个 least square 解**乘上输入产生分类输出**的形式，与 **Mahalanobis distance classifier** 的解几乎一模一样。区别在于：Mahalanobis 的解在 "data 是 Gaussian PDF" 时才是最优；而 least square 解在**任意分布**下都最优（**但最优指的是"最小化 mean square error"，不是"最小化分类错误率"**）。两者最终结果可能非常接近，值得比较。
+- ⚠️ 用此解做分类时：$\mathbf{x}$ 必须**含一个常数分量 1**（bias，§2.3）；两类时常用 target = $+1$ / $-1$，决策边界取输出为零处。
+
+#### 5.3 ⭐ Gradient Descent（梯度下降）
+
+$J(\mathbf{w})$ 单层时是二次的，但**多层非线性时没有解析解**（§6.1）。通用做法是迭代：
+
+$$
+\mathbf{w} \leftarrow \mathbf{w} + \Delta\mathbf{w}, \qquad \Delta\mathbf{w} = -\eta \nabla J(\mathbf{w})
+$$
+
+其中
+
+$$
+\nabla J(\mathbf{w}) = \frac{\partial E\{(t-\mathbf{w}^{T}\mathbf{x})^{2}\}}{\partial \mathbf{w}}
+= -2E\{(t-\mathbf{w}^{T}\mathbf{x})\mathbf{x}\} = -2E\{e\mathbf{x}\} \cong -2e_i\mathbf{x}_i
+$$
+
+- 梯度指向 loss **增大**最快的方向，所以沿**反方向**更新（$-\eta$）能让 loss 下降。老师原话："gradient will point out the direction the loss function will increase... modify the W in the opposite direction of the gradient."
+- 用**单个样本**近似期望 $E\{\cdot\}$，得到经典的 **LMS / delta rule**：
+
+$$
+\boxed{\;\mathbf{w} \leftarrow \mathbf{w} + \eta\, e_i \mathbf{x}_i = \mathbf{w} + \eta\,(t_i - y_i)\mathbf{x}_i\;}
+$$
+
+  迭代下去会收敛到与解析解 $\mathbf{w}=(\mathbf{X}\mathbf{X}^{T})^{-1}\mathbf{X}\mathbf{t}^{T}$ **相同的结果**。
+
+#### 5.4 ⭐ Learning Rate $\eta$ 的取舍
+
+| $\eta$ | 收敛速度 | 结果 |
+|---|---|---|
+| **大** | 快 | 靠近 minimum 时会**来回振荡（oscillate）**，收敛到误差较大的值，无法非常接近 minimum |
+| **小** | 慢 | 需要**很多次迭代**，但能收敛得非常接近 minimum |
+
+- 常用做法（现代 deep learning 仍在用）：**先用较大 learning rate，若干轮后改小**（learning rate schedule）。
+- 老师自述：他**硕士期间**就研究过如何计算/选取 adaptive signal processing 中的**最优 learning rate / step size**——那时还没有 neural network 和 deep learning，但"参数从数据中学习"的思想已经存在，且与 gradient descent 完全同构。这是他"早期研究"的起点。
+
+#### 5.5 ⭐ Batch 的三种极端：SGD / Mini-batch / Full-batch
+
+期望 $E\{e\mathbf{x}\}$ 如何用样本实现，对应三种做法：
+
+| 方式 | 更新频率 | 说明 |
+|---|---|---|
+| **单样本（SGD）** | 每个样本更新一次 | 一个极端：用 1 个 sample 就算 gradient 并更新 |
+| **Mini-batch** | 每个 batch 更新一次 | **中间方案**：把 training data 分成若干 batch，batch 内求平均后更新一次 |
+| **Full-batch** | 每轮（epoch）更新一次 | 另一个极端：在**全部** training data 上求平均后更新一次 |
+
+- ⚠️ 老师强调："**the size of the batch is very important to make the learning more effective**"——这就是今天 deep learning 里 batch size 这个超参的由来。
+
+#### 5.6 Learning Curve 与线性决策边界
+
+- 把 loss 对 iteration 数作图 → **learning curve（学习曲线）**。
+- **training data 上的 loss 曲线必然单调下降**（因为更新规则就是为减小 loss 设计的）；但 **test data 上的 loss 不一定下降，可能上升**——因为 test data 从不参与训练，网络"学不到"它。两条曲线的**差距（gap）**就是问题所在。
+- 单层网络 → 输入输出是**线性关系** → 分类时只能形成**线性决策边界**：
+
+$$
+\mathbf{w}^{T}\mathbf{x} = 0
+$$
+
+  即一条直线 / 一个平面 / 一个 hyperplane。两类 target 取 $\pm 1$ 时，边界就是输出等于 0 的位置。**这正是必须研究多层网络的原因**。
+
+### 6. ⭐⭐ Backpropagation（反向传播，本周最核心）
+
+#### 6.1 动机：为什么必须有 backprop
+
+两层网络的 loss：
+
+$$
+J(\mathbf{w},\mathbf{v}) = E\{e^{2}\} = E\{\|\mathbf{t}-\mathbf{y}\|^{2}\} = E\!\left\{\left\|\mathbf{t} - f\!\left(\mathbf{V}^{T} f(\mathbf{W}^{T}\mathbf{x})\right)\right\|^{2}\right\}
+$$
+
+- 令 $\nabla J(\mathbf{w},\mathbf{v}) = 0$ —— ⚠️ **由于非线性函数 $f$ 的存在，这个方程组没有解析解（no analytical solution）**，无法像单层那样解出 $\mathbf{w}, \mathbf{v}$ 的显式表达式。
+- 这就是 1940s–1970s（**30 多年**）神经网络研究**只能停留在单层**的原因："people just stop here. For more than 20, 30 years, people research on the neural network just on the single layer."
+- 突破点（老师说他当年觉得很惊讶，因为解法"并不难"）：**既然 gradient 可算，就不必解方程**。只要能得到 $\nabla J$ 的**数学表达式**（哪怕解不出 $=0$），代入数值就能迭代更新：
+
+$$
+\mathbf{w} \leftarrow \mathbf{w} - \eta\nabla J(\mathbf{w}), \qquad \mathbf{v} \leftarrow \mathbf{v} - \eta\nabla J(\mathbf{v})
+$$
+
+#### 6.2 ⭐ 链式法则推导（scalar 形式）
+
+记 $\mathbf{z} = f(\mathbf{q})$，$\mathbf{y} = f(\mathbf{q}_k)$ 式的中间量：
+
+- $q_j = \sum_i w_{ji} x_i$：隐含神经元 $j$ 的 weighted sum，$z_j = f(q_j)$
+- $q_k = \sum_j v_{kj} z_j$：输出神经元 $k$ 的 weighted sum，$y_k = f(q_k)$
+
+取带 $\frac{1}{2}$ 的平方误差（**取 $1/2$ 只是为了求导后系数变简洁**，老师原话）：
+
+$$
+J(\mathbf{w},\mathbf{v}) = \frac{1}{2}\sum_{k=1}^{c}(t_k - y_k)^{2}
+= \frac{1}{2}\sum_{k=1}^{c}\left(t_k - f(q_k)\right)^{2}
+= \frac{1}{2}\sum_{k=1}^{c}\left(t_k - f\!\left(\sum_{j=1}^{d} v_{kj} z_j\right)\right)^{2}
+$$
+
+**① 对输出层权重 $v_{kj}$ 求导**（chain rule 一次）：
+
+$$
+\boxed{\;\frac{\partial J(\mathbf{w},\mathbf{v})}{\partial v_{kj}} = \frac{\partial J}{\partial q_k}\cdot\frac{\partial q_k}{\partial v_{kj}} = -(t_k - y_k)\,f'(q_k)\,z_j\;}
+$$
+
+**② 对隐含层权重 $w_{ji}$ 求导**（chain rule 三次，逐层"回传"）：
+
+$$
+\boxed{\;\frac{\partial J(\mathbf{w},\mathbf{v})}{\partial w_{ji}} = \frac{\partial J}{\partial z_j}\cdot\frac{\partial z_j}{\partial q_j}\cdot\frac{\partial q_j}{\partial w_{ji}} = -\sum_{k=1}^{c}(t_k - y_k)\,f'(q_k)\,v_{kj}\,f'(q_j)\,x_i\;}
+$$
+
+⚠️ **这两个式子的关键差别**：$\partial J/\partial w_{ji}$ 中出现了 $\sum_k (t_k-y_k)f'(q_k)v_{kj}$ —— 正是**输出层的误差项**经过权重 $v_{kj}$ 传回第 $j$ 个隐含神经元的结果。也就是说：
+
+- 输出层：**error 乘上该层输入的 derivative**
+- 隐含层：**把输出层的 error 沿权重"反向"传回来**，再乘本层 activation 的 derivative
+
+⛔ 这正是算法得名 **back-propagation（误差反向传播）** 的原因。
+
+#### 6.3 更新公式（最终形式）
+
+$$
+v_{kj} \leftarrow v_{kj} - \eta\frac{\partial J}{\partial v_{kj}}
+= v_{kj} + \eta\,(t_k - y_k)\,f'(q_k)\,z_j
+$$
+
+$$
+w_{ji} \leftarrow w_{ji} - \eta\frac{\partial J}{\partial w_{ji}}
+= w_{ji} + \eta\sum_{k=1}^{c} v_{kj}\,(t_k - y_k)\,f'(q_k)\,f'(q_j)\,x_i
+$$
+
+- 注意符号：$\partial J/\partial v_{kj}$ 带负号，所以 $-\eta\frac{\partial J}{\partial v_{kj}}$ 变成 **$+\eta$**。
+- 直觉：weight 的更新量 ∝ **误差 × 该 weight 对应输入信号 × activation 斜率**。
+
+#### 6.4 ⭐ Sigmoid 的导数（为什么 backprop 选 sigmoid）
+
+$$
+f(q) = \frac{1}{1+\exp(-aq)}, \qquad 0 \le f(q) \le 1
+$$
+
+$$
+f'(q) = \frac{a\exp(-aq)}{\left[1+\exp(-aq)\right]^{2}} = a\,f(q)\left[1 - f(q)\right]
+$$
+
+- ⚠️ **极其重要的计算优势**：$f'(q)$ 可以用**已经算出的输出 $f(q)$ 直接表示**，不必重新计算 exp。老师原话："This is why this mode function is very nice. It is smooth, differentiable everywhere, and **we can just use the output of this activation function to get its differentiation.**"
+- sigmoid 的导数最大值只有 $a/4$（$a=1$ 时 = 0.25）→ 这正是深层网络 **vanishing gradient** 的根源（§10.7）。
+
+#### 6.5 ⭐ Backpropagation 训练流程（PDF 第 288–290 页，5 步）
+
+给定 $n$ 个 training sample $\{\mathbf{x}(1),\mathbf{t}(1)\},\ldots,\{\mathbf{x}(n),\mathbf{t}(n)\}$：
+
+| 步骤 | 名称 | 内容 |
+|---|---|---|
+| **(1)** | **Initialization** | 无先验信息时，weight 取**均匀分布**随机值（mean = 0）；**方差要选得让 activation signal 的标准差落在 sigmoid 的"线性区与饱和区交界处"** |
+| **(2)** | **Presentation** | 向网络呈现一个 **epoch（一轮）** 的 training samples |
+| **(3)** | **Forward computation** | 把 $\mathbf{x}(i)$ 送入输入层，**逐层前向**计算各神经元的 activation signal 与 function signal |
+| **(4)** | **Backward computation** | 计算 local gradient，**逐层反向**调整 synaptic weights |
+| **(5)** | **Iteration** | 呈现新的 epoch，重复 (3)(4)，直到满足 **stopping criterion** |
+
+- ⚠️ **每个 epoch 都要重新随机打乱样本顺序**（"the order of presentation of training samples should be randomized from epoch to epoch"）。
+- **Stopping criterion**：迭代次数上限，或 **average error 的变化率足够小**。
+- 两种信号（PDF 第 287 页）：forward 传的是 input/function signal，backward 传的是 error signal。**训练 = forward + backward 交替；预测 = 只做 forward。**
+- ⚠️ 老师的历史评价：backprop **数学上只是链式法则**（"We just use the chain rule, we don't need specific skills"），但意义重大——"even now the deep learning and the transformer also use this backpropagation"，是 **Hinton 获 Nobel Prize 的贡献之一**（⚠️ 老师原话：主要贡献是 convolutional network，backpropagation 也被诺奖提及；Nobel Prize 于 2024 年颁给 University of Toronto 的 Hinton，具体奖项表述以官方为准）。
+
+### 7. ⭐ 训练的两大根本困难
+
+#### 7.1 Problem of Local Minima（→ underfitting）
+
+- loss 作为 network parameter 的函数是**高度非线性（highly nonlinear）**的，且参数多达数百上千个 → loss surface 极其复杂。
+- gradient descent **只依赖局部信息**，只能沿梯度下降 → 一旦到达某个 **local minimum**，gradient = 0，**无法再更新**（它不接受 loss 先升后降的策略）。
+- 从不同的初始点出发，会收敛到**不同的 local minimum** → 训练结果，理论上有 global minimum（可让 training error → 0）但**不保证能找到**。
+- 后果：训练停在某个 loss 值远高于目标的点 → **underfitting（欠拟合）**：网络没能学到 training data 中的规律。
+- ⚠️ 老师的博士论文工作：提出一种**构造网络结构 + 初始化参数**的方法以保证得到解 —— *X.D. Jiang and A. Kam, "Constructing and Training Feed-Forward Neural Networks for Pattern Classification," Pattern Recognition, vol. 36, no. 4, pp. 853–867, April 2003*（PDF 第 290、299 页引用）。
+
+#### 7.2 ⭐⭐ Overfitting（比 local minima 更严重，老师称"the most important problem in all machine learning"）
+
+- 设定：machine learning 的目标是找到**未知的连续函数** $f$，使 $\mathbf{y} = f(\mathbf{x})$ 对**整个 population** $\mathbf{x}\in\mathbb{R}^{n}$ 成立；但我们只有**有限的离散训练样本** $\{\mathbf{x}_i,\mathbf{y}_i\}$，只能求出近似 $\hat{f}$。
+
+$$
+\min_{\hat{f}} e^{2} = \min_{\hat{f}} \sum_{\forall i}\left\|\mathbf{y}_i - \hat{f}(\mathbf{x}_i)\right\|_{2}^{2} \;\Rightarrow\; 0
+\quad\text{但只会得到}\quad \mathbf{y}_i = \hat{f}(\mathbf{x}_i)\ \text{（训练点）而非}\ \mathbf{y} = f(\mathbf{x})\ \text{（全体）}
+$$
+
+- ⚠️ 老师的**核心论断**："Compared to the continuous, uncountable infinite different values, a set of **finite discrete samples, whatever large in size, is always negligible**!"（有限样本相对连续无限总体，永远可以忽略不计）→ **overfitting / poor generalization 是 machine learning 的根本困难。**
+- **典型案例：double spiral problem（双螺旋问题）**（PDF 第 299 页）：
+  - 二维输入，两类样本（黑/白）各自形成一条螺旋，**两条螺旋完全重叠**（fully overlapped）→ 需要**高度非线性**的决策边界。
+  - 线性分类边界 → 错误率最高约 **50%**（等于乱猜）。
+  - **两层 MLP** 训练后 → **training data 上 100% 正确**，形成极复杂的非线性边界。
+  - ⚠️ 但画出的 decision region 显示：边界**极度扭曲（wiggly/funding）**，某些训练点被"孤立地"包进正确的区域；**输入只要与该点略有不同，立刻分类错误**。
+  - 用更多层（5 层）训练 → 边界几乎一样，仍然处处是 overfitting 的痕迹 —— **更多层并不能解决 overfitting**。
+- ⚠️ 老师用这个例子说明："although the network is powerful in terms of machine learning — it can learn the training data perfectly — it cannot work for the [new] data. Sometimes just very slightly different from the training data."
+- 历史代价（老师亲历的 research history）：正因为 overfitting，神经网络研究在 1990s–2000s 中期**跌入谷底**——"in that year, nobody cared about neural networks. Even top conferences such as **CVPR** and **TPAMI** would reject all submissions if your paper topic is neural network."
+
+#### 7.3 ⭐ Regularization（正则化：解决 overfitting 的唯一思路）
+
+⚠️ 老师的根本逻辑：**仅靠 machine learning 原理上无法解决 overfitting**（因为它就是从 training data 学）。唯一出路是**用 human knowledge 去限制/约束 $\hat{f}$**，这就是 **regularization**。PDF（第 300–301 页）给出三种做法：
+
+| 做法 | 数学形式 | 说明 |
+|---|---|---|
+| **限制函数类** | $\min_{\hat{f}\in\Omega}\sum_{\forall i}\|\mathbf{y}_i - \hat{f}(\mathbf{x}_i)\|^{2}$ | 约束学到的函数只能是"简单的/经典的"一类函数，复杂度不超过某个程度 |
+| **先降维再学习** | 先 reduce data 到低维，再在低维空间最小化 loss | 这就是 **dimensionality reduction（PCA/LDA）能提高 test accuracy 的原因**——它提供了一条克服 overfitting 的途径 |
+| **加正则项** | $\min_{\hat{f}}\sum_{\forall i}\|\mathbf{y}_i-\hat{f}(\mathbf{x}_i)\|^{2} + \lambda\Phi(\hat{f})$ | 在 loss 中追加 regularization term，例如约束参数**稀疏（sparse）**→ sparse coding / sparse representation |
+
+#### 7.4 Validation Set 与 Early Stopping
+
+- 把 training data 划出一部分**不参与训练**，作为 **validation data**，用来"validate 训练后的 loss 值"。
+- 训练在 **validation data 上 loss 最小处停止**，而不是在 training data 上 loss 最小处停止。
+- ⚠️ 老师明确指出这**只能部分解决问题**："even if the network is trying to work well on the validation data, the test data is also different from the validation data. It cannot [completely] solve the problem of overfitting."
+
+### 8. ⭐⭐ 神经网络发展史（老师亲历的研究曲线）
+
+| 时期 | 状态 | 原因 |
+|---|---|---|
+| **1940s 起** | 研究起步（比 1950s 更早） | 但**只能做单层**——多层没有解法 |
+| **1980s** | **backpropagation 出现** → 多层可训练 | 发现"两层 MLP 就能实现任意非线性关系" → 研究热情爆发；新期刊涌现：*IEEE Trans. on Neural Networks*、*Neural Computation* 等，大量 PhD 以此毕业（老师本人也是） |
+| **1980s–1990s** | 第一个**高峰** | 人们相信神经网络无所不能 |
+| **1990s → 2000s 中期** | **跌入极深的谷底（AI winter）** | ⚠️ 因为**只对 training data 有效**：真实数据的 variation 巨大，test 图像与训练集差异很大 → "people found the neural network is useless"；CVPR/TPAMI 直接拒掉 neural network 的投稿 |
+| **2006 前后 → 2010s** | **CNN / deep learning 复兴** | 用**极大规模真实数据集**（如 ImageNet，数百万张真实图像）训练 CNN → 真实图像识别率从约 **60% 提升到 90% 以上** |
+| **2010s → 现在** | Transformer → **large model（ChatGPT）** | 这次的推动力**主要来自工业界**（industry，因为能直接产生 revenue），而非大学学术界 |
+
+- ⚠️ **DNN / CNN 是"第三代神经网络"**（PDF 第 295 页）。
+- ⚠️ 老师对 "deep learning" 一词的**祛魅**：**"Deep learning does not mean the network can learn knowledge deep inside. Deep learning just means we have deep layers — many layers, a huge number of layers."**（现代 CNN 可达 100 层甚至数百层、上千层。）
+- 深刻学习 = **progressive learning**（PDF 原话）：复杂的非线性 input-output relation 是**逐层、渐进**学出来的。
+
+### 9. ⭐ CNN 的结构：Convolution + Pooling + ReLU
+
+#### 9.1 CNN 与 MLP 的五大差异（PDF 第 303 页）
+
+1. **Network architecture**（网络结构，二维排布，直接面向图像）
+2. **Convolution**（卷积替代 weighted sum）
+3. **Simple nonlinear activation function ReLU**（最简非线性激活）
+4. **Pooling**（池化）
+5. **Deep, large number of layers**（层数很多）
+
+以 **VGG-Face CNN**（人脸识别网络）为例：
+
+- 输入图像 → 用 **3×3 的 filter window** 卷积 → 输出多张 output image（**feature map**，也叫 channel）。
+- 第一层用 **64 个不同的 filter → 生成 64 张 output image**（64 channels）。
+- 卷积后接 **ReLU**，再接 **pooling layer**：以 2×2 窗口为例，4 个像素中只留 1 个、丢掉另外 3 个 → **空间尺寸长宽各减半，像素数只剩 1/4**。
+- 反复 "convolution → ReLU → pooling" 堆叠后，最后得到一个 **spatial size 为 7×7、channel 数超过 500** 的 feature map。
+- 这个 7×7×500 的 feature map 就是**最终特征**，用于分类/预测（识别输入图像是哪个人的人脸）。
+- 演化规律：**空间尺寸（spatial size）不断减小，channel 数（number of feature maps）不断增大**。
+
+⚠️ 老师对 pooling 的**个人观点**（与主流教材不同，且他明确说 "pooling does not make much role"）：
+
+- pooling **只是减小 spatial size**，本身不提供什么能力；
+- 如果 pooling 是 **sub-sampling（下采样）**型而非 **max pooling**，那么"在部分像素上算卷积"和"算完之后 pooling"是**等价的**——**去掉 pooling 层，效果差不多**；
+- 真正的主角是 **convolution**。
+
+#### 9.2 ⭐ Convolution 的数学定义（含 bias 与 channel 求和）
+
+训练数据：输入 feature maps 空间尺寸 $P\times Q$、$C$ 个 channel，记为 $x_{i,j,k}$；输出 feature maps 空间尺寸 $P\times Q$、$D$ 个 channel，记为 $y_{i,j,k}$。则（PDF 第 304 页，以 3×3 filter 为例）：
+
+$$
+\boxed{\;y_{i,j,k} = \sum_{n=1}^{C}\ \sum_{m=-1}^{1}\ \sum_{l=-1}^{1} w_{l,m,n,k}\, x_{i-l,\, j-m,\, n} \;+\; b_k\;}
+$$
+
+$$
+1\le i\le P,\quad 1\le j\le Q,\quad 1\le k\le D
+$$
+
+逐项解读（老师原话的整理）：
+
+| 部分 | 含义 |
+|---|---|
+| $\sum_{l=-1}^{1}\sum_{m=-1}^{1}$ | **卷积本身**：以 $(i,j)$ 为中心的 3×3 邻域**空间加权求和**（$l,m$ 取 $-1,0,1$ 即 3×3；换成 $-\infty..\infty$ 就是传统卷积定义） |
+| $\sum_{n=1}^{C}$ | ⚠️ **CNN 特有**：把 **所有输入 channel（输入图像）** 上同一 spatial position 的结果**再加总**——"convolution in CNN includes a bias term; along the channel dimension, all inputs of different channels are **fully connected**, same as MLP" |
+| $w_{l,m,n,k}$ | 第 $k$ 个 filter 的权重（$n$ = 输入 channel 索引，$k$ = 输出 channel 索引） |
+| $b_k$ | 每个输出 feature map（每个 filter）**一个 bias** |
+| 下标 $k$ | 不同 filter → 不同输出 channel |
+
+- ⚠️ 与图像处理课里的传统 convolution 的区别：传统卷积只对**单张图**做空间加权求和；CNN 的卷积**还必须在 channel 维上求和**（因为输入天然是多张图，RGB 就有 3 个 channel）。
+- 老师提醒：PPT 上 $\sum_{m=-1}^{1}$ 的上下限有时显示成 $\pm 1$ 有时显示别的东西，是 PowerPoint 的显示 bug，"this sign is just here, same as this one"，不影响含义。
+
+#### 9.3 ⭐ CNN vs MLP（1D 形式的严格对照）
+
+这是本周**最关键的一段推导**——把 CNN 写成 MLP 的形式，两者差异一目了然（PDF 第 306–309 页）。
+
+**MLP**：
+
+$$
+o_j = \sum_{\forall i} w_{ji}\,x_i = \mathbf{w}_j^{T}\mathbf{x}, \qquad \mathbf{o} = \mathbf{W}\mathbf{x}
+$$
+
+**CNN（1D 卷积）**：
+
+$$
+o_j = w_j * x_j = \sum_{\forall i} w_i\, x_{j-i} = \mathbf{w}^{T}\mathbf{x}_j = \mathbf{w}\mathbf{x}_j
+$$
+
+把 CNN 的每个输出 $o_j$ 也写成 MLP 的 $\mathbf{w}_j^{T}\mathbf{x}$ 形式：
+
+- $\mathbf{x}$：**整个输入**（长向量，含所有位置）
+- $\mathbf{x}_j$：**以像素 $j$ 为中心、filter 窗口内**的**短向量**（低维）
+- ⚠️ **关键差别**：
+  - MLP 的 $\mathbf{w}_j$ **随 $j$ 变化**（每个输出位置有自己**各自独立**的权重）；
+  - CNN 的 $\mathbf{w}$ **与 $j$ 无关**——**对所有输出位置用同一个 filter**。
+
+若坚持用"全长度向量"写法，则 CNN 的权重矩阵
+
+$$
+\mathbf{W} = (\mathbf{W}_1,\ \ldots,\ \mathbf{W}_q,\ \ldots,\ \mathbf{W}_p)
+$$
+
+$$
+\mathbf{W}_q = \left(\ \cdots,\ 0,\ \mathbf{g}_1,\ \mathbf{g}_2,\ \ldots,\ \mathbf{g}_p,\ 0,\ \cdots\ \right)^{T}
+$$
+
+- 即：**每个 $\mathbf{W}_q$ 只有 filter 窗口覆盖的那一小段 $(\mathbf{g}_1,\ldots,\mathbf{g}_p)$ 非零，其余分量全部补 0**；filter $\mathbf{g}$ 被"搬"到第 $q$ 个输出位置（这也是"zero padding 视角"——把 filter 参数补零到与输入等长）。
+
+$$
+\boxed{\;\text{CNN is a regularized MLP（CNN 是一种被强正则化的 MLP）}\;}
+$$
+
+| 对比项 | MLP | CNN |
+|---|---|---|
+| 基本运算 | weighted sum | convolution（**也是 weighted sum**） |
+| 权重自由度 | $\mathbf{W}$ 中**所有元素**都自由地从训练数据学 | $\mathbf{W}$ 中**大量元素被强制为 0**；非零元在**所有列上取值完全相同** |
+| 每个输出位置的参数 | $\mathbf{w}_j$ 各不相同 | 共用同一个 filter $\mathbf{w}$ |
+| 参数量 | 巨大（$p\times p$ 级） | 只有 filter 大小（如 3×3） |
+| 学习方式 | 各自为政地学 | "把一组参数移到不同位置去产生输出" |
+| 本质 | 自由学习 | **强正则化**的 MLP |
+
+- ⚠️ 老师对这条结论的评价：**这是 CNN 优于 MLP 的"真正原因"**——不是因为 local structure，而是因为**强正则化 = 抑制 overfitting = 提升 generalization**。
+
+### 10. ⭐⭐ CNN 为什么更好：Parameter Sharing 的深层含义
+
+#### 10.1 ⭐ 核心机制：each learnable parameter goes through all pixels
+
+- CNN 的 filter 参数**被所有输入像素和输出像素共享（shared by all input and output pixels）**。
+- 最关键的一步推理：**在机器学习过程中，共享意味着这个参数是由所有像素共同决定的，而不是只由某个特定像素决定**。
+- ⚠️ 老师的经典表述（PDF 第 308 页原句）：
+
+  > "**Each learnable parameter goes through all pixels. Convert one image as a training sample to every pixel as a training sample?**"
+
+  即：本来一张图像是**一个** training sample；而在 CNN 中，每一个像素位置都相当于一个 training sample，**所有像素一起训练每一个 filter 参数**。
+- 于是参数学到的是**覆盖整个输入的 general rule**，而不是 overfit 到某个 specific component。这就是 CNN **robust to novel unseen data**、能克服 overfitting 的原因。
+
+#### 10.2 ⭐ 由此可解释"为什么 filter 只用 3×3 或 1×1"（PDF 第 307 页）
+
+- 如果只想"捕捉大面积信息"，直觉上应该用**大 filter**；但现代 CNN 反而**只用最小的 3×3（甚至 1×1）**。早期模型还用过 7×7、9×9 甚至更大，越到后来越小。
+- 理由：**要让每个可学习参数都能"走过"图像的每一个位置（尤其是边界处）**。
+  - 用 **1×1** 卷积，参数自然能覆盖每一个像素；
+  - 用 **大 filter**（比如 100×100）时，滑到边界就会**有一部分 filter 落在图像之外**，filter 的参数无法访问所有位置 → 学到的不是"全局通用规则"。
+- 结论：**filter 越小，越能保证"所有像素共同训练同一个参数"这一正则化优势**。
+
+#### 10.3 ⭐ 由此可解释"为什么 CNN 需要很多层"（receptive field）
+
+- 单个 3×3 卷积层的输出**只依赖输入的 3×3 局部区域**。
+- 但多层堆叠后，**感受野（receptive field）逐层扩大**：
+
+| 层数 | 有效覆盖原始输入的窗口 |
+|---|---|
+| 1 层 3×3 | **3×3** |
+| 2 层 3×3 | **5×5** |
+| 3 层 3×3 | **7×7** |
+| ⋮ | ⋮ |
+| 深层（配合尺寸缩减） | 可覆盖**整幅图像** |
+
+- ⚠️ 老师的关键反驳：**"很多人说 CNN 优于 MLP 是因为它利用 local structure。可是层数一多，CNN 的输出能捕捉到几乎整幅图像的信息，不只是一个小窗口。"**——所以"local"不是理由（详见 §10.5）。
+- ⚠️ 另一处细节：因为每层还配合 spatial size 缩减（pooling/stride），3×3 在高层的"有效覆盖"相对于**原始输入**更大。
+
+#### 10.4 ⭐ 由此可解释"为什么 CNN 用 ReLU 而不是漂亮的 sigmoid"（PDF 第 309 页）
+
+- 因为 CNN **层数多**：训练时需要 back-propagate error **从最后一层一路传回第一层**。
+- 若用复杂的非线性函数（如 sigmoid），梯度在逐层相乘中**越来越弱、几乎变成 0** → **vanishing gradient**，深层根本训不动。
+- **ReLU 是最简单的非线性函数**（正半轴近似线性、负半轴置零），梯度为 1 或 0，不会累乘衰减 → 老师说这是 ReLU 之所以成为深度网络标配的**根本理由**（"**the simplest ReLU activation function facilitates the deep layers' learning**"，PDF 原话；CNN 的层数多正是为了配合小 filter 扩大覆盖，§10.3）。
+- ⚠️ 但 ReLU **必须仍是非线性函数**（§4.3），否则多层退化为一层。
+
+#### 10.5 ⭐ 老师的理论：驳斥 "local vs global" 说法
+
+围绕 "为什么 CNN 比 MLP 好 / 为什么 Transformer 比 CNN 好"，流行的解释是：
+
+| 流行说法 | 老师的反驳 |
+|---|---|
+| "CNN 好，因为 convolution 只捕捉 **local** 信息，而图像有 local structure" | ⚠️ **不是理由**。首先，CNN 的 convolution **包含 bias，且沿 channel 维做了全连接**（§9.2）——所以完全可以取 **1×1 卷积**，连空间局部性都不要，CNN 仍然 work；而 1×1 卷积在传统图像滤波里根本不能算 filter（单像素无法滤波）。其次，层数一多，CNN 的输出**已经捕捉到接近整幅图像的信息**（§10.3） |
+| "Transformer 好，因为 Transformer 捕捉 **global** 信息，而 CNN 只是 local" | ⚠️ **同样不是理由**。如果"global 就是好"，那么 **MLP 本来就是 fully connected（全连接 = 完全 global）**，理应最好——可 MLP 恰恰表现最差 |
+| — | ⚠️ 老师的正面回答：**CNN 的优势来自 parameter sharing 的强正则化**（§10.1）；**global information 并不是靠局部/全局这个维度区分的**。PDF（第 320 页）另有一句关键补充：**"Global information learnt by CNN is on the whole training dataset."**（CNN 的"全局性"体现在它从**整个训练集**学规则）—— 这与 Transformer 用 test input 生成权重的机制有本质区别（§12） |
+
+#### 10.6 ⭐ 1×1 Convolution 为什么有意义（PDF 第 305 页）
+
+- 传统图像处理里，filter 必须是**局部区域**的加权和——**单像素无法"滤波"**。
+- 但 CNN 中 **1×1 卷积完全合理**，因为除了空间维，CNN 的卷积还要**沿 channel 维求和**，而沿 channel 维的求和**本身就是一次 fully-connected 的 weighted sum（与 MLP 相同）**。
+- 所以 1×1 convolution = **对每个像素位置，做一次跨 channel 的加权求和**（pointwise 操作），可用来升/降 channel 数。
+- ⚠️ 老师埋了个伏笔："Later, I will show what is the role of this 1×1 convolution."——**答案在 Transformer**：Transformer 里的 **pointwise feed-forward network** 正是 "each learnable parameter goes through all inputs" 的 1×1 卷积思想（§12）。
+
+#### 10.7 ⭐ 深层网络的整体图景（progressive learning）
+
+```
+y = h(W_m^T ... h(W_2^T h(W_1^T x)))     ⇒     y = f(x)
+```
+
+| 论断 | 内容 |
+|---|---|
+| 理论上 | **$m=2$ 就足够**（universal approximator：任意非线性连续函数都能被两层 perceptron + sigmoid 任意逼近，只要节点足够多） |
+| 实际上 | 两层**很难找到解**（§7.1 local minima）；$m \gg 2$ 反而**更容易找到解** |
+| 因此 | **Deep learning：$m \gg 2$**（现代网络可达上百层） |
+| 学到的内容 | 复杂的非线性 input-output 关系被**逐层、渐进（progressive, layer by layer）**地学出来 |
+| 层的递推写法 | $\mathbf{x}_{k+1} = h(\mathbf{W}_k^{T}\mathbf{x}_k),\ k=1,2,\ldots,m$，$\mathbf{x}_1 = \mathbf{x}$，$\mathbf{y} = \mathbf{x}_{m+1}$ |
+
+- ⚠️ PDF 第 297–298 页把 supervised learning 写成一个统一的优化问题：给定有限离散样本 $\{\mathbf{x}_i,\mathbf{y}_i\}$，求 $\hat{f}$ 使 $\min_{\hat{f}} e^{2} = \min_{\hat{f}}\sum_{\forall i}\|\mathbf{y}_i - \hat{f}(\mathbf{x}_i)\|_2^{2}$；neural network 的解法就是上面的 $h$-复合形式。
+- 老师也在此**公开质疑**了"human knowledge 是否无用"：看上去 raw data 直接进网络就能出结果，"our human knowledge is useless"——但这只是印象，真正的关键仍是 regularization 与 generalization（§7.3、§10.1）。
+
+### 11. ⭐ 深层学习成功的官方总结（PDF 第 341 页 "Conclusion of Deep Learning"）
+
+按 PDF 原文逐条：
+
+1. **The success of AI lies in Machine Learning.**
+2. **The success of Machine Learning lies in learning general rules, not overfitting to specific details of training data.**
+3. 这一点靠 **learning in convolution with minimum filter size ⇒ CNN** 实现。
+4. **因此需要很多 convolutional layers 来捕捉大面积信息 ⇒ Deep learning。**
+5. **Deep learning is facilitated by the simplest nonlinear activation function ReLU.**
+6. **CNN 中每个学到的参数都走过所有输入，极大增强了 generalization**；但它是**靠从 training data 学到的权重**去捕捉信息，**这也限制了它的能力**（cannot capture what is not learnable from the training set）。
+7. **Transformer 用 non-learnable 的 attention module 捕捉 global information**：与 MLP / CNN 都不同，**捕捉 global information 的方式不是从训练集学出来的，而是由具体的 test input 决定的**。
+8. **Transformer 所有可学习的模块，用的仍然是 convolution 的思想！**（§12：Q/K/V 投影与 feed-forward 都是 1×1 convolution / pointwise）
+
+### 12. ⭐ Transformer 预告（Topic 10，本周未展开，下周正式讲）
+
+> ⚠️ 本节内容来自 **PDF Topic 10（第 318–341 页）** 与老师本周的口头预告，**本周课堂未讲授**，仅供预习。老师原话："after next week, I will first [cover] further development of the CNN and then based on that, further go to the current state of the art module of the AI model. It is a Transformer."
+
+#### 12.1 Transformer 的定位（PDF 第 319 页）
+
+- 输入 **sequence**（序列）→ 输出 sequence：speech（语音）、text（文本）、time series（时间序列）。
+- **RNN（recurrent neural network）** 及其发展 **LSTM（long short-term memory）** 天然处理序列/列表，但 **Transformer 通过把序列操作并行化（parallelization）而胜过它们**。
+- 最初为 **NLP（natural language processing）** 而生，如今在 **computer vision** 中也比 CNN 更强。
+- 力量的来源是 **Attention module（注意力模块）**：捕捉序列中**每个 word/token 与其余所有 token 的关系**。原始论文标题：***"Attention Is All You Need"***。
+- PDF 提出的三个**待答问题**（下周展开）：
+  1. Transformer 到底怎么工作？**attention 真是一切吗？**
+  2. 与 CNN 有什么关系？
+  3. 能否简单地说 "CNN 只捕捉 local information，而 Transformer 捕捉 global information，所以 Transformer 更强"？——⚠️ **不能**（见 §10.5 的反驳）。
+
+#### 12.2 结构：Encoder + Decoder（PDF 第 321–329 页）
+
+- **一叠结构相同的 encoders + 一叠结构相同的 decoders**。
+- 机器翻译示例：输入一句英文，输出另一语言的译文；**所有 word/token（或图像的 patch）并行地（parallelly）送入** transformer；输出是 decoder 输出上的**线性分类**。
+- 每个 token 先 **embedding** 成一个 feature vector。
+- **Attention layer 与 feed-forward layer 都带 residual skip-connection（残差跳连）**。
+- 每个 encoder/decoder 中都有 **multi-head attention（多头注意力）**。
+- 两类 attention：**self-attention**（源序列自己关注自己）与 **encoder-decoder attention**。
+
+#### 12.3 ⭐ Attention 的计算（PDF 第 330–335 页）
+
+以英译西为例：源句 "The ball is blue" → 目标句 "La bola es azul"。
+
+**Step 1：三个可学习的线性投影（Query / Key / Value）**
+
+$$
+\mathbf{Q} = \mathbf{X}\mathbf{W}_q,\qquad \mathbf{K} = \mathbf{X}\mathbf{W}_k,\qquad \mathbf{V} = \mathbf{X}\mathbf{W}_v
+$$
+
+$$
+\mathbf{q}_i = \mathbf{x}_i\mathbf{W}_q,\quad \mathbf{k}_i = \mathbf{x}_i\mathbf{W}_k,\quad \mathbf{v}_i = \mathbf{x}_i\mathbf{W}_v,\qquad i = 1,2,\ldots,N
+$$
+
+- ⚠️ **所有 token 共享同一套可学习参数**——"any single learnable parameter goes through all tokens or is learned from all tokens"。PDF 明确标注：**这就是 CNN 的 1×1 convolution！**（§10.6 的伏笔在此揭晓）
+
+**Step 2：Attention score = Q 与 K 的点积**
+
+$$
+\mathbf{R} = \mathbf{Q}\mathbf{K}^{T}
+$$
+
+- 点积度量**两个 token 之间的相似度**（similarity）。
+- ⚠️ PDF 标注：这个中间矩阵（"factor" matrix）的每个元素都是两个 word 的乘积 → **Covariance Matrix!!!**（与协方差矩阵同构）。
+
+**Step 3：用 relevance 做 Value 的加权求和**
+
+$$
+\mathbf{Z} = \mathbf{Q}\mathbf{K}^{T}\mathbf{V}, \qquad \mathbf{z}_i = \sum_{j}\left(\mathbf{q}_i\cdot\mathbf{k}_j\right)\mathbf{v}_j
+$$
+
+- Q 与 K 的点积算出**每对 word 之间的 relevance**，再以此作为"factor"对所有 **Value** 做加权和，结果即 attention module 的输出。
+- ⚠️ PDF 讲义中**未写出 softmax 与 $\sqrt{d_k}$ 缩放**，属简化表述；标准 self-attention 为 $\mathrm{softmax}(\mathbf{Q}\mathbf{K}^{T}/\sqrt{d_k})\mathbf{V}$。以老师课件写法为准。
+
+**Step 4：Learnable feed-forward network（pointwise）**
+
+$$
+\mathbf{Y} = h\!\left(h\!\left(h\!\left(\mathbf{Z}\mathbf{W}_1\right)\mathbf{W}_2\right)\mathbf{W}_3\right),\qquad
+\mathbf{y}_i = h\!\left(h\!\left(h\!\left(\mathbf{z}_i\mathbf{W}_1\right)\mathbf{W}_2\right)\mathbf{W}_3\right)
+$$
+
+- 每行 $\mathbf{z}_i$ 对应一个 token；**所有 token 共享同一套参数**。
+- ⚠️ PDF 强调：Transformer 的 feed-forward network **是 pointwise 的，不是 MLP**——"Pointwise means that each single learnable parameter goes through all inputs. **It comes again from the key concept, 1×1 convolution of CNN.**"
+
+#### 12.4 ⭐⭐ 与 MLP / CNN 的本质区别（PDF 第 334、341 页）
+
+> **"Each output token is weighted sum of all input tokens, capturing global information. Different from MLP and CNN, weights are not learnt by training data. They are flexibly generated by specific test input. Attention itself is not learnable."**
+
+| 属性 | MLP | CNN | Transformer |
+|---|---|---|---|
+| 权重来源 | 从 training data 学（**自由**） | 从 training data 学（**共享 + 大量置零**） | ⚠️ **不从 training data 学**——由**具体 test input** 动态生成（attention 本身 non-learnable） |
+| 捕捉范围 | 全连接（global） | 小 filter 局部、**多层后覆盖整图**；从**整个训练集**学全局规则 | **输出 token 是所有输入 token 的加权和 → 天然 global** |
+| 解决 overfitting 的方式 | 无（→ overfit） | **parameter sharing 强正则** | attention 由 test input 决定，**不依赖训练集学到的固定权重** |
+| 可学习部分 | 全部权重 | convolution filter | 仅 **Q/K/V 投影 + feed-forward**（且都基于 **1×1 convolution / pointwise** 思想） |
+
+- ⚠️ Encoder-decoder attention：最后一个 encoder 的输出 → 送入 **Key 与 Value**；其下方 self-attention module 的输出 → 送入 **Query**。即 $\mathbf{Z} = \mathbf{Q}\mathbf{K}^{T}\mathbf{V}$，$z_i = \sum_j (\mathbf{q}_i\cdot\mathbf{k}_j)\mathbf{v}_j$。
+
+#### 12.5 Vision Transformer（ViT）vs CNN（PDF 第 339 页）
+
+- **ViT** 在大规模数据上 pre-train 后，在**多项 computer vision benchmark 上超过 SOTA 的 convolutional network**，且训练所需算力更少。
+- CNNs 在各类 CV 任务上有**经过验证的良好记录**，处理大规模数据集**高效**；而 **Vision Transformer 在需要 global dependencies 与 contextual understanding 的场景下有优势**。
+- ⚠️ 注意 PDF 在 "global(?)" 处打了问号——与 §10.5、§12.4 的讨论呼应：老师**不认为** "local vs global" 是完整的解释。
+
+### 13. ⭐ 本周考点速查
+
+| 考点 | 要点 | 节号 |
+|---|---|---|
+| **neuron model** | $u_k=\sum_j w_{kj}x_j$，$y_k=f(u_k-\theta_k)$；weighted sum 可学，activation 固定 | §2 |
+| **bias 技巧** | 令 $x_0=1,\ w_{k0}=-\theta_k$ → $v_k=\sum_{j=0}^{p}w_{kj}x_j$；**网络必须有 bias** | §2.3 |
+| **四种 activation function** | binary（阶跃）/ piecewise-linear（带过渡区）/ **sigmoid**（光滑处处可导）/ **ReLU**（$\max(0,v)$） | §3 |
+| **sigmoid 用于 MLP 的原因** | 处处可导，且 $f'(q)=a\,f(q)[1-f(q)]$——**用输出即可算导数** | §3, §6.4 |
+| **ReLU 用于 CNN 的原因** | 最简单的非线性函数；深层 backprop 不会 vanishing gradient | §3, §10.4 |
+| **MLP 三种写法** | scalar / vector $\mathbf{y}=f(\mathbf{V}^T f(\mathbf{W}^T\mathbf{x}))$ / matrix | §4 |
+| **⭐ activation 必须非线性** | 线性时 $\mathbf{y}=\mathbf{V}^T\mathbf{W}^T\mathbf{x}=(\mathbf{W}\mathbf{V})^T\mathbf{x}$ → 多层 = 单层 | §4.3 |
+| **单层 loss** | $J(\mathbf{w})=E\{(t-\mathbf{w}^T\mathbf{x})^2\}$，是 $\mathbf{w}$ 的**二次函数** → 唯一 minimum | §5.1 |
+| **⭐ least square 闭式解** | 令梯度 = 0 → $\mathbf{w}=(\mathbf{X}\mathbf{X}^{T})^{-1}\mathbf{X}\mathbf{t}^{T}$；类似 Mahalanobis | §5.2 |
+| **⭐ LMS / delta rule** | $\mathbf{w}\leftarrow\mathbf{w}+\eta(t_i-y_i)\mathbf{x}_i$ | §5.3 |
+| **learning rate 取舍** | 大 → 快但振荡；小 → 慢但精确；常用"先大后小" | §5.4 |
+| **SGD / mini-batch / full-batch** | 期望的实现方式；**batch size 很关键** | §5.5 |
+| **learning curve** | training loss 必降；**test loss 可能升**（gap = 问题所在） | §5.6 |
+| **单层决策边界** | $\mathbf{w}^{T}\mathbf{x}=0$，直线/平面/hyperplane | §5.6 |
+| **⭐⭐ backprop 动机** | 多层 loss 求导方程**无解析解**（非线性 $f$）；但梯度可算 → 用 gradient descent | §6.1 |
+| **⭐⭐ 链式法则结果** | $\frac{\partial J}{\partial v_{kj}}=-(t_k-y_k)f'(q_k)z_j$；$\frac{\partial J}{\partial w_{ji}}=-\sum_k (t_k-y_k)f'(q_k)v_{kj}f'(q_j)x_i$ | §6.2 |
+| **⭐ 为什么叫 backprop** | 隐含层的 error = 输出层 error 经 $v_{kj}$ **反向传回** | §6.2 |
+| **⭐ sigmoid 导数** | $f'(q)=a f(q)[1-f(q)]$ | §6.4 |
+| **backprop 5 步** | init / present epoch / forward / backward / iterate；**每轮打乱样本顺序** | §6.5 |
+| **⭐ local minima** | 梯度只含局部信息，停在 local minimum → **underfitting** | §7.1 |
+| **⭐⭐ overfitting** | double spiral：training 100% 正确但 decision boundary 扭曲，略变即错；**加层不能解决** | §7.2 |
+| **double spiral 数字** | 线性边界错误率 ≈ **50%**；两层 MLP 训练集 **100%** 正确 | §7.2 |
+| **⭐ regularization 三种** | 限制函数类 $\hat{f}\in\Omega$ / 先降维 / 加正则项 $\lambda\Phi(\hat{f})$（如 sparse） | §7.3 |
+| **validation set** | 在 validation loss 最小处停训（**只能部分解决** overfitting） | §7.4 |
+| **⭐ 发展史** | 1940s 单层 → 1980s backprop 高峰 → 1990s–2000s 谷底（CVPR/TPAMI 拒稿）→ 2006+ CNN 复兴（60%→90%+）→ Transformer/large model | §8 |
+| **deep learning 定义** | **只是层数多（$m\gg 2$）**，不是"学到内部深处知识"；理论 $m=2$ 就够但难找解 | §8, §10.7 |
+| **CNN 五大特征** | architecture / convolution / ReLU / pooling / deep many layers | §9.1 |
+| **VGG-Face 例子** | 第一层 64 filters → 64 feature maps；最终 7×7×(**>500**) 特征图 | §9.1 |
+| **⭐⭐ CNN 卷积公式** | $y_{i,j,k}=\sum_{n=1}^{C}\sum_{m=-1}^{1}\sum_{l=-1}^{1}w_{l,m,n,k}x_{i-l,j-m,n}+b_k$ | §9.2 |
+| **⭐ 与 MLP 的差别** | MLP：$o_j=\sum_i w_{ji}x_i$（$w_{ji}$ 随 $j$ 变）；CNN：$o_j=\sum_i w_i x_{j-i}$（**$w$ 与 $j$ 无关**） | §9.3 |
+| **⭐⭐ CNN is a regularized MLP** | CNN 的 W 有大量 **0**，且非零元在各列**取值相同**（filter 挪到不同位置） | §9.3 |
+| **⭐ parameter sharing 的意义** | 每个参数走过**所有像素** → 由**所有像素共同训练** → **一个像素 = 一个 training sample** → 抗 overfitting | §10.1 |
+| **为什么 filter 用 3×3 / 1×1** | 保证参数能覆盖**每个位置**（大 filter 在边界会露出图像外） | §10.2 |
+| **为什么需要很多层** | 3×3 → 5×5 → 7×7…**感受野随层数扩大**，最终覆盖整图 | §10.3 |
+| **为什么用 ReLU** | 层多 → backprop 路径长 → ReLU 梯度不衰减 | §10.4 |
+| **1×1 convolution 为何有意义** | 沿 channel 维的 weighted sum = fully connected（同 MLP） | §10.6 |
+| **⚠️ 驳斥 local/global 说法** | MLP 全连接（global）却最差；CNN 高层也覆盖整图；Transformer 更不是靠 global | §10.5 |
+| **⭐ Transformer 预告** | Encoder+Decoder；$\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\mathbf{K}=\mathbf{X}\mathbf{W}_k,\mathbf{V}=\mathbf{X}\mathbf{W}_v$；$\mathbf{R}=\mathbf{Q}\mathbf{K}^T$（类似协方差）；$\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$ | §12.3 |
+| **⭐⭐ attention 的独特性** | **权重不由 training data 学得**，而由 **specific test input 灵活生成**；attention 本身 non-learnable | §12.4 |
+| **Q/K/V 与 feed-forward 的实质** | 都是 **1×1 convolution / pointwise**——Transformer 可学习部分仍用 convolution 思想 | §12.3, §11 |
+
+### 14. 本周要点小结
+
+- **Neuron model**：neuron = weighted sum → 减 threshold → activation function。**weighted sum 是唯一可学习的部分**，machine learning 就是更新这些 weight；**bias 必须有**，只是可以吸收进输入（$x_0=1$）。
+- **Activation function**：MLP 时代用 **sigmoid**（光滑处处可导，$f'=af(1-f)$ 计算极省）；CNN/Transformer 时代用 **ReLU**（最简非线性，避免深层 vanishing gradient）。**activation 必须非线性**，否则多层网络退化为单层。
+- **单层网络**：loss 是 $\mathbf{w}$ 的二次函数，有**闭式解** $\mathbf{w}=(\mathbf{X}\mathbf{X}^{T})^{-1}\mathbf{X}\mathbf{t}^{T}$（least square），也可用 **gradient descent**（$\mathbf{w}\leftarrow\mathbf{w}+\eta(t_i-y_i)\mathbf{x}_i$）迭代得到同一结果；learning rate、batch size 都在此埋下伏笔。
+- **Backpropagation**：多层网络的 loss 导数方程**无解析解**（非线性 $f$），但**梯度表达式可以用 chain rule 算出** → 用 gradient descent 迭代。其精髓是把输出层的 error 经权重**反向传回**隐含层，故得名 backpropagation。训练 = forward 计算 output + backward 更新权重，逐 epoch 迭代、每轮打乱样本顺序。
+- **两大困难**：**local minima**（→ underfitting，梯度只含局部信息）与 **overfitting**（→ 训练完美但 test 崩，老师视为 machine learning 最核心的问题）。**regularization**（限制函数类 / 降维 / 加正则项）与 **validation set + early stopping** 是缓解手段，但都不能彻底解决。
+- **发展史**：1940s 起只能做单层 → 1980s backprop 带来第一个高峰 → 1990s–2000s 因 overfitting 跌入谷底（CVPR/TPAMI 拒稿）→ 2006 年后 CNN + 大数据集复兴（真实图像识别率 60% → 90%+，主要由工业界推动）→ Transformer → large model（ChatGPT）。**DNN/CNN 是第三代神经网络。**
+- **CNN** = convolution + ReLU + pooling + deep layers。卷积公式 $y_{i,j,k}=\sum_{n}\sum_{m}\sum_{l}w_{l,m,n,k}x_{i-l,j-m,n}+b_k$ 比传统卷积多了**沿 channel 维的求和**（与 bias）。
+- **⭐ CNN 优于 MLP 的真正原因（老师观点）**：不是"local structure"，而是 **CNN is a regularized MLP**——权重矩阵被强制"局部非零 + 所有位置共享同一组非零值"。由此**每个可学习参数走过所有像素，由所有像素共同训练**（一张图 = 每像素一个 training sample），学到 general rule 而非 overfit；也由此解释了**为什么 filter 只用 3×3/1×1**（保证参数能到每个位置）、**为什么需要很多层**（感受野 3×3→5×5→7×7 逐层扩大）、**为什么用 ReLU**（层多、梯度不能衰减）、**1×1 卷积为何有意义**（channel 维本来就是全连接）。
+- **Transformer（预告）**：Encoder + Decoder 堆叠，靠 **attention** 捕捉 token 之间的相互关系；$\mathbf{Q}=\mathbf{X}\mathbf{W}_q$、$\mathbf{K}=\mathbf{X}\mathbf{W}_k$、$\mathbf{V}=\mathbf{X}\mathbf{W}_v$ 都是 **1×1 convolution**；$\mathbf{R}=\mathbf{Q}\mathbf{K}^{T}$ 度量相似度（类比 covariance matrix），$\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$。⚠️ 与 MLP/CNN 的**本质不同**：**attention 的权重不是从 training data 学出来的，而是由具体的 test input 动态生成**，attention 本身 non-learnable——这可能正是它超越 CNN 的关键；而 **Transformer 所有可学习的模块，用的仍是 convolution 的思想**。
+
+### 15. 下一周预告
+
+老师在转写末尾明确说明："**After next week, I will first [cover] further development of the CNN, and then based on that, further go to the current state of the art module of the AI model. It is a Transformer.**"
+
+1. **CNN 的进一步发展（Further Development of CNN）**：PDF 第 310–317 页列出的是**老师本人的研究工作**，预计下周展开：
+   - **Image Segmentation**（逐像素的场景理解，pixel-wise scene understanding）；
+   - **Context Contrasted Local (CCL) features**（把局部信息与其 context/surroundings 做对比）：H. Ding, X.D. Jiang et al., "Context contrasted feature and gated multi-scale aggregation for scene segmentation," **CVPR Oral 2018**；H. Ding, X. Jiang et al., "Semantic Segmentation with Context Encoding and Multi-Path Decoding," IEEE TIP 2020；
+   - **Gated Multi-scale Aggregation**（skip layer 输出选择性融合）；
+   - **Boundary Refinement**（multi-scale Gaussian diffusions）；
+   - **Shape-Variant Convolution**（spatial-dependent vs semantic-dependent context）：H. Ding, X. Jiang et al., "Semantic Correlation Promoted Shape-Variant Context for Segmentation," **CVPR'19 Oral**。
+2. **Transformer（Topic 10 正式讲授）**：重点回答 PDF 第 319–320 页提出的三个问题——Transformer 如何工作？attention 是否真是一切？它与 CNN 有何关系？**"local vs global" 是否足以解释 Transformer 优于 CNN？**（老师已提前给出否定性论证，见 §10.5。）
+3. 后续还会讲 Transformer 在 CV 中的落地：**Vision Transformer (ViT)** 及老师团队的 **Vision-Language Transformer**（H. Ding, C. Liu, S. Wang, X. Jiang, "Vision-Language Transformer and Query Generation for Referring Segmentation," **ICCV'21**；扩展版 **IEEE TPAMI**, vol. 45, no. 6, pp. 7900–7916, Jun. 2023）。
+
+> ⚠️ 具体以 Week 9 课件/转写为准。
+

@@ -1475,3 +1475,659 @@ yy = -(w[0] * xx + b) / w[1]   # 从 w1*x + w2*y + b = 0 解出 y
 > **下一周（Week 8）预告**：本周课件覆盖到 Naïve Bayes 结束。`Python_Implementation.pdf` 中已出现 SVM、LDA、Decision Tree 的代码示例，但课件 `ML-Slides3.pdf` 未展开其理论推导。转写末尾老师提到 Assignment 2 在 Week 8（recess 后）发布。推测 Week 8 可能展开 **LDA（Linear Discriminant Analysis）的理论推导**（Fisher criterion、within-class/between-class scatter matrix）与 **SVM（Support Vector Machine）的 maximum margin、hinge loss、kernel trick、soft margin**，或进入 **Decision Tree / 其他 classifier**。具体以 Week 8 课件确认。
 
 ---
+
+## Week 8 — Linear Discriminant Analysis（LDA / Fisher Discriminant Analysis, FDA）
+
+> **权威来源说明**：本周转写 `week8/week8.txt`（约 16,600 词，单行无标点）噪声极大，以下内容以官方课件 `week8/ML-Slides4.pdf`（Mao Kezhi，58 页）为**权威来源**逐页核对修正（课件中公式为图片，已逐页读图还原）。转写中典型 ASR 错拼与修正对照：
+>
+> | 转写错拼 | 正确术语 |
+> |---|---|
+> | causan / causan function / gau mist / gase / gut | **Gaussian** |
+> | divion / disuion / dibuion / normal divion | **distribution** |
+> | posior probability / posterior | **posterior probability** |
+> | pan / patent / panal / pane classification, pan classifier | **pattern classification / pattern classifier**（"one pan classification" 按上下文 = probability-based（Bayesian）classification） |
+> | harbor plane / harbo plate / hyper plate | **hyperplane** |
+> | stree line / st line / three line / s line | **straight line** |
+> | dismal / dial / der / descal / disal / discal / deer / d function | **discriminant function** |
+> | descent / dissent / decent / decal / different boundary | **decision boundary** |
+> | linear discipline / dental / dial / dicalyss / fi linear / facial (=fish) linear achievement analysis | **Linear Discriminant Analysis / Fisher Linear Discriminant Analysis** |
+> | Lear classifier / linear classified | **linear classifier** |
+> | scomtric / scmtric / scametric / scomtc / scat metric / kata / gato matric / catamtric / scmric | **scatter matrix** |
+> | general eg value / general egalue / gener them / general omic / e value / general value problem | **generalized eigenvalue problem / eigenvalue problem** |
+> | rule | **ρ（rho）**——投影后两类均值之差 |
+> | Alamda / Land a / Lambda / alumna / goma | **λ（eigenvalue）** |
+> | dominolgy / dominot / domnoly / Dnolgy / termination（reduction）/ domeral / Dumeral | **dimensionality（dimensionality reduction）** |
+> | ST / total scat matri | **$S_T$（total scatter matrix）** |
+> | SV（三类例中） | **$S_B$（between-class scatter matrix）** |
+> | no base | **Naïve Bayes** |
+> | Mcelln / Mcellne / mechal path | **machine learning（ML）** |
+> | current matrix / classical ppts function | **covariance matrix** |
+> | Regular raization | **regularization** |
+> | Aric include distance / Atria square distance | **Euclidean distance** |
+> | one 90 / 190 eigen value | **eigenvalue of 0.000** |
+> | 890 eigen value | **eigenvalue 0.0580（二类例）/ 2.9127（三类例）** |
+> | bone face / bone pa | **boldface（记号约定：小写粗体 = 向量，大写粗体 = 矩阵）** |
+> | tie / tied（S tie、SB tied） | **tilde（投影后新空间的 "~" 记号）** |
+> | chum / classroom / Snu / lend the dum | **clustering** |
+> | In words of the S um | **inverse of $S_W$** |
+> | undetermined ants reg / undetermined region | **undecided region** |
+> | VT（"you ask VT"） | **TA（助教）** |
+> | spect | **space** |
+> | Mats / Mb / Matlab | **Matlab** |
+>
+> **本周主题**：承接上周的 **probability-based（Bayesian）classification**（上周的 Bayesian classifier 因 Gaussian density 含指数项，decision boundary 是**曲线** → non-linear classifier）。本周进入 **linear classifier（线性分类器）** 的第一种——**Linear Discriminant Analysis（LDA）**，即 **Fisher Discriminant Analysis（FDA，Fisher 判别分析）**：先讲**任意线性分类器的几何性质**（$w$ 垂直于超平面、$g(\boldsymbol{x})$ 的几何意义），再讲 **Fisher criterion（Fisher 准则）**、**within-class scatter matrix / between-class scatter matrix（类内/类间散布矩阵）**、**generalized eigenvalue problem（广义特征值问题）**、**闭式解**、**bias $w_0$**，最后推广到 **Multiple Discriminant Analysis（多类判别分析，$c-1$ 个判别函数）**。
+>
+> ⚠️ **本周老师发布 Assignment 2**（linear FDA classifier，同一 Iris 数据集，与 Assignment 1 合并为一份 PDF 提交，**2026-10-19 截止**）——详见 §7，属必须完成的行动项。
+
+### 1. 从 non-linear classifier 到 linear classifier（PDF p.1-2）
+
+上周的 Bayes classifier 用 Gaussian density 构造 discriminant function，decision boundary 是**平滑曲线**（non-linear）。本周开始换思路：**不估计概率密度，直接找一条能把两类分开的边界**。
+
+**Linear classifier（线性分类器）的定义**：两类之间的 decision boundary 是一条**直线**（2D）或一个 **hyperplane（超平面）**（高维）。
+
+> ⭐ 老师反复强调的 **geometric interpretation of pattern classification（模式分类的几何解释）**：分类 = **对特征空间的划分（partition of the feature space）**。
+> - 用直线/超平面划分 → **linear classification**
+> - 用曲线/曲面划分（如 neural network 构造的边界）→ **non-linear classification**
+> - 每个 region 对应一个 class；二类问题把整个空间划成两块，$c$ 类划成 $c$ 块。
+
+**本课程的两个 linear classifier**：
+
+| 周次 | 方法 | 判据来源 |
+|---|---|---|
+| **Week 8（本周）** | **LDA / FDA** | Fisher criterion（类间散度 / 类内散度 之比最大） |
+| **Week 9（下周）** | **Linear SVM** | maximum margin（间隔最大） |
+
+⭐ 两者都是 linear classifier，但**优化准则不同**（老师原话：it is all linear classifier, but we all have different criteria）。
+
+### 2. ⭐ 线性判别函数与决策规则（PDF p.3-4）
+
+**Linear discriminant function（线性判别函数）**：
+
+$$g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+w_0=w_1x_1+w_2x_2+\dots+w_dx_d+w_0$$
+
+- $\boldsymbol{w}=(w_1,\dots,w_d)^T$：**weight vector（权向量）**
+- $w_0$：**bias / threshold weight（偏置/阈值权）**
+
+**二类决策规则**：
+
+$$\text{Decide }\omega_1\text{ if }g(\boldsymbol{x})>0;\qquad \text{Decide }\omega_2\text{ if }g(\boldsymbol{x})<0;\qquad \text{On decision boundary if }g(\boldsymbol{x})=0$$
+
+⭐ 设计 linear classifier 的**核心问题**就是求这两个参数 $\boldsymbol{w}$ 和 $w_0$（"This is a core problem"）。
+
+### 3. ⭐ 线性分类器的几何性质（PDF p.5-13，考试常考）
+
+以下性质**对任何 linear classifier 都成立**（下周的 SVM 也一样用）。
+
+#### 3.1 ⭐ $w$ 垂直于超平面（PDF p.5-6）
+
+取 decision boundary 上**任意两点** $\boldsymbol{x}_1,\boldsymbol{x}_2$，则 $g(\boldsymbol{x}_1)=g(\boldsymbol{x}_2)=0$：
+
+$$\boldsymbol{w}^T\boldsymbol{x}_1+w_0=\boldsymbol{w}^T\boldsymbol{x}_2+w_0=0$$
+
+两式相减，$w_0$ 抵消：
+
+$$\boldsymbol{w}^T(\boldsymbol{x}_1-\boldsymbol{x}_2)=0$$
+
+⭐ **结论**：$\boldsymbol{w}$ 与**超平面上任意向量 $(\boldsymbol{x}_1-\boldsymbol{x}_2)$ 正交**，即 $\boldsymbol{w}$ 是 decision boundary 的**法向量（normal vector）**。
+⇒ $\boldsymbol{w}$ 决定超平面的**方向/朝向（orientation）**。
+
+#### 3.2 正侧与负侧（PDF p.7-8）
+
+超平面把特征空间分成两个 **half-space（半空间）**：$g(\boldsymbol{x})>0$ 的一侧称 **positive side（正侧）**，$g(\boldsymbol{x})<0$ 的一侧称 **negative side（负侧）**。约定：**class 1 在正侧，class 2 在负侧**（设计目标）。
+
+#### 3.3 ⭐ $g(\boldsymbol{x})$ 的几何意义 = 到超平面的带符号距离（PDF p.9-11）
+
+把任意样本 $\boldsymbol{x}$ 分解为"在超平面上的投影 + 垂直于超平面的分量"：
+
+$$\boldsymbol{x}=\boldsymbol{x}_p+r\frac{\boldsymbol{w}}{\lVert\boldsymbol{w}\rVert}$$
+
+其中 $\boldsymbol{x}_p$ 是 $\boldsymbol{x}$ 在超平面上的**正交投影**，$r$ 是 $\boldsymbol{x}$ 到超平面的（带符号）距离。代入 $g$：
+
+$$g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}_p+\underbrace{r\frac{\boldsymbol{w}^T\boldsymbol{w}}{\lVert\boldsymbol{w}\rVert}}_{=\,r\lVert\boldsymbol{w}\rVert}+w_0=r\lVert\boldsymbol{w}\rVert$$
+
+（因 $\boldsymbol{x}_p$ 在边界上，$\boldsymbol{w}^T\boldsymbol{x}_p+w_0=0$。）于是
+
+$$\boxed{\;r=\frac{g(\boldsymbol{x})}{\lVert\boldsymbol{w}\rVert}\;}$$
+
+⭐ **三个要点**：
+1. $g(\boldsymbol{x})$ 本身**不是距离**，$g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 才是到超平面的距离；
+2. $r$ 的**符号**表示在正侧还是负侧（$g>0$ 正侧，$g<0$ 负侧）；
+3. $r$ 的大小是**confidence（置信度）**：离边界越远越有信心判对；离边界很近则"分对了也心虚"。
+
+> 老师举例（转写）：考试 40 分及格线 = decision boundary；估分 90 → 离边界远 → 高 confidence；估分 41、42 → 贴着边界 → 很可能 actually fail。**"confidence = 数据点到 decision boundary 的距离"**。
+
+⚠️ 不能直接用 $g(\boldsymbol{x})$ 判断置信度：$\boldsymbol{w}$ 可以整体缩放到任意小，$g$ 随之变小，但距离不变。**$w$ 的 magnitude（尺度）不重要，direction（方向）才重要** —— 这是本周反复出现的核心思想。
+
+#### 3.4 ⭐ 原点的距离与 $w_0$ 的意义（PDF p.12-13）
+
+令 $\boldsymbol{x}=\boldsymbol{0}$（原点）：
+
+$$r=\frac{g(\boldsymbol{0})}{\lVert\boldsymbol{w}\rVert}=\frac{w_0}{\lVert\boldsymbol{w}\rVert}$$
+
+⭐ **$w_0$ 的几何意义 = 原点到超平面（带符号）距离 × $\lVert\boldsymbol{w}\rVert$**：
+
+| 情形 | 含义 |
+|---|---|
+| $w_0>0$ | 原点在超平面的 **positive side** |
+| $w_0<0$ | 原点在超平面的 **negative side** |
+| $w_0=0$ | 超平面**过原点** |
+
+**分工总结**：$\boldsymbol{w}$ 决定超平面的 **orientation（方向/旋转）**，$w_0$ 决定超平面的 **position/location（位置/平移）**。
+
+⭐ **为什么必须有 bias 项 $w_0$**（老师特别强调）：若省略 $w_0$（等价于强制 $w_0=0$），就相当于加了一个**约束——decision boundary 必须过原点**。而边界该不该过原点应由**数据**决定，不应人为约束。所以要"let the data determine $w_0$"。
+
+### 4. ⭐⭐ Fisher Linear Discriminant——从直观到准则函数（PDF p.14-17）
+
+#### 4.1 基本思想：投影（projection）
+
+样本在同类中聚成 cluster。把样本投影到某个方向 $\boldsymbol{w}$ 上：
+- 若两类投影后**分得开（well separated）** → 好方向；
+- 若投影后**混在一起（intermingled/mixed）** → 坏方向。
+
+⭐ $\boldsymbol{w}^T\boldsymbol{x}$ 的几何意义就是 $\boldsymbol{x}$ 在 $\boldsymbol{w}$ 方向上的**投影**（内积 = 投影长度）；投影后每个样本变成一个**标量**。
+
+#### 4.2 类间分离度的度量：投影均值的差（PDF p.15-16）
+
+**类均值向量（$d$ 维）**：
+
+$$\boldsymbol{m}_i=\frac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{x}$$
+
+**投影后的类均值（标量）**：
+
+$$\tilde{m}_i=\frac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{w}^T\boldsymbol{x}=\boldsymbol{w}^T\Big(\frac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{x}\Big)=\boldsymbol{w}^T\boldsymbol{m}_i$$
+
+⭐ **重要性质**：**投影后的均值 = 均值的投影**（$\tilde{m}_i=\boldsymbol{w}^T\boldsymbol{m}_i$），$\boldsymbol{w}^T$ 是公共因子可提到求和号外。
+
+**类间分离度 = 投影均值的距离**：
+
+$$|\tilde{m}_1-\tilde{m}_2|=|\boldsymbol{w}^T(\boldsymbol{m}_1-\boldsymbol{m}_2)|$$
+
+#### 4.3 类内散布的度量：within-class scatter（PDF p.16）
+
+只让均值差最大还不够——还需**类内投影尽量紧凑**。定义第 $i$ 类投影后的 **scatter（散布）**：
+
+$$\tilde{s}_i^2=\sum_{\boldsymbol{x}\in D_i}\big[g(\boldsymbol{x})-\tilde{m}_i\big]^2$$
+
+**总 within-class scatter**：$\tilde{s}^2=\tilde{s}_1^2+\tilde{s}_2^2$。
+
+⭐ 注意这里的 scatter = **平方和，不除以样本数**。转写中老师解释：**若除以样本数就是 variance**；此处用 scatter 是为了方便。scatter 小 → 同类样本彼此相似（spread 小）。
+
+#### 4.4 ⭐⭐ Fisher criterion（Fisher 准则，PDF p.17）
+
+同时满足两个要求：**类间差要大，类内散布要小**。把它们合并成**一个**比值目标：
+
+$$\boxed{\;J(\boldsymbol{w})=\frac{|\tilde{m}_1-\tilde{m}_2|^2}{\tilde{s}_1^2+\tilde{s}_2^2}=\frac{(\tilde{m}_1-\tilde{m}_2)^2}{\tilde{s}_1^2+\tilde{s}_2^2}\;}$$
+
+⭐ **解读**：分子大（类间分离大）→ $J$ 大；分母小（类内紧凑）→ $J$ 也大。**最大化 $J(\boldsymbol{w})$** 是一次 **optimization problem**（$\boldsymbol{w}$ 是变量），于是 classifier design 被转化成了优化问题。
+
+> 术语：within-class 也叫 **intra-class（类内）**，between-class 也叫 **inter-class（类间）**。
+
+#### 4.5 Scatter matrix 的定义（PDF p.17）
+
+为了把 $J(\boldsymbol{w})$ 写成 $\boldsymbol{w}$ 的显式函数，定义：
+
+$$\boldsymbol{S}_i=\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T\qquad\text{（$d\times d$ 矩阵）}$$
+
+$$\boldsymbol{S}_W=\boldsymbol{S}_1+\boldsymbol{S}_2\qquad\text{（within-class scatter matrix，类内散布矩阵）}$$
+
+⭐ 与 covariance matrix 的关系（转写）：$\boldsymbol{S}_i$ **除以 $n_i$ 就是该类样本的 covariance matrix**；此处不除，故称 scatter matrix。
+
+⚠️ 注意 $(\boldsymbol{x}-\boldsymbol{m}_i)$ 是**列向量**，$(\boldsymbol{x}-\boldsymbol{m}_i)^T$ 是行向量，**两者相乘得到矩阵**（顺序不能反）。
+
+### 5. ⭐⭐ 求解 $w$：从 Rayleigh quotient 到广义特征值问题（PDF p.18-23）
+
+#### 5.1 把分子分母都写成 $w$ 的二次型（PDF p.18-19）
+
+**分母（within-class scatter）**：
+
+$$\tilde{s}_i^2=\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{w}^T\boldsymbol{x}-\boldsymbol{w}^T\boldsymbol{m}_i)^2=\sum_{\boldsymbol{x}\in D_i}\big[\boldsymbol{w}^T(\boldsymbol{x}-\boldsymbol{m}_i)\big]^2$$
+
+因 $\boldsymbol{w}^T(\boldsymbol{x}-\boldsymbol{m}_i)$ 是标量，等于其转置 $(\boldsymbol{x}-\boldsymbol{m}_i)^T\boldsymbol{w}$：
+
+$$\tilde{s}_i^2=\sum_{\boldsymbol{x}\in D_i}\boldsymbol{w}^T(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T\boldsymbol{w}=\boldsymbol{w}^T\Big[\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T\Big]\boldsymbol{w}=\boldsymbol{w}^T\boldsymbol{S}_i\boldsymbol{w}$$
+
+（$w$ 与求和无关，可提到求和号外。）故
+
+$$\tilde{s}^2=\tilde{s}_1^2+\tilde{s}_2^2=\boldsymbol{w}^T(\boldsymbol{S}_1+\boldsymbol{S}_2)\boldsymbol{w}=\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}$$
+
+**分子（between-class separation）**：
+
+$$(\tilde{m}_1-\tilde{m}_2)^2=(\boldsymbol{w}^T\boldsymbol{m}_1-\boldsymbol{w}^T\boldsymbol{m}_2)^2=\big[\boldsymbol{w}^T(\boldsymbol{m}_1-\boldsymbol{m}_2)\big]^2$$
+
+$$=\boldsymbol{w}^T(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T\boldsymbol{w}=\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}$$
+
+其中 **between-class scatter matrix（类间散布矩阵）**：
+
+$$\boldsymbol{S}_B=(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$$
+
+⚠️ $\boldsymbol{S}_B$ 是**两个均值向量之差的 outer product**，故 $\text{rank}(\boldsymbol{S}_B)=1$（二类情形）。
+
+**∴ Fisher criterion 化为**：
+
+$$\boxed{\;J(\boldsymbol{w})=\frac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}\;}\qquad\text{（generalized Rayleigh quotient，广义 Rayleigh 商）}$$
+
+⭐ 此时 $\boldsymbol{S}_B$、$\boldsymbol{S}_W$ **完全由训练数据算出**（已知常数矩阵），$J$ 只是 $\boldsymbol{w}$ 的函数——问题变成"求 $\boldsymbol{w}$ 使这个比值最大"。
+
+#### 5.2 ⭐ 对 $w$ 求导 → 广义特征值问题（PDF p.20）
+
+令 $\dfrac{\partial J}{\partial \boldsymbol{w}}=\boldsymbol{0}$，用商的求导法则（分子分母都是 $\boldsymbol{w}$ 的二次型，$\frac{\partial(\boldsymbol{w}^T\boldsymbol{A}\boldsymbol{w})}{\partial\boldsymbol{w}}=2\boldsymbol{A}\boldsymbol{w}$）：
+
+$$\frac{\partial J}{\partial\boldsymbol{w}}=\frac{2\boldsymbol{S}_B\boldsymbol{w}\,(\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w})-2\boldsymbol{S}_W\boldsymbol{w}\,(\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w})}{(\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w})^2}=\boldsymbol{0}$$
+
+分子为零即
+
+$$\boldsymbol{S}_B\boldsymbol{w}\,(\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w})=\boldsymbol{S}_W\boldsymbol{w}\,(\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w})$$
+
+两边同除 $(\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w})$，并注意 $\dfrac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}=J(\boldsymbol{w})$：
+
+$$\boldsymbol{S}_B\boldsymbol{w}=J(\boldsymbol{w})\,\boldsymbol{S}_W\boldsymbol{w}$$
+
+记 $\lambda=J(\boldsymbol{w})$（正是我们要最大化的目标值），得到 **generalized eigenvalue problem（广义特征值问题）**：
+
+$$\boxed{\;\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{S}_W\boldsymbol{w}\;}$$
+
+⭐ 若 $\boldsymbol{S}_W$ **非奇异（non-singular，$\det\boldsymbol{S}_W\neq 0$）**，两边左乘 $\boldsymbol{S}_W^{-1}$ 得**常规特征值问题（conventional eigenvalue problem）**：
+
+$$\boldsymbol{S}_W^{-1}\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{w}$$
+
+解此特征值问题即可得到 **eigenvector $\boldsymbol{w}$**（对应最大 eigenvalue 的那个）。
+
+**两个问题的区别（PDF p.21）**：
+
+| 类型 | 形式 | 说明 |
+|---|---|---|
+| **Eigenvalue problem（常规）** | $\boldsymbol{A}\boldsymbol{w}=\lambda\boldsymbol{w}$ | 只需输入矩阵 $\boldsymbol{A}$ |
+| **Generalized eigenvalue problem（广义）** | $\boldsymbol{A}\boldsymbol{w}=\lambda\boldsymbol{B}\boldsymbol{w}$ | 需输入两个矩阵 $\boldsymbol{A}$ 和 $\boldsymbol{B}$ |
+
+⭐ 用 Matlab 求解时要分清哪个放左边、哪个放右边：本问题是 $\boldsymbol{S}_B$（左，即 $\boldsymbol{A}$）和 $\boldsymbol{S}_W$（右，即 $\boldsymbol{B}$）——**顺序输反结果就错**。
+
+#### 5.3 ⭐⭐ 闭式解：其实不必解特征值问题（PDF p.22-23）
+
+观察 $\boldsymbol{S}_B$ 的特殊结构（rank 1）：
+
+$$\boldsymbol{S}_B\boldsymbol{w}=(\boldsymbol{m}_1-\boldsymbol{m}_2)\underbrace{(\boldsymbol{m}_1-\boldsymbol{m}_2)^T\boldsymbol{w}}_{=\,\rho}=(\boldsymbol{m}_1-\boldsymbol{m}_2)\,\rho$$
+
+其中 $\rho=(\boldsymbol{m}_1-\boldsymbol{m}_2)^T\boldsymbol{w}=\boldsymbol{w}^T(\boldsymbol{m}_1-\boldsymbol{m}_2)$ 是**标量**，物理意义 = **投影后两类均值之差**（the difference of sample mean projections on the hyperplane）。
+
+代入 $\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{S}_W\boldsymbol{w}$：
+
+$$(\boldsymbol{m}_1-\boldsymbol{m}_2)\,\rho=\lambda\,\boldsymbol{S}_W\boldsymbol{w}$$
+
+两边左乘 $\boldsymbol{S}_W^{-1}$：
+
+$$\boldsymbol{w}=\frac{\rho}{\lambda}\,\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$$
+
+⭐ $\rho$ 和 $\lambda$ 都只是**缩放因子（scaling factors）**。因为我们对 $\boldsymbol{w}$ 只关心**方向**（尺度不影响 decision boundary 的位置，只改变 $g$ 的数值大小），可以忽略这两个因子：
+
+$$\boxed{\;\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)\;}$$
+
+⭐ **这就是 LDA / FDA 的闭式解（analytical solution）**——只需算均值、类内散布矩阵、求逆、相乘，**不必解特征值问题**。
+
+**记忆方法（老师的解读，PDF 未写但转写中有）**：
+- 分子 $\boldsymbol{m}_1-\boldsymbol{m}_2$ 是 **between-class** 项，我们希望它大 → 放分子；
+- 分母是 **within-class** 项 $\boldsymbol{S}_W$，我们希望它小 → 应放分母；但**矩阵不能做除数**，所以改用**求逆** $\boldsymbol{S}_W^{-1}$ 代替"除以"。
+- 合起来：$(\text{between-class})\times(\text{within-class})^{-1}=(\boldsymbol{m}_1-\boldsymbol{m}_2)\boldsymbol{S}_W^{-1}$。⚠️ 注意矩阵**不可交换**，正确顺序是 $\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$。
+
+#### 5.4 ⭐ 正则化：$\boldsymbol{S}_W$ 奇异时怎么办（PDF p.23）
+
+当**特征维数 $d$ 高而样本数有限**时，$\boldsymbol{S}_W$ 常常 **singular（奇异，$\det\boldsymbol{S}_W\approx 0$，不可逆）**。用 **regularization（正则化）** 处理——在主对角线加一个小正数：
+
+$$\boxed{\;\boldsymbol{w}=(\boldsymbol{S}_W+\beta\boldsymbol{I})^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)\;}$$
+
+- $\beta$：小的正数，如 $\beta=0.001$
+- $\boldsymbol{I}$：**identity matrix（单位矩阵）**（对角线为 1、其余为 0）
+- $\beta\boldsymbol{I}$ 的作用 = 给 $\boldsymbol{S}_W$ 的**每个对角元素加一个小正数**，避免奇异
+
+⭐ **正则化不只是"救急"**：即使 $\boldsymbol{S}_W$ 可逆，也常主动加 $\beta$。因为：
+- 现代 ML 中模型常是 **over-parameterized（过参数化）**（参数远多于训练样本，如 neural network / deep network）；
+- 此时容易 **overfitting（过拟合）**——训练集表现好、测试集差；
+- **regularization** 通过给 loss function 加 **penalty term**（约束 $\boldsymbol{w}$ 的大小/范数）来缓解 overfitting。
+- 在 LDA 中，$\boldsymbol{S}_W$ 接近奇异会让 $\boldsymbol{S}_W^{-1}$ 的数值极大（转写中提到"value 100,000"），加 $\beta\boldsymbol{I}$ 后 $\boldsymbol{w}$ 变小、更稳定。
+
+### 6. ⭐ 阈值 $w_0$ 与完整算法（PDF p.24-27）
+
+#### 6.1 bias $w_0$ 的确定（PDF p.24）
+
+**基本思路**：让**两个类均值的中点落在 decision boundary 上**。即把 $\boldsymbol{x}=\frac{\boldsymbol{m}_1+\boldsymbol{m}_2}{2}$ 代入 $g(\boldsymbol{x})=0$：
+
+$$\boldsymbol{w}^T\frac{\boldsymbol{m}_1+\boldsymbol{m}_2}{2}+w_0=0\qquad\Longrightarrow\qquad \boxed{\;w_0=-\frac{\boldsymbol{w}^T(\boldsymbol{m}_1+\boldsymbol{m}_2)}{2}\;}$$
+
+⚠️ **前提假设**：两类投影后的 **scatter 相同或相近**，边界才在中点。若两类 spread 差别很大（一类很紧凑、另一类很散），中点**不是最优**。此时做法是：**按公式算出 $w_0$ 作为基准，再在其附近微调**（转写：公式算出 1.2，则试 1.3 / 1.25 / 1.4 或 1.15 / 1.1 / 1.0），用训练数据（或 validation data）的表现挑最好的一组。
+
+#### 6.2 ⭐⭐ Fisher LDA 完整流程（PDF p.26-27，必须背下）
+
+| 步骤 | 内容 | 公式 |
+|---|---|---|
+| **1** | 计算两类的 **mean vector** | $\boldsymbol{m}_i=\dfrac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{x}$ |
+| **2** | 计算 **within-class scatter matrix** | $\boldsymbol{S}_i=\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T$，$\boldsymbol{S}_W=\boldsymbol{S}_1+\boldsymbol{S}_2$ |
+| **3** | 计算 $\boldsymbol{w}$ 和 $w_0$ | $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$（奇异时用 $(\boldsymbol{S}_W+\beta\boldsymbol{I})^{-1}$）；$w_0=-\dfrac{\boldsymbol{w}^T(\boldsymbol{m}_1+\boldsymbol{m}_2)}{2}$ |
+| **4** | 构造 discriminant function 并分类 | $g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+w_0$；$g>0\to\omega_1$，$g<0\to\omega_2$，$g=0\to$ decision boundary |
+
+⭐ **若改用特征值法求 $w$**，还需额外算 $\boldsymbol{S}_B=(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$；而用**闭式公式**只需 $\boldsymbol{S}_W$，不需要 $\boldsymbol{S}_B$。
+
+#### 6.3 ⭐⭐ 符号检查（TODO 关键点，Assignment 2 必做）
+
+**用特征值法求出的 $\boldsymbol{w}$，不保证 class 1 落在正侧（positive side）！**（PDF p.36 Note (1)）
+
+- 因为特征向量的**符号是任意的**（$\boldsymbol{w}$ 与 $-\boldsymbol{w}$ 都是合法解）；
+- 若发现 **class label 1 的样本大多落在负侧**，则用 $-\boldsymbol{w}$ 和 $-w_0$ **替换**原来的 $\boldsymbol{w}$ 和 $w_0$，使 class 1 回到正侧；
+- 或者检查完成后反向解读决策规则（$\boldsymbol{x}<0$ 判 class 2），但更干净的做法是直接取反，以保持"$g>0\Rightarrow$ class 1"的约定。
+
+⭐ 老师原话（转写）：过去几年**有学生因为没做这一步，导致测试集 label 全部反了**——"Most likely, they did not check this."
+
+### 7. ⭐⭐ Assignment 2 发布（行动项，转写末尾）
+
+> 老师在课上明确宣布 **Assignment 2** 将在**次日（"maybe tomorrow"）上传到 NTULearn**。
+
+| 项目 | 要求 |
+|---|---|
+| **数据集** | **与 Assignment 1 完全相同**的数据集（同一份 Iris 数据：**120 训练 / 30 测试 / 4 个 continuous feature**） |
+| **任务** | 设计一个 **linear FDA classifier（Fisher 判别分析线性分类器）**，对 30 个测试样本预测 class label |
+| **求解方式** | ✅ 闭式公式 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$，**或**用 **generalized eigenvalue problem** $\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{S}_W\boldsymbol{w}$，**或**两者都用（用哪种都行） |
+| **⚠️ 必做检查** | **验证符号方向**：投影后 **class 1 应在正侧（$g(\boldsymbol{x})>0$）**。若用 eigenvalue 法发现 class 1 落在负侧，须用 $-\boldsymbol{w},-w_0$ 替换 |
+| **报告内容** | **数学化地说明设计思路**（设计流程 + 公式推导）；说明**如何处理缺失值、outlier、feature range** 等数据问题（承接 Assignment 1 的数据预处理说明） |
+| **预测结果格式** | 一张表：**sample number → predicted label**（老师明确要求逐样本列出，不要只有代码或汇总数字） |
+| **提交形式** | **Assignment 1 + Assignment 2 合并为一份 PDF**（**不含代码**）上传 NTULearn 的 Assignments 文件夹 |
+| **截止日期** | **2026-10-19（周一）** |
+| **占比** | 两次 assignment 合计 **20%**（CA Part 2 的 30% 中的一部分） |
+
+⭐ 课上 Q&A 相关补充：
+- 老师建议：**先看讲义、再看录播视频**，然后带着问题来问（"read the lecture first, watch the video, then ask me"）；也可先问 **TA**。
+- 有同学问 Assignment 1 中能否**不假设 Gaussian**、而按类别型数据 + 缺失值填补处理（因数据是 0.01 递增量）——老师回答**可以**，并指出"即便数据并不真正服从 normal distribution，我们仍然用 normal distribution 去建模，往往也能得到不错的结果，这正是我们引入 normal distribution 的原因"。说明**两种处理都可以接受**，关键是把做法在 PDF 里说明清楚。
+
+### 8. ⭐ 二类实例：闭式公式 vs 特征值法（PDF p.28-37）
+
+**设置**：两类样本各 100 个（共 200），二维。
+
+| 项 | 结果 |
+|---|---|
+| 均值 | $\boldsymbol{m}_1$、$\boldsymbol{m}_2$ 由各类样本算得 |
+| $\boldsymbol{S}_W$ | $\boldsymbol{S}_1+\boldsymbol{S}_2$ |
+| **闭式公式** $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$ | $\boldsymbol{w}=\begin{bmatrix}-0.0071\\-0.0153\end{bmatrix}$（元素值很小） |
+| **Matlab 特征值法** `[V,D] = eig(inv(S_W)*S_B)` | $\boldsymbol{D}=\begin{bmatrix}0.0000&0\\0&0.0580\end{bmatrix}$，$\boldsymbol{V}=\begin{bmatrix}-0.8568&-0.4198\\0.5157&-0.9076\end{bmatrix}$ |
+
+⭐ **Matlab `eig` 的输出约定**：$\boldsymbol{D}$ 的主对角线元素是 **eigenvalues**，$\boldsymbol{V}$ 的**列向量**是对应的 **eigenvectors**。
+
+#### 8.1 ⭐ 要选哪个特征向量？
+
+- **eigenvalue = 0.000 对应的第一个特征向量没有任何 discriminative power（判别能力）**——用它作 $\boldsymbol{w}$，$g(\boldsymbol{x})$ 对 200 个样本在 $-3\sim3$ 之间随机上下跳动，两类完全混在一起，无法区分；
+- **必须用 eigenvalue = 0.0580（非零）对应的第二个特征向量**作 $\boldsymbol{w}$——此时两类投影值范围明显分离。
+
+⭐ 原因（后续 §9 会看到）：$\boldsymbol{S}_W^{-1}\boldsymbol{S}_B$ 的**零特征值对应的是"对类间差异无贡献"的方向**。
+
+#### 8.2 ⭐ 两个 Note（PDF p.36）
+
+**Note (1) 符号检查**：eigenvalue 法求出的 $\boldsymbol{w}$ **不保证 class 1 在正侧**。若 class 1 落在负侧，用 $-\boldsymbol{w}$、$-w_0$ 替换。（→ 见 §6.3，也是 Assignment 2 明确要求的检查。）
+
+**Note (2) 两种方法的 $\boldsymbol{w}$ 数值不同但方向相同**：
+
+$$\boldsymbol{w}_{\text{闭式}}=\begin{bmatrix}-0.0071\\-0.0153\end{bmatrix},\qquad \frac{\boldsymbol{w}(1)}{\boldsymbol{w}(2)}=\frac{-0.0071}{-0.0153}=0.4625$$
+
+特征值法得到的 $\boldsymbol{w}$ 只是闭式解的某个倍数——**比值（方向）完全相同**。
+
+⭐ **结论**：$\boldsymbol{w}$ 的**数值大小无意义，方向才有意义**；
+⚠️ 但这带来一个实际后果——**不能直接用 $g(\boldsymbol{x})$ 的数值判断置信度**，必须除以 $\lVert\boldsymbol{w}\rVert$。
+
+#### 8.3 结果可视化（PDF p.30-35）
+
+用训练数据范围内生成的 10,000 个点逐一代入 $g(\boldsymbol{x})$ 上色：
+- **绿色 region = 判为 class 1**，**黄色 region = 判为 class 2**；
+- 两色之间是 **decision boundary（$g(\boldsymbol{x})=0$ 的直线）**；
+- 有**少量 misclassification**（几个 class 2 样本落在绿色区、几个 class 1 样本落在黄色区）——但老师指出这些错分"**是合理的**"，因为这些样本本来就**更靠近另一类**（很可能是 outlier/noise）。
+
+### 9. ⭐⭐ Multiple Discriminant Analysis（多类推广，PDF p.38-44）
+
+⚠️ **"Multiple" 指多个 class（$c>2$），不是多个 feature**（老师说得很明确："Multiple here not multiple dimension"）。
+
+#### 9.1 基本结论
+
+对 **$c$ 类问题**，Fisher discriminant 的自然推广需要 **$c-1$ 个 discriminant functions（判别函数）**，投影从 $d$ 维空间 → **$c-1$ 维空间**（假设 $d\ge c$）。
+
+⭐ 二类问题是 $c=2$ 的特例：$c-1=1$ 个判别函数——这解释了为什么二类只需一个 $g(\boldsymbol{x})$。
+
+#### 9.2 ⭐ 多类的 within-class scatter matrix（PDF p.38）
+
+$$\boldsymbol{S}_W=\sum_{i=1}^{c}\boldsymbol{S}_i,\qquad \boldsymbol{S}_i=\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T,\qquad \boldsymbol{m}_i=\frac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{x}$$
+
+（把各类的 scatter matrix 直接相加。）
+
+#### 9.3 ⭐ 多类的 between-class scatter matrix（PDF p.39-40）
+
+先定义 **total mean vector（总均值向量）**——**所有类所有样本**的均值：
+
+$$\boldsymbol{m}=\frac{1}{n}\sum\boldsymbol{x}=\frac{1}{n}\sum_{i=1}^{c}n_i\boldsymbol{m}_i\qquad\text{（= 各类均值的加权和，权重为各类样本数）}$$
+
+再定义 **total scatter matrix（总散布矩阵）** 并做分解：
+
+$$\boldsymbol{S}_T=\sum(\boldsymbol{x}-\boldsymbol{m})(\boldsymbol{x}-\boldsymbol{m})^T$$
+
+$$\boldsymbol{S}_T=\sum_{i=1}^{c}\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i+\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{x}-\boldsymbol{m}_i+\boldsymbol{m}_i-\boldsymbol{m})^T=\sum_{i=1}^{c}\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T+\sum_{i=1}^{c}\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$$
+
+$$=\boldsymbol{S}_W+\sum_{i=1}^{c}n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$$
+
+⭐ **关键恒等式**：$\boldsymbol{S}_T=\boldsymbol{S}_W+\boldsymbol{S}_B$。于是
+
+$$\boxed{\;\boldsymbol{S}_B=\sum_{i=1}^{c}n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T\;}$$
+
+⭐ **多类 $S_B$ 与二类 $S_B$ 的构造差异（考试易混）**：
+
+| | 二类（PDF p.19） | 多类（PDF p.40） |
+|---|---|---|
+| 公式 | $\boldsymbol{S}_B=(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$ | $\boldsymbol{S}_B=\sum_{i=1}^c n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$ |
+| 参照物 | 另一类的均值 | **total mean $\boldsymbol{m}$** |
+| 项数 | 1 项（两个均值的差） | $c$ 项（每个类均值 vs 总均值） |
+| 权重 | 无 | $n_i$（类样本数） |
+
+⚠️ 老师强调：多类情形**不用"两两配对（pairwise）"**的方式算类间差（3 类有 3 对、4 类有 6 对，类数大时组合爆炸），而是**每个类均值统一与 total mean 比较**，再求和。
+
+> 小注：当 $c=2$ 且两类样本数相近时，多类公式 $\sum_i n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T=\frac{n_1n_2}{n}(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$，即**退化为二类 $\boldsymbol{S}_B$ 的标量倍**——两个定义方向一致，故可统一。
+
+#### 9.4 ⭐ 投影与准则函数（PDF p.40-43）
+
+$c-1$ 个 discriminant functions：
+
+$$g_i(\boldsymbol{x})=\boldsymbol{w}_i^T\boldsymbol{x},\qquad i=1,2,\dots,c-1$$
+
+拼成向量与矩阵：
+
+$$\boldsymbol{g}(\boldsymbol{x})=\begin{bmatrix}g_1(\boldsymbol{x})\\\vdots\\g_{c-1}(\boldsymbol{x})\end{bmatrix},\qquad \boldsymbol{W}^T=\begin{bmatrix}\boldsymbol{w}_1^T\\\vdots\\\boldsymbol{w}_{c-1}^T\end{bmatrix}\qquad\Longrightarrow\qquad \boldsymbol{g}(\boldsymbol{x})=\boldsymbol{W}^T\boldsymbol{x}$$
+
+⭐ **投影后仍是向量**（二类时投影是标量）——所以不能再用"均值之差"作分离度，必须用**矩阵**。投影后新空间的量：
+
+$$\tilde{\boldsymbol{m}}_i=\frac{1}{n_i}\sum_{\boldsymbol{x}\in D_i}\boldsymbol{g}(\boldsymbol{x}),\qquad \tilde{\boldsymbol{m}}=\frac{1}{n}\sum_{i=1}^{c}n_i\tilde{\boldsymbol{m}}_i$$
+
+$$\tilde{\boldsymbol{S}}_W=\sum_{i=1}^{c}\sum_{\boldsymbol{x}\in D_i}(\boldsymbol{g}(\boldsymbol{x})-\tilde{\boldsymbol{m}}_i)(\boldsymbol{g}(\boldsymbol{x})-\tilde{\boldsymbol{m}}_i)^T=\boldsymbol{W}^T\boldsymbol{S}_W\boldsymbol{W}$$
+
+$$\tilde{\boldsymbol{S}}_B=\sum_{i=1}^{c}n_i(\tilde{\boldsymbol{m}}_i-\tilde{\boldsymbol{m}})(\tilde{\boldsymbol{m}}_i-\tilde{\boldsymbol{m}})^T=\boldsymbol{W}^T\boldsymbol{S}_B\boldsymbol{W}$$
+
+**多类准则函数（PDF p.43）**：
+
+$$J(\boldsymbol{W})=\frac{|\tilde{\boldsymbol{S}}_B|}{|\tilde{\boldsymbol{S}}_W|}=\frac{|\boldsymbol{W}^T\boldsymbol{S}_B\boldsymbol{W}|}{|\boldsymbol{W}^T\boldsymbol{S}_W\boldsymbol{W}|}$$
+
+⭐ **为什么用 determinant（行列式）**？二类时分子分母都是**标量**，可以直接比大小；多类时 $\tilde{\boldsymbol{S}}_B$、$\tilde{\boldsymbol{S}}_W$ 都是**矩阵**，无法直接作比值 → 用 **determinant 作为 scatter 的标量化度量**（determinant 大 = 散布体积大）。
+
+> 老师说 **determinant of scatter matrix 作为 scatter 度量**这一思想后面还会反复用到：**feature selection**（评价一个 feature subset 好不好）和 **clustering evaluation**（评价聚类好不好）都会用"类间大 / 类内小"这同一套概念。
+
+#### 9.5 ⭐⭐ 求解：广义特征值问题（PDF p.43-44）
+
+$J(\boldsymbol{W})$ 对**矩形矩阵** $\boldsymbol{W}$ 的优化"not easy"，但可以证明：**$\boldsymbol{W}$ 的列向量 = $\boldsymbol{S}_B$ 与 $\boldsymbol{S}_W$ 的、对应最大特征值的 generalized eigenvectors**：
+
+$$\boldsymbol{S}_B\boldsymbol{w}_i=\lambda_i\boldsymbol{S}_W\boldsymbol{w}_i\qquad\Longrightarrow\qquad \text{取前 }c-1\text{ 个最大 }\lambda_i\text{ 对应的 }\boldsymbol{w}_i$$
+
+若 $\boldsymbol{S}_W$ 非奇异：
+
+$$\boldsymbol{S}_W^{-1}\boldsymbol{S}_B\boldsymbol{w}_i=\lambda_i\boldsymbol{w}_i\qquad\text{（常规特征值问题）}$$
+
+⚠️ **重要结论**：对 $c$ 类问题，**最多只有 $c-1$ 个（有效的）eigenvectors**——因为 $\boldsymbol{S}_B$ 的 rank 不超过 $c-1$。所以 $\boldsymbol{W}=[\boldsymbol{w}_1,\dots,\boldsymbol{w}_{c-1}]$，投影维度就是 $c-1$。
+
+**Matlab 通用调用**：
+```matlab
+[W, Lambda] = eig(S_B, S_W)   % 广义特征值问题：S_B * W = S_W * W * Lambda
+```
+
+⭐ **多类 LDA 的另一个身份——dimensionality reduction（降维）**：
+- 从 **$d$ 维 → $c-1$ 维**（通常 $d\gg c$，所以降维幅度很大）；
+- 但多类 LDA 直接用于分类时**决策规则很繁琐**（要看 $g_1,\dots,g_{c-1}$ 的各种组合，容易出错）；
+- 因此**实践中更常把 LDA 当作降维/特征提取工具**：先用 LDA 把数据投到 $c-1$ 维新空间，再在低维空间上**套用其他分类器**（老师明确提到可以接着用上周的 **Naïve Bayes** 等 probability-based classifier）。
+
+### 10. 三类实例（PDF p.45-58）
+
+**设置**：3 类（红 = class 1、蓝 = class 2、黑 = class 3），各 100 个样本（共 ~300）。
+
+**步骤与结果**：
+
+1. 算 $\boldsymbol{S}_B$（PDF p.47）：
+
+$$\boldsymbol{S}_B=\begin{bmatrix}439.7196&-56.5992\\-56.5992&809.7615\end{bmatrix}\qquad\text{（Note: divided by 100 for scaling）}$$
+
+⭐ 因样本数约 300，$\boldsymbol{S}_W$ 的数值会非常大（约 30,000 量级），**除以 100 只是缩放**，不影响 $\boldsymbol{w}$ 的方向，故无妨。
+
+2. 解广义特征值问题 `[W, Lambda] = eig(S_B, S_W)`：
+
+$$\boldsymbol{\Lambda}=\begin{bmatrix}1.4155&0\\0&2.9127\end{bmatrix},\qquad \boldsymbol{W}=\begin{bmatrix}-0.0564&-0.012\\-0.0101&0.0585\end{bmatrix}$$
+
+（第 1 列 ↔ $\lambda=1.4155$；第 2 列 ↔ $\lambda=2.9127$。）
+
+3. **选判别函数的方向。** ⭐ 取 **eigenvalue 较大**的那个（$\lambda=2.9127$，第 2 列）作 $\boldsymbol{w}_1$，先看它的投影分布：
+
+| 判别函数 | 用它投影后 | 用途 | $w_0$ 的取法 |
+|---|---|---|---|
+| $\boldsymbol{w}_1$（$\lambda=2.9127$） | **class 2（蓝）**与 class 1/3（红黑重叠）**明显分离**；红与黑几乎重叠 | **分离 class 2 vs (1,3)** | 取 **class 1 与 class 3** 均值的中点（这两类最接近）→ $w_{01}$ |
+| $\boldsymbol{w}_2$（$\lambda=1.4155$，第 1 列） | **class 1（红）**与 class 2/3（蓝黄重叠）**明显分离** | **分离 class 1 vs (2,3)** | 取 **class 2 与 class 1** 均值的中点 → $w_{02}$ |
+
+⭐ 得到两个判别函数 $g_1(\boldsymbol{x})=\boldsymbol{w}_1^T\boldsymbol{x}+w_{01}$，$g_2(\boldsymbol{x})=\boldsymbol{w}_2^T\boldsymbol{x}+w_{02}$。
+
+4. **新表示（new representation）**：每个样本映射为 $(g_1(\boldsymbol{x}),g_2(\boldsymbol{x}))$——原 $d$ 维空间 → **2 维新空间**（虽是 2D→2D 的 toy 例，但一般情形是 $d\to c-1$ 降维）。在这个新空间里三类分得较开。
+
+5. ⭐⭐ **Decision rules（PDF p.56）**：
+
+| 规则 | 条件 | 判为 |
+|---|---|---|
+| (1) | $g_1(\boldsymbol{x})>0$ **且** $g_2(\boldsymbol{x})<0$ | **Class 2** |
+| (2) | $g_2(\boldsymbol{x})>0$ **且** $g_1(\boldsymbol{x})<0$ | **Class 1** |
+| (3) | $g_1(\boldsymbol{x})<0$ **且** $g_2(\boldsymbol{x})<0$ | **Class 3** |
+| (4) | $g_1(\boldsymbol{x})>0$ **且** $g_2(\boldsymbol{x})>0$ | $g_1>g_2$ → **Class 2**；$g_2>g_1$ → **Class 1** |
+
+⚠️ **若省略规则 (4)，会留下一块 undecided region（无法判定的区域）**——即两个判别函数都为正的重叠区（PDF p.58）。这是多类 LDA 决策规则必须"看组合"的原因。
+
+⭐ 想进一步提高置信度判断，同样可以把 $g$ 除以对应的 $\lVert\boldsymbol{w}_i\rVert$ 得到到各 decision boundary 的距离。
+
+### 11. ⭐ 对比总结
+
+#### 11.1 ⭐⭐ LDA（FDA）二类 vs 多类
+
+| 项目 | **二类（$c=2$）** | **多类（$c$ 类）** |
+|---|---|---|
+| 判别函数个数 | **1** | **$c-1$** |
+| 投影结果 | **标量** $g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+w_0$ | **向量** $\boldsymbol{g}(\boldsymbol{x})=\boldsymbol{W}^T\boldsymbol{x}$（维度 $c-1$） |
+| $\boldsymbol{S}_W$ | $\boldsymbol{S}_1+\boldsymbol{S}_2$ | $\sum_{i=1}^c\boldsymbol{S}_i$ |
+| $\boldsymbol{S}_B$ | $(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$ | $\sum_{i=1}^c n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$ |
+| 准则 | $J(\boldsymbol{w})=\dfrac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}$（标量比） | $J(\boldsymbol{W})=\dfrac{\lvert\boldsymbol{W}^T\boldsymbol{S}_B\boldsymbol{W}\rvert}{\lvert\boldsymbol{W}^T\boldsymbol{S}_W\boldsymbol{W}\rvert}$（**行列式**比） |
+| 求解 | 闭式 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$ **或** 特征值法 | 只能解广义特征值问题取前 $c-1$ 个 |
+| bias | 有单一 $w_0=-\frac{\boldsymbol{w}^T(\boldsymbol{m}_1+\boldsymbol{m}_2)}{2}$ | 每个 $g_i$ 各有 $w_{0i}$，按"最接近两类的均值中点"逐一定 |
+| 主要用途 | **直接分类**（考试常考手算） | 更多当 **dimensionality reduction**，再套其他 classifier |
+| 决策规则 | 一条规则（$g\gtrless 0$） | 需按 $g_1,g_2,\dots$ 的组合分情况（否则有 undecided region） |
+
+#### 11.2 LDA vs Bayes classifier vs SVM（本课程视角）
+
+| 方法 | 核心思想 | decision boundary | 是否用类概率 |
+|---|---|---|---|
+| **Bayes classifier + Gaussian（Week 7）** | 估 class-conditional density → posterior | **曲线**（non-linear） | ✅ 需要 prior + density |
+| **LDA / FDA（Week 8）** | 最大化 $\frac{\text{between-class scatter}}{\text{within-class scatter}}$ | **直线/超平面**（linear） | ❌ 只用均值与 scatter |
+| **Linear SVM（Week 9）** | 最大化 margin（间隔） | **直线/超平面**（linear） | ❌ 只用支持向量 |
+
+#### 11.3 延伸对照：LDA vs PCA（PCA 本课不讲，仅作理解）
+
+| 项目 | **PCA** | **LDA** |
+|---|---|---|
+| 类型 | unsupervised | **supervised**（用 class label） |
+| 优化目标 | 最大化**投影方差**（保留最多信息） | 最大化**类间/类内散度比**（保留最多判别力） |
+| 目标函数 | $\frac{\boldsymbol{w}^T\boldsymbol{S}_T\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{w}}$（$S_T$ = total scatter） | $\frac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}$ |
+| 最多降维到 | $\min(d,n)$ 维 | **$c-1$ 维** |
+| 关心 | 数据**结构** | 数据**分类可分性** |
+
+⭐ 一句话：**PCA 找"方差最大"的方向，LDA 找"类间分离最好"的方向**；两者都可能用 eigenvalue problem 求解。
+
+### 12. 老师 Q&A 与课程安排（转写后半）
+
+#### 12.1 考试相关性（老师与学生的对话）
+
+| 提问 | 老师回答 |
+|---|---|
+| **Multiple discriminant analysis（多类那十几页）会考吗？** | "Normally not"——**多类部分通常不考**（too complex）。 |
+| **那考什么？** | **二类的计算**：给定数据，用**闭式公式**算 $\boldsymbol{S}_W^{-1}$ 和 $(\boldsymbol{m}_1-\boldsymbol{m}_2)$，并**检查 $w_0$**（用"两均值中点在 decision boundary 上"这一原则）。老师原话：这部分"过去几年 exam 里至少考过"（"I think this part normally at least test in the exam in the past years, but not for this"——"this" 指多类那部分）。 |
+| 为什么多类不用 **Euclidean distance** 直接比"样本到类均值的距离"？ | $g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 本身已经是带符号距离；若要用距离度量，通常用**平方距离（squared distance）**更简单（避免开根号）。 |
+
+⚠️ 考试为闭卷纸笔 → **必须能手算二类 LDA**：算均值 → 算 $\boldsymbol{S}_W$ → 求逆 → 得 $\boldsymbol{w}$ → 算 $w_0$ → 写决策规则。公式 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$ 短且易记（老师："easy to understand, also even easier to remember"）。
+
+#### 12.2 后续课程安排（老师口述）
+
+| 周次 | 内容 |
+|---|---|
+| **Week 9** | **Linear SVM**（+ 可能开始一部分 decision tree） |
+| Week 10 | **Decision tree classifier** |
+| Week 11 | **Evaluation of classifiers**（分类器评估） |
+| Week 12 | **Feature selection** + **regression problem** |
+| Week 13 | **Clustering**（Lecture 10 是 clustering） |
+
+- 教学到 **11 月 13 日（周五）**左右结束，之后是复习周；老师提到有学生按"lecture by lecture"推算考试时间（转写中日期口述含混，**具体日期以 NTULearn 公布为准**）。
+- 关于考试出题：老师提到**该部分（分类器/ML）通常至少会出一题**；有些讲义内容会被**合并或省略**——"内容列在 syllabus 里不等于会讲满三小时"，往年题可作练习参考，但**每年题目不同**。
+- ⭐ 学习方法建议：**先读讲义 → 再看录播视频 → 带着具体问题找老师/TA 讨论**。
+
+#### 12.3 老师对 LDA 的评价（转写结尾）
+
+> ⭐ 老师认为自己引入 LDA 的**真正价值在于 "between-class difference / within-class difference" 这一概念**，它**不只在分类里用**：
+> - **Feature selection**：一个 feature subset 好不好？看它是否"类间差异大、类内差异小"；
+> - **Clustering evaluation**：没有 label，但有 cluster/group → 用"组间差异大、组内相似度高"来评价聚类质量；
+> - **determinant of scatter matrix** 作为 scatter 的标量度量，后面还会再用。
+>
+> 此外，**geometric interpretation（几何解释）** 很重要：分类 = 对特征空间的划分；用直线/超平面划分就是 linear classification，用曲线就是 non-linear classification。虽然高维数据的分布无法可视化，但可以想象一条边界，并用 $g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 度量每个样本到边界的距离。
+
+### 13. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **linear discriminant function** | $g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+w_0$；$\boldsymbol{w}$ 定方向，$w_0$ 定位置 |
+| **决策规则** | $g>0\to\omega_1$；$g<0\to\omega_2$；$g=0\to$ on decision boundary |
+| **$\boldsymbol{w}$ 的几何意义** | $\boldsymbol{w}$ **垂直于（normal to）**超平面：由 $\boldsymbol{w}^T(\boldsymbol{x}_1-\boldsymbol{x}_2)=0$（两点均在边界上）推出 |
+| **$g(\boldsymbol{x})$ 的几何意义** | 距离 $r=\dfrac{g(\boldsymbol{x})}{\lVert\boldsymbol{w}\rVert}$；符号 = 正/负侧；大小 = **confidence** |
+| **$w_0$ 的几何意义** | 原点距离 $r=\dfrac{w_0}{\lVert\boldsymbol{w}\rVert}$；$w_0>0$ 原点在正侧，$w_0<0$ 在负侧，$w_0=0$ 过原点 |
+| **为什么要有 $w_0$** | 否则强制边界过原点（人为约束）；应由数据决定 |
+| **投影均值性质** | $\tilde{m}_i=\boldsymbol{w}^T\boldsymbol{m}_i$（投影的均值 = 均值的投影） |
+| **Fisher criterion** | $J(\boldsymbol{w})=\dfrac{(\tilde{m}_1-\tilde{m}_2)^2}{\tilde{s}_1^2+\tilde{s}_2^2}=\dfrac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}$（generalized Rayleigh quotient） |
+| **scatter matrix** | $\boldsymbol{S}_i=\sum(\boldsymbol{x}-\boldsymbol{m}_i)(\boldsymbol{x}-\boldsymbol{m}_i)^T$（除以 $n_i$ 才是 covariance）；$\boldsymbol{S}_W=\boldsymbol{S}_1+\boldsymbol{S}_2$ |
+| **$\boldsymbol{S}_B$（二类）** | $(\boldsymbol{m}_1-\boldsymbol{m}_2)(\boldsymbol{m}_1-\boldsymbol{m}_2)^T$，rank 1 |
+| **求导结果** | $\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{S}_W\boldsymbol{w}$（**generalized eigenvalue problem**）；$\boldsymbol{S}_W$ 非奇异 → $\boldsymbol{S}_W^{-1}\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{w}$ |
+| **闭式解** | $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$（不需解特征值问题） |
+| **正则化** | $\boldsymbol{w}=(\boldsymbol{S}_W+\beta\boldsymbol{I})^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$，$\beta\approx0.001$，解决 $\boldsymbol{S}_W$ singular |
+| **bias 公式** | $w_0=-\dfrac{\boldsymbol{w}^T(\boldsymbol{m}_1+\boldsymbol{m}_2)}{2}$（假设两类 scatter 相近，否则需微调） |
+| **⚠️ 符号检查** | 特征值法求的 $\boldsymbol{w}$ **不保证 class 1 在正侧**，必要用 $-\boldsymbol{w},-w_0$ 替换 |
+| **两种方法的关系** | 闭式解与特征值法得到的 $\boldsymbol{w}$ **数值不同、方向相同**（元素比值一致） |
+| **特征向量选择** | 用 **非零（较大）eigenvalue** 对应的特征向量；零特征值的无判别能力 |
+| **Matlab** | `[V,D]=eig(inv(S_W)*S_B)`（常规）；`[W,Lambda]=eig(S_B,S_W)`（广义）；$D$ 对角线 = eigenvalues，$V$ 的列 = eigenvectors |
+| **多类判别函数个数** | **$c-1$** 个，投影 $d\to c-1$ 维 |
+| **多类 $\boldsymbol{S}_B$** | $\sum_{i=1}^c n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$，与 **total mean** 比较（不 pairwise） |
+| **total mean / $\boldsymbol{S}_T$** | $\boldsymbol{m}=\frac1n\sum_i n_i\boldsymbol{m}_i$；$\boldsymbol{S}_T=\boldsymbol{S}_W+\boldsymbol{S}_B$ |
+| **多类准则** | $J(\boldsymbol{W})=\dfrac{\lvert\boldsymbol{W}^T\boldsymbol{S}_B\boldsymbol{W}\rvert}{\lvert\boldsymbol{W}^T\boldsymbol{S}_W\boldsymbol{W}\rvert}$（用 **determinant**） |
+| **多类求解** | $\boldsymbol{S}_B\boldsymbol{w}_i=\lambda_i\boldsymbol{S}_W\boldsymbol{w}_i$，取前 $c-1$ 个最大 $\lambda$ |
+| **多类决策规则** | 4 条规则；缺 (4) 会有 **undecided region** |
+| **LDA 的另一用途** | **dimensionality reduction**（$d\to c-1$），再套其他 classifier（如 Naïve Bayes） |
+| **考试重点** | **二类手算**（公式 + $w_0$ 检查）；多类"normally not"考 |
+| **Assignment 2** | linear FDA，同一 Iris 数据，可用公式或 eigenvalue；**必做符号检查**；A1+A2 合并一份 PDF（无代码）；**10/19 截止** |
+
+### 14. 本周要点小结
+
+- **从 non-linear 到 linear**：上周 Bayes classifier（Gaussian density）的边界是曲线；本周起研究 boundary 为直线/超平面的 **linear classifier**，其几何含义是"用直线/超平面划分特征空间"。
+- **线性分类器的一般性质**（下周 SVM 同样适用）：$g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+w_0$；$\boldsymbol{w}$ 是超平面的**法向量**（定方向），$w_0$ 定位置；**$r=g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 才是到超平面的带符号距离**，其大小即 confidence；原点到超平面距离为 $w_0/\lVert\boldsymbol{w}\rVert$。$\boldsymbol{w}$ 的**尺度不重要，方向才重要**——所以不要直接用 $g(x)$ 谈置信度。
+- **Fisher 的思想**：把样本投影到 $\boldsymbol{w}$ 上，希望**类间投影均值差尽量大**、**类内投影散布尽量小** → 合并为比值准则 $J(\boldsymbol{w})=\frac{\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}}{\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}}$。
+- **推导主线（必须会）**：$\tilde{s}_i^2=\boldsymbol{w}^T\boldsymbol{S}_i\boldsymbol{w}\Rightarrow\tilde{s}^2=\boldsymbol{w}^T\boldsymbol{S}_W\boldsymbol{w}$；$(\tilde{m}_1-\tilde{m}_2)^2=\boldsymbol{w}^T\boldsymbol{S}_B\boldsymbol{w}$；对 $\boldsymbol{w}$ 求导令零 ⇒ $\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{S}_W\boldsymbol{w}$（generalized eigenvalue problem）⇒ $\boldsymbol{S}_W^{-1}\boldsymbol{S}_B\boldsymbol{w}=\lambda\boldsymbol{w}$。
+- **闭式解**：把 $\boldsymbol{S}_B\boldsymbol{w}=(\boldsymbol{m}_1-\boldsymbol{m}_2)\rho$ 代入可得 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$（$\rho,\lambda$ 只是缩放）——考试手算用这个；$\boldsymbol{S}_W$ 奇异时用 $(\boldsymbol{S}_W+\beta\boldsymbol{I})^{-1}$。
+- **bias**：$w_0=-\frac{\boldsymbol{w}^T(\boldsymbol{m}_1+\boldsymbol{m}_2)}{2}$，依据"两均值中点在边界上"（假设两类 scatter 相近，否则微调）。
+- **⚠️ 符号检查**：eigenvalue 法求出的 $\boldsymbol{w}$ 可能使 class 1 落在负侧，必须检查并取反——这是 **Assignment 2 明确要求**、也是往届同学常犯的错误。
+- **多类推广**：$c$ 类需 **$c-1$ 个判别函数**；$\boldsymbol{S}_W=\sum_i\boldsymbol{S}_i$；$\boldsymbol{S}_B=\sum_i n_i(\boldsymbol{m}_i-\boldsymbol{m})(\boldsymbol{m}_i-\boldsymbol{m})^T$（与 **total mean** 比）；$\boldsymbol{S}_T=\boldsymbol{S}_W+\boldsymbol{S}_B$；准则用 **determinant** 比值；解 $\boldsymbol{S}_B\boldsymbol{w}_i=\lambda_i\boldsymbol{S}_W\boldsymbol{w}_i$ 取前 $c-1$ 个最大特征值。多类 LDA 更常作为 **dimensionality reduction**（$d\to c-1$）使用。
+- **考试层面**：**二类手算**是重点（past years 考过），**多类那部分通常不考**；Euclidean distance 若要用于决策一般用**平方距离**。
+- **Assignment 2**：用**同一 Iris 数据**设计 **linear FDA classifier**，可用闭式公式或解 generalized eigenvalue problem，**必须验证投影后 class 1 在正侧**；与 Assignment 1 **合并成一份 PDF（不含代码）**，含设计说明 + 测试样本预测结果表，**2026-10-19（周一）截止**，两次作业合计 20%。
+
+---
+
+> **下一周（Week 9）预告**：老师明确说 **"next week we are going to study the linear support vector machines"**——Week 9 = **Linear SVM（线性支持向量机）**，与本周的 LDA 同属 **linear classifier**，但**优化准则不同**：LDA 用 **Fisher criterion（类间散度/类内散度之比）**，SVM 用 **maximum margin（最大间隔）**。二者共享本周讲的线性分类器几何性质（$\boldsymbol{w}$ 垂直于超平面、$g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 为距离）。转写中老师还提到，若时间允许，Week 9 可能**同时开始一部分 Decision Tree**；后续次序为：decision tree classifier → evaluation of classifiers → feature selection + regression → clustering（最后一周）。

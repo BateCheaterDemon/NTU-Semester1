@@ -14,6 +14,7 @@ EE6406 Analytic and Ensemble Machine Learning（NTU，AY2026-27 S1，School of E
 
 **考核占比**：
 - Final Exam **60%**：4 题，2.5 题来自 Part 1（Week 1–8）、1.5 题来自 Part 2（Week 9–13）。
+- ⭐ **CA2（15%）范围 = Lecture 5–7**（regression / classification learning + penalized learning），concept 为主 + 少量 basic calculation（参照 lecture slides examples，不做书末难题）；原定 **Week 8**（recess 后）课上举行。**CA3（15%）在 Week 12**，Week 9 起 Simon Liu 接手 Ensemble Learning。
 - CA（仅 quiz）**40%**：CA1 10% **Week 5**、CA2 15% **Week 8**（recess 后）、CA3 15% **Week 12**。
 - 三次 quiz 均 **online 但 in-class（必须到课）**、**closed-book**、需 **lockdown browser**（PC+Windows 最稳，Mac/Unix 可能有问题，iPad 可用但不稳）；计划 Week 4 开头 10–15 分钟 try-run 测设备。**无日常考勤**——平时不点名，仅在三次 quiz 日须到场。
 - **Lecture 1 不进 quiz/exam；Lecture 2 起会进。**
