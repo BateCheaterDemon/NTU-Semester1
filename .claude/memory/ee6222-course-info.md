@@ -12,7 +12,15 @@ EE6222 Machine Vision（NTU，AY26-27 Semester1，School of EEE）。注意用�
 - 后 4 周（Week 10–13，Topic 11–14）**Dr. Cheng Jun**，讲 Video Analysis / Video Recognition / 3D Machine Perception / 3D Machine Vision。
 
 **考核占比**：
-- Final Exam 期末 **60%**。
+- Final Exam 期末 **60%**：**4 题 / 3 小时**。其中 **3 题来自 Jiang Xudong 部分（Topic 1–10）**，第 4 题来自 Cheng Jun 部分（Topic 11–14，纯英文简答）。
+  - ⭐ **Jiang Xudong 亲口公布的命题范围（Week 9，2026-10）**：
+    | 题 | 来源 | 备注 |
+    |---|---|---|
+    | Q1 | **Topic 3**（image noise and enhancement） | 更偏 **enhancement** 而非 denoising |
+    | Q2 | **Topic 5**（MAP rule 与基于 MAP 的分类器设计） | — |
+    | Q3 | **Topic 9 + 10**（Neural Network / CNN / Transformer） | — |
+  - **不考**：Topic **1、2、4、6、7、8**。
+  - 老师强调："I will never test your skills, but I test your **understanding**"——考的是 fundamentals，不是具体 corner case。
 - Continuous Assessment (CA) **40%**：
   - Quiz **10%**：**Week 7**，课堂内 **30 分钟**。
   - Assignment ×2 共 **30%**（各 15%）：take-home mini-project + report（论文形式）；一份来自 Jiang Xudong 部分、一份来自 Cheng Jun 部分。

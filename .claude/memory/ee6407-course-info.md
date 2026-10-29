@@ -27,11 +27,12 @@ EE6407 Genetic Algorithms and Machine Learning（NTU，AY26-27 Semester1）。
 （注：`Learning_note.md` 第 29 行写作"11 Nov 周二"，但 2026-11-11 是周三，**应以 11-10 周二为准**。）
 
 **课程进度与收尾**：
-- Week 8 = **Linear Discriminant Analysis / FDA**（Fisher criterion、within/between-class scatter、多类推广为 c−1 个判别函数）；**Week 9 = Linear SVM**；Week 10 = clustering 等。
+- Week 8 = **Linear Discriminant Analysis / FDA**（Fisher criterion、within/between-class scatter、多类推广为 c−1 个判别函数）；**Week 9 = Linear SVM**（maximum margin / Lagrange-KKT / dual / soft margin / kernel SVM）；**Week 10 = classification tree + random forest**（impurity measure：entropy / variance / Gini / misclassification；impurity drop + gain ratio；continuous feature 的排序+中点 split；stopping + pruning + leaf majority；random forest = Bagging（bootstrap 有放回采样）+ 随机 feature 子集 + majority voting）；**Week 11 = classifier performance evaluation + feature selection**（curse of dimensionality / peaking phenomenon，据 Week 10 末原话）；之后 regression，最后一周 clustering。
+- ⭐ **Week 10 上课（2026-10-19~23）没有新的 quiz/assignment 公告**；作业 A1+A2 已于 **2026-10-19** 截止，**Quiz 2（11/10）是 6407 唯一剩余的 CA**。
 - **教学于 2026-11-13（周五）结束**，其后 Week 14 为复习周（11/16–20），**期末考试随后开始**（转写提到"20 号那个周一"但含糊，实际以教务排期为准）。
 
 **要点**：前 4 周只靠一次闭卷 Quiz（10%）评估；CA 40% 中 ML 部分占 30%（作业 20% + Quiz 10%）；期末 60% 中约 3/4 题来自 ML 部分。
 
-**权威来源**：`6407/week1/L1(2-1).pdf`（官方课件，作者 Meng-Hiot Lim）、`6407/week8/ML-Slides4.pdf` + `week8/week8.txt`（LDA 与 Assignment 2 发布公告）。笔记见 `6407/Learning_note.md`。
+**权威来源**：`6407/week1/L1(2-1).pdf`（官方课件，作者 Meng-Hiot Lim）、`6407/week8/ML-Slides4.pdf` + `week8/week8.txt`（LDA 与 Assignment 2 发布公告）、`6407/week10/ML-Slides6.pdf` + `week10/week10.txt` + `Data_HeartDisease.xlsx`（classification tree / random forest）。笔记见 `6407/Learning_note.md`。
 
 相关：[[semester1-repo-purpose]]、[[ee6497-course-info]]、[[transcript-quality-noise]]

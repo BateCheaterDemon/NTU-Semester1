@@ -2663,3 +2663,899 @@ $$p(\text{Rope}) = 38.662\%,\qquad p(\text{LSE}) = 0.004\%,\qquad p(\text{TER}) 
 > **考核节奏**：CA2 已于本周课上完成（15%）；**CA3 在 4 周后（Week 12）**，同一天、同一时间、同样形式（online lockdown browser，closed-book，approved calculator，不得中途离开考场）。final exam 60%，其中约 2.5 题来自 Part 1（Lecture 1–8）。
 >
 > Week 9 的具体内容（bagging / boosting / stacking / random forest 等哪个先讲）以 Lecture 9 课件为准。
+
+---
+
+## Week 9 — Lecture 9: Ensemble Learning: Introduction and Fundamentals（集成学习导论与基础）
+
+> **材料**：转写 `week9/week9.txt`（Simon Liu 首次授课；转写含大量课堂行政、SkillsFuture 签到与课后 Q&A，考试相关内容集中在 lecture 部分），官方课件 `week9/EE6406_Lecture9_SL.pdf`（Simon Liu，**权威来源**，57 slides，Oct 15, 2026）。
+>
+> **本周定位**：**Part 2（Ensemble Learning，Lecture 9–13）的第一讲**。Part 1（Analytic Learning，Lecture 3–8，Toh Kar-Ann）到此结束；从本周起由 **Simon Liu** 接手。本讲回答三个问题：(1) 为什么 linear models 不够用？(2) ensemble 为什么有效（bias–variance 视角）？(3) 最基础的 ensemble 方法 **bagging** 如何工作、为什么能降 variance？
+>
+> **课堂节奏**（Simon 的 regular week）：Lecture Part 1（约 70%）→ 15 分钟 break → Lecture Part 2 → practical sample code / review → summary → Q&A。
+
+> ⚠️ **权威来源说明 / 本周 ASR 错拼修正**：本周课件结构完整、公式齐全，**以 PDF 为准**。需要注意：
+>
+> - PDF 第 52 页 “Coding Examples” 只是 **section divider**，实际代码是 Simon 在课堂上用 Google Colab 现场演示的（Iris + decision tree），PDF 中没有代码内容；§10 的代码与结果按 transcript 重建，仅作学习参考。
+> - 标 **⚠️ 补充** 的内容是标准教材推导/常识，课件未给：Condorcet 定理的二项式表达、bias–variance decomposition 的展开、bootstrap 的 OOB 比例、Gini/Entropy 手算示例、bagging 的 general bias 公式、boosting 对比细节。
+> - 转写中大量 “on sample / sample learning / semble” 实为 **ensemble**；“begging / backing” 实为 **bagging**；“book strap / boot shaping / book shopping” 实为 **bootstrap**。完整对照表如下：
+>
+> | 转写 ASR | 正确术语 |
+> |---|---|
+> | “on sample learning / sample learning / semble / ample learning” | **ensemble learning** |
+> | “begging / backing” | **bagging** |
+> | “book strap / boot shaping / book shopping / booksep / boo shaping / hook shopping” | **bootstrap** |
+> | “random force / random forrest” | **Random Forest** |
+> | “G impurity / genie purity / Geni / GE” | **Gini impurity** |
+> | “various / varus / virus / vars / varies” | **variance** |
+> | “bans / bales / bars” | **bias** |
+> | “overfeeding / underfeeding” | **overfitting / underfitting** |
+> | “deplaning / de len models / declare models / big learn models” | **deep learning (models)** |
+> | “decision try / decision truths / decisionry / three models” | **decision trees / tree models** |
+> | “homogeneality” | **homogeneity** |
+> | “mean sample leaf / mean sample split” | **min samples leaf / min samples split** |
+> | “P T problem” | **NP-hard problem** |
+> | “explanation”（grows explanation） | **exponentially** |
+> | “weekly cooling” | **weakly correlated** |
+> | “spective to outliers” | **sensitive to outliers** |
+> | “Jeffrey Hinton” | **Geoffrey Hinton** |
+> | “University of Fornto / UOT / UFT” | **University of Toronto** |
+> | “doctor Sibaja” | **Dr. Supraja** |
+> | “e64 oh five” | **EE6405** |
+> | “adapt boosting” | **AdaBoost** |
+> | “cyc” | **sklearn（scikit-learn）** |
+> | “Panda syria PD” | **pandas as pd** |
+> | “num Pi / SMP” | **NumPy / np** |
+> | “IRs” | **Iris** |
+> | “sp length / pedal length / pattern length / pdl lay” | **sepal length / petal length** |
+> | “sos” | **setosa** |
+> | “Google's Cb / Cob” | **Google Colab** |
+> | “skill future” | **SkillsFuture** |
+> | “sin”（activation） | **sign** |
+> | “passive class” | **positive class** |
+> | “ti class” | **multi-class** |
+> | “nom”（degree minus one point nom） | **polynomial** |
+> | “conflict”（better than conflict） | **coin flip** |
+> | “row” | **rho（ρ）** |
+> | “cation / o lation” | **correlation** |
+> | “dom / domes” | **randomness** |
+> | “diminision return” | **diminishing return** |
+> | “sample mothers” | **ensemble methods** |
+> | “intruive / curistics / nose” | **intuitive / heuristics / nodes** |
+> | “500,000”（RF 树数量） | **500**（按上下文修正） |
+> | “A paper” | **AlexNet paper**（2012） |
+
+---
+
+### 0. 本周课程信息与新讲师：Simon Liu
+
+| 项目 | 详情 |
+|---|---|
+| **讲师** | **Simon Liu** |
+| **本职** | **Chief Data and AI Officer, TrustDecision**（风险管理软件公司） |
+| **学术** | **Adjunct Associate Professor at NTU**；Ph.D. in Electrical and Computer Engineering, **University of Toronto** |
+| **经历** | **Senior Vice President, Head of Data Science (risk), Lazada**；**Director in Data Science, Scotiabank, Canada** |
+| **授课范围** | **Week 9–13**：Ensemble Learning、Reinforcement Learning、Industry Applications；同时与 **Dr. Supraja** 合授 **EE6405**（NLP） |
+| **学术轶事** | 2011 年在 Toronto 上过 **Geoffrey Hinton** 的 deep learning 课——当时班上只有约 20 人，深度学习尚未爆发；两年后（2012–14）AlexNet 引爆领域 |
+
+- Simon 的 industry 背景贯穿 Part 2：他会反复用 **risk management / banking / e-commerce / fintech** 的例子说明 ensemble 为什么在 regulated industry 仍然重要。
+
+**Weekly schedule（PDF p4）**：
+
+| Week | 内容 |
+|---|---|
+| **9** | Introduction to Ensemble Learning, **Decision Trees**, **Bagging** |
+| **10** | **Random Forest**, **Boosting**, **AdaBoost** |
+| **11** | **Gradient-Boosted Trees**, **XGBoost**, **LightGBM** |
+| **12** | Introduction to **Reinforcement Learning** + **Quiz 3（CA3）** |
+| **13** | **Industrial Applications** + Review |
+
+**考核信息（transcript + 课程既有安排）**：
+
+| 项目 | 详情 |
+|---|---|
+| **CA3 / Quiz 3** | **Week 12**，占 **15%**，范围为 **Week 9–11**（ensemble + trees + bagging + RF + boosting + GBDT/XGBoost/LightGBM） |
+| **Week 12 前 1 小时** | Ensemble 与 Reinforcement Learning 的联系——**明确说明不考**（“that 1 hour will not be tested”） |
+| **Final Exam** | **60%**，其中约 **1.5 题来自 Part 2（L9–L13）**，约 2.5 题来自 Part 1（L1–L8） |
+| **形式** | 与 CA1/CA2 相同：online lockdown browser，closed-book，approved calculator |
+
+- ⭐ **复习策略**：Week 9–11 是 Quiz 3 的全部范围；Week 12 的 RL 内容和 Week 13 的 industry applications 不进入 CA3，但 industry examples 可能帮助理解 final 的应用题。
+- 课后 Q&A 主要是 PhD/AI 职业发展讨论（Simon 认为 PhD 的“研究价值”在 AI 时代下降，但社会 hierarchy/reputation 仍需要它），**与考试无关**，本笔记从略。
+
+---
+
+### 1. 从 Linear Models 到 Ensemble Learning
+
+#### 1.1 Linear Models 是什么
+
+**定义**：linear model 用输入特征的**线性组合**预测输出：
+
+$$y = w_0 + w_1 x_1 + w_2 x_2 + \cdots + w_d x_d = w_0 + \mathbf{w}^{\top}\mathbf{x} \tag{9.1}$$
+
+**三个代表**：
+
+| 模型 | 用途 |
+|---|---|
+| **Linear Regression** | 连续输出（regression） |
+| **Logistic Regression** | 分类（classification） |
+| **Support Vector Machines（linear kernel）** | 线性可分分类 |
+
+**为什么用 linear models**：
+
+- **Simple and interpretable**：权重符号直接告诉你特征与输出的方向关系——“$x$ 增大、weight 为正 → $y$ 增大”；这是 Simon 所说的“能向老板解释”的模型。
+- **Efficient for high-dimensional data**：当特征关系近似线性时，即使 $d$ 很大也能快速训练；历史上算力不足时几乎是唯一选择。
+
+#### 1.2 Linear Models 的五个局限
+
+| 局限 | 含义 | 例子 |
+|---|---|---|
+| **Non-linear relationships** | 无法捕捉复杂 decision boundary | **XOR problem** 不能被任何线性模型分开 |
+| **Feature interactions** | 假设各特征独立贡献，难以刻画交互 | 线性模型不会自动产生 $x_1 x_2$ 项 |
+| **Outlier sensitivity** | 极端值乘以权重后影响巨大 | 大部分值在 0–10，突然出现 100，会把 fitted line 拉偏 |
+| **Overfitting / Underfitting** | 太简单 → underfit；太复杂（如 $n$ 个点用 $n-1$ 次多项式）→ overfit | transcript：“degree $n-1$ polynomial 可以完美穿过 $n$ 个点” |
+| **Limited flexibility** | 多模态、类别重叠的数据难以处理 | 两类数据混在一起，线性 boundary 无能为力 |
+
+- ⭐ **关键点**：linear model 的 bias–variance 很容易失控——要么太简单（underfit），要么为了拟合而加高阶项（overfit）；而且它**没有内建的机制**在两者之间自动平衡。
+
+#### 1.3 Interpretability vs Predictive Power 的 trade-off
+
+**PDF p9 的对照表**（重要，考试常以概念题出现）：
+
+| Aspect | Linear Models | **Ensemble Models** | Deep Learning |
+|---|---|---|---|
+| **Interpretability** | High | **Moderate** | Low |
+| **Predictive Power** | Low | **High** | Very High |
+| **Overfitting Risk** | Low | **Moderate** | High |
+| **Training Speed** | Fast | **Moderate** | Slow |
+| **Non-linear Data** | Poor | **Excellent** | Excellent |
+| **Data Needs** | Low | **Moderate** | High |
+
+- ⭐ **Key insight（课件原话）**：**Ensemble models strike the best balance — powerful yet interpretable — ideal for real-world applications.**
+- **Transcript 补充（行业视角）**：在 regulated industry（banking、fintech、risk management），deep learning 的“黑箱”很难向 regulator / boss 解释；ensemble 的 interpretability 是 **moderate**，但配合 **feature importance** 足以给出“合理的解释”，同时 predictive power 接近 deep learning，overfitting 风险可控，训练也不需要 GPU。这是 ensemble 在工业界仍然大量使用的原因。
+- **数据量经验值（transcript，非严格定律）**：
+  - 数据量在**数百到数千**级别时，linear model 可能已经够用；
+  - 超过约 **$10^4$** 量级后，需要更强的模型；
+  - 到 **$10^8$** 量级，ensemble 仍可与 deep learning 竞争，某些场景甚至更好；
+  - 数据量太小（如 1,000–10,000 点）时，复杂 ensemble 的收益有限——**没有足够数据支撑多个模型的多样性**。
+
+---
+
+### 2. Ensemble Learning 的直觉：Wisdom of the Crowd
+
+#### 2.1 定义与基本术语
+
+**Ensemble learning（集成学习）**：combines multiple models（通常称为 **weak learners**）to build a stronger predictive model。
+
+| 术语 | 含义 |
+|---|---|
+| **Weak learner / base learner（弱学习器 / 基学习器）** | ensemble 中的单个模型；简单、易训练，通常只比随机猜测略好（或只在某一方面擅长） |
+| **Strong learner（强学习器）** | 高精度、低误差的模型；ensemble 的目标是用多个 weak learners 构造 strong learner |
+| **Diversity（多样性）** | 模型之间“犯错方式不同”的程度；diversity 越高，aggregation 越能抵消错误 |
+| **Aggregation（聚合）** | 把多个模型的预测组合起来（voting / averaging / weighted sum / meta-learner） |
+
+- 直觉：**wisdom of the crowd**——collective decisions often outperform individual ones。
+- **Jury analogy**：单个 juror 可能犯错，但多数投票（majority vote）往往更可靠。
+- 这不是“随便把模型加在一起”：ensemble 的核心是**让多个模型犯不同的错误（diversity）**，再通过 aggregation 把错误抵消。
+
+#### 2.2 ⭐ Condorcet Jury Theorem
+
+**定理（PDF p11 的表述）**：
+
+> “If each juror has a better than random chance of being correct, adding more jurors increases the probability that the majority decision is correct.”
+
+**形式化（⚠️ 补充）**：设有 $M$ 个（$M$ 为奇数）独立 juror，每个 juror 以概率 $p > 1/2$ 给出正确答案。多数投票正确的概率为
+
+$$P_M = \sum_{k=(M+1)/2}^{M} \binom{M}{k} p^k (1-p)^{M-k} \tag{9.2}$$
+
+由 **Law of Large Numbers（大数定律）**，当 $M \to \infty$ 时，正确票的比例依概率收敛到 $p > 1/2$，因此
+
+$$P_M \longrightarrow 1 \qquad (p > 1/2) \tag{9.3}$$
+
+- 若 $p = 1/2$：$P_M = 1/2$，加多少人也没用。
+- 若 $p < 1/2$：$P_M \to 0$，多数投票会放大错误。
+- ⭐ **直觉**：每个 juror 只需要“略好于随机”（例如 51%），人数足够多时，多数票几乎必然正确。
+
+**数值示例（$p = 0.51$，正态近似）**：
+
+| $M$ | $P_M$（多数正确） |
+|---|---|
+| 101 | ≈ 0.58 |
+| 1,001 | ≈ 0.74 |
+| 10,001 | ≈ 0.98 |
+
+- 注意收敛速度：$p$ 只比 0.5 高 0.01 时，需要**上万**个 juror 才能接近 1；这也解释了为什么 ensemble 的收益取决于 base learner 的**质量**和**独立性**。
+- ⚠️ **两个强假设**：juror **independent** 且 **identically competent**。在真实 ensemble 中，base learners 训练数据重叠、模型结构相似，**独立性不成立**——这正是 §8 要量化的 correlation $\rho$ 问题。
+
+#### 2.3 为什么 ensemble 有效
+
+**Individual models 的两类错误**：
+
+| 错误 | 来源 | 典型表现 |
+|---|---|---|
+| **Bias** | overly simplistic assumptions | underfitting |
+| **Variance** | excessive sensitivity to noise | overfitting |
+
+**Ensemble 的五个优势（PDF p12）**：
+
+| 优势 | 含义 |
+|---|---|
+| **Robustness** | 通过 averaging 多个模型降低 overfitting |
+| **Improved Accuracy** | 聚合 diverse models 提升性能 |
+| **Stability** | 对数据噪声/outlier 不那么敏感；单个模型出错不会拖垮整体 |
+| **Versatility** | 同时适用于 classification 和 regression |
+| **Reduced Model Dependency** | 通常只需很少 hyperparameter tuning 就能超过精细调参的单个模型 |
+
+- ⭐ **一句话总结**：ensemble 不是靠“一个更强的模型”，而是靠“**很多个各自不错、但犯错方式不同的模型**”来提升稳定性和精度。
+
+---
+
+### 3. 统一组合框架：Weak Learners 与 Aggregation
+
+#### 3.1 一般形式
+
+给定 $M$ 个 weak learners $f_m(\mathbf{x})$，$m = 1, \dots, M$，ensemble 的输出为
+
+$$F(\mathbf{x}) = \Phi\left(\sum_{m=1}^{M} \alpha_m f_m(\mathbf{x})\right) \tag{9.4}$$
+
+**两个组件**：
+
+- $\Phi(\cdot)$：**activation / output function**，把聚合后的分数转成最终输出（注意：这里的 “activation” 不是 neural network 的激活函数，而是 ensemble 的 output/link function）。
+- $\alpha_m$：第 $m$ 个 weak learner 的**权重**。
+  - **Bagging**：$\alpha_m = 1/M$（equal weights）。
+  - **Boosting**：$\alpha_m$ 根据 learner 的表现调整（performance-dependent）。
+
+#### 3.2 $\Phi$ 的选择
+
+| 任务 | $\Phi(z)$ | 最终形式 | 备注 |
+|---|---|---|---|
+| **Binary classification** | $\Phi(z) = \operatorname{sign}(z)$ | 输出 $\pm 1$ | 通常把两类编码为 $-1$ 和 $+1$ |
+| **Multi-class classification** | $\Phi(z) = \arg\max_k z_k$ | 输出聚合分数最大的类 | $z_k$ 是第 $k$ 类的聚合分数 |
+| **Regression** | $\Phi(z) = z$ | $F(\mathbf{x}) = \sum_m \alpha_m f_m(\mathbf{x})$ | 直接输出加权和 |
+
+- ⭐ **统一性**：bagging、boosting、甚至 stacking 都可以放进这个框架；区别在于 **$\alpha_m$ 怎么定**、**$f_m$ 怎么训练**、**$\Phi$ 是什么**。
+- **Stacking 的特殊性**：它的 $\Phi$ 不是一个简单函数，而是一个 **meta-learner** $g(\cdot)$，输入是 base models 的预测向量（见 §7.4）。
+
+---
+
+### 4. Bias–Variance 视角（偏差–方差权衡）
+
+#### 4.1 定义
+
+设真实函数为 $f(\mathbf{x})$，模型预测为 $\hat f(\mathbf{x})$（$\hat f$ 是随 training set 变化的随机变量）：
+
+$$\operatorname{Bias}\left[\hat f(\mathbf{x})\right] = \mathbb{E}\left[\hat f(\mathbf{x})\right] - f(\mathbf{x}) \tag{9.5}$$
+
+$$\operatorname{Var}\left[\hat f(\mathbf{x})\right] = \mathbb{E}\left[\left(\hat f(\mathbf{x}) - \mathbb{E}\left[\hat f(\mathbf{x})\right]\right)^2\right] \tag{9.6}$$
+
+| 概念 | 含义 | 症状 |
+|---|---|---|
+| **High bias（高偏差）** | 模型太简单，无法捕捉真实模式 | **underfitting** |
+| **High variance（高方差）** | 模型对 training data 的微小变化过于敏感 | **overfitting** |
+
+#### 4.2 ⭐ Prediction Error Decomposition
+
+**课件公式（PDF p16，⚠️ 记号说明）**：PDF 左侧写作 $\mathbb{E}[(\hat f(\mathbf{x}) - f(\mathbf{x}))^2]$，但右侧包含 $\sigma^2$。严格来说，$\mathbb{E}[(\hat f-f)^2] = \operatorname{Bias}^2 + \operatorname{Var}$，而 $\sigma^2$ 来自观测噪声；因此标准写法是把左侧写成预测误差 $\mathbb{E}[(y-\hat f)^2]$：
+
+$$\mathbb{E}\left[(y - \hat f(\mathbf{x}))^2\right] = \operatorname{Bias}^2 + \operatorname{Variance} + \sigma^2 \tag{9.7}$$
+
+其中 $\sigma^2$ 是 **irreducible error**（数据本身的 random noise）。
+
+**⚠️ 补充推导**：设观测 $y = f(\mathbf{x}) + \varepsilon$，$\mathbb{E}[\varepsilon] = 0$，$\operatorname{Var}(\varepsilon) = \sigma^2$，且 $\varepsilon$ 与 $\hat f$ 独立：
+
+$$
+\begin{aligned}
+\mathbb{E}\left[(y - \hat f)^2\right]
+&= \mathbb{E}\left[(f + \varepsilon - \hat f)^2\right] \\
+&= \mathbb{E}\left[(f - \hat f)^2\right] + 2\mathbb{E}\left[(f - \hat f)\varepsilon\right] + \mathbb{E}[\varepsilon^2] \\
+&= \mathbb{E}\left[(f - \hat f)^2\right] + \sigma^2 \qquad (\text{交叉项为 } 0) \\
+&= \left(\mathbb{E}[\hat f] - f\right)^2 + \mathbb{E}\left[(\hat f - \mathbb{E}[\hat f])^2\right] + \sigma^2 \\
+&= \operatorname{Bias}^2 + \operatorname{Var}(\hat f) + \sigma^2
+\end{aligned}
+\tag{9.8}
+$$
+
+- ⭐ **$\sigma^2$ 不可消除**：无论模型多强，数据本身的噪声都无法被消除；模型最多只能逼近 $f(\mathbf{x})$。
+- ⭐ **可控制的是 Bias 和 Variance 的 trade-off**：模型复杂度上升 → bias 下降、variance 上升；复杂度下降 → bias 上升、variance 下降。
+
+#### 4.3 对 Ensemble 的指导意义
+
+| 方法 | 主要目标 | 机制 |
+|---|---|---|
+| **Bagging** | **降低 variance** | 对 high-variance 模型做 averaging |
+| **Boosting** | **降低 bias** | 顺序训练，关注之前模型犯错的样本 |
+
+- ⭐ 这是 Part 2 的**总纲**：Week 9 讲 bagging（variance），Week 10–11 讲 boosting / GBDT（bias），所有细节都围绕这两条线展开。
+
+---
+
+### 5. 如何选择 Weak Learners
+
+PDF p17 给出三个设计原则：
+
+#### 5.1 Simplicity
+
+- weak learners 应该**简单**，只捕捉 basic patterns。
+- 太复杂的 base learner 本身就有 high variance，且会**限制 ensemble diversity**——如果每个模型都很复杂且相似，aggregation 没有意义。
+
+#### 5.2 Diversity
+
+- 模型之间要有**不同结构、不同特征、不同数据子集**，才能让错误不完全相关。
+- ⭐ **Diversity 是 ensemble 的灵魂**：§8 会用 correlation $\rho$ 量化——$\rho$ 越小，variance reduction 越明显。
+
+#### 5.3 Moderate Performance
+
+- weak learners 通常**故意限制预测能力**（如 shallow trees、simple rules）。
+- ⭐ **原因**：如果某个 learner 太强，它会 **dominate** 整个 ensemble，其他模型变成“陪衬”，diversity 消失，ensemble 退化成单个强模型。
+- 这也解释了 “weak learner” 的名字：不是“很差的模型”，而是“**各自只学一部分、但组合起来很强**”的模型。
+
+**Common choice：Decision Trees**——下一节详细讲为什么。
+
+---
+
+### 6. Decision Trees（决策树）：最常用的 Weak Learner
+
+#### 6.1 为什么决策树是常见选择
+
+| 原因 | 含义 |
+|---|---|
+| **Flexibility** | 同时处理 numerical 和 categorical 数据 |
+| **Fast Training** | shallow trees（如 **tree stumps**）训练很快，适合 boosting 这类迭代方法 |
+| **Interpretable Rules** | split 对应直观的 if-then 规则 |
+| **Natural Diversity** | 决策树本身 **high variance**，正好适合 bagging 用 averaging 降 variance |
+| **Adaptive Splits** | 能自然适应 non-linear patterns |
+
+- ⭐ **关键逻辑**：决策树不是“因为 ensemble 才用”，而是它的 **high variance + 易训练 + 可解释** 恰好匹配 ensemble 的需求。Transcript：“ensemble learning 不等于 tree models；如果你能设计更好的 weak learner，完全可以替换 trees。”
+
+#### 6.2 三个简单例子
+
+| 例子 | 结构 |
+|---|---|
+| **Binary categorical tree** | `Is Raining?` → True: Stay Home；False: Go Out |
+| **Numeric threshold tree** | `Height < 100cm` → Sorry；`>= 100cm` → Enjoy the Ride |
+| **Iris tree** | 多个 feature + 多个 threshold，用 sklearn 可视化 |
+
+- 复杂树（如 Iris）手工画很困难，实际用 `sklearn.tree.plot_tree` 等工具。
+
+#### 6.3 最优决策树是 NP-hard
+
+- **目标**：找到**最小的**、能正确分类所有训练点的决策树（smallest tree that correctly classifies all data points）；最优树要在 **simplicity 与 accuracy** 之间平衡，以 minimize overfitting。
+- **困难**：可能的树结构数量随数据规模**指数增长**；寻找最优树是 **NP-hard**。
+- **实际做法**：**greedy**——每一步选择“让子节点最 homogeneous”的 split，不保证全局最优，但计算可行。
+- ⭐ 这是算法设计中常见的取舍：optimal 不可行 → greedy heuristic；类似思路在 boosting 中也会出现。
+
+#### 6.4 Split Criteria（划分准则）
+
+##### (a) Regression：Variance Reduction
+
+对一个含 $n$ 个样本的节点 $N$：
+
+$$\operatorname{Var}(N) = \frac{1}{n}\sum_{i=1}^{n}\left(y_i - \bar y\right)^2 \tag{9.9}$$
+
+一次 split 把 $N$ 分成 $N_L$（$n_L$ 个）和 $N_R$（$n_R$ 个），**variance reduction** 为
+
+$$\Delta\operatorname{Var} = \operatorname{Var}(N) - \left[\frac{n_L}{n}\operatorname{Var}(N_L) + \frac{n_R}{n}\operatorname{Var}(N_R)\right] \tag{9.10}$$
+
+- 目标：**maximize $\Delta\operatorname{Var}$**，让子节点尽可能纯。
+- 直觉：如果子节点内 $y_i$ 都很接近，variance 小；如果完美分开，两个子节点的 variance 都为 0，$\Delta\operatorname{Var}$ 等于父节点的 variance。
+
+##### (b) Classification：Gini Impurity（基尼不纯度）
+
+对一个含 $K$ 个类别的节点 $N$：
+
+$$\operatorname{Gini}(N) = 1 - \sum_{k=1}^{K} p_k^2 \tag{9.11}$$
+
+其中 $p_k$ 是节点 $N$ 中属于类别 $k$ 的样本比例。
+
+$$\Delta\operatorname{Gini} = \operatorname{Gini}(N) - \left[\frac{n_L}{n}\operatorname{Gini}(N_L) + \frac{n_R}{n}\operatorname{Gini}(N_R)\right] \tag{9.12}$$
+
+- 目标：**maximize $\Delta\operatorname{Gini}$**。
+- 二分类性质：pure node（$p_1=1, p_2=0$）→ Gini $=0$；$p_1=p_2=0.5$ → Gini $=0.5$（最大值）。
+- 直觉：Gini 衡量“随机抽一个样本、按节点类别分布随机猜，猜错的概率”。
+
+##### (c) Classification：Entropy（熵）/ Information Gain（信息增益）
+
+$$\operatorname{Entropy}(N) = -\sum_{k=1}^{K} p_k \log_2 p_k \tag{9.13}$$
+
+$$\Delta\operatorname{Entropy} = \operatorname{Entropy}(N) - \left[\frac{n_L}{n}\operatorname{Entropy}(N_L) + \frac{n_R}{n}\operatorname{Entropy}(N_R)\right] \tag{9.14}$$
+
+- 目标：**maximize $\Delta\operatorname{Entropy}$**，等价于 **maximize information gain**。
+- 二分类性质：pure node → entropy $=0$；$p_1=p_2=0.5$ → entropy $=1$ bit（最大值）。
+
+**Gini vs Entropy 对比**：
+
+| 性质 | Gini | Entropy |
+|---|---|---|
+| Pure node | 0 | 0 |
+| 二分类最大值 | 0.5（$p=0.5$） | 1 bit（$p=0.5$） |
+| 度量 | 误分类概率 | 不确定性/随机性 |
+| 计算 | 只有平方，较快 | 有 log，稍慢 |
+| 选择 | 默认常用 | 与 Gini 通常给出相似结果；数据特殊时可互换尝试 |
+
+- Transcript：“for good problems（数据量足够），两者给出的结果通常很相似；没有理论上的绝对优劣，可以都试一下。”
+
+##### ⚠️ 补充：Gini / Entropy 手算示例
+
+设父节点 $N$ 有 10 个样本：6 个 A、4 个 B。
+
+- 父节点：$\operatorname{Gini}(N)=1-(0.6^2+0.4^2)=0.48$；$\operatorname{Entropy}(N)=0.971$ bit。
+
+考虑两个候选 split：
+
+| Split | 左子节点 | 右子节点 | $\Delta$Gini | $\Delta$Entropy |
+|---|---|---|---|---|
+| $S_1$ | 4A + 1B（$n_L=5$） | 2A + 3B（$n_R=5$） | 0.08 | 0.124 |
+| $S_2$ | 5A + 0B（$n_L=5$） | 1A + 4B（$n_R=5$） | **0.32** | **0.610** |
+
+计算细节（$S_1$）：
+
+- $\operatorname{Gini}(N_L)=1-(0.8^2+0.2^2)=0.32$
+- $\operatorname{Gini}(N_R)=1-(0.4^2+0.6^2)=0.48$
+- $\Delta\operatorname{Gini}=0.48-(0.5\times0.32+0.5\times0.48)=0.08$
+- $\operatorname{Entropy}(N_L)=0.722$，$\operatorname{Entropy}(N_R)=0.971$
+- $\Delta\operatorname{Entropy}=0.971-(0.5\times0.722+0.5\times0.971)=0.124$
+
+→ 两种准则都选 $S_2$。这说明 Gini 与 Entropy 的**数值不同**，但**排序通常一致**。
+
+#### 6.5 递归构建算法
+
+```
+BuildTree(D, depth):
+    1. Stopping condition:
+       if all samples in D belong to the same class, or depth == max_depth:
+           return leaf node:
+               majority class (classification) / average value (regression)
+
+    2. Find best split:
+       evaluate all features and split points
+       choose the split maximizing homogeneity:
+           regression     -> minimize variance in children (maximize ΔVar)
+           classification -> maximize ΔGini or ΔEntropy
+
+    3. Split the data:
+       D_L = samples satisfying the split condition
+       D_R = remaining samples
+
+    4. Recursively build:
+       left  = BuildTree(D_L, depth + 1)
+       right = BuildTree(D_R, depth + 1)
+
+    5. Return decision node:
+       split condition + left/right child pointers
+```
+
+#### 6.6 Additional Stopping Criteria
+
+| 准则 | 作用 |
+|---|---|
+| **Minimum Samples Split** | 节点样本数少于阈值就不再 split |
+| **Minimum Samples per Leaf** | 任一子节点样本数太少则拒绝该 split |
+| **Maximum Leaf Nodes** | 限制叶子节点总数，控制复杂度 |
+| **Maximum Impurity Decrease** | 只有 impurity reduction 超过阈值才 split |
+
+**目的**（PDF p30）：
+
+- **Improves model efficiency**：避免为了 0.1% 的 impurity reduction 浪费大量计算。
+- **Enhances robustness**：避免因为个别噪声点而 split（如 99 vs 1 的划分）。
+- **Reduces risk of overfitting**：不让树无限生长。
+
+- Transcript 补充：`min_samples_leaf` 常设为 10 / 50 / 100（取决于数据量）；`min_samples_split` 防止 99:1 这种由单个噪声点触发的 split；`max_leaf_nodes` 用于控制总复杂度；`min_impurity_decrease` 更多是效率考虑。
+
+#### 6.7 Decision Tree 的 Bias（偏差）与 Variance（方差）
+
+| 树的深度 | Bias | Variance | 症状 |
+|---|---|---|---|
+| **Shallow tree**（如 stump） | **High** | **Low** | underfitting |
+| **Deep tree**（不限制） | **Low** | **High** | overfitting |
+
+- **Bias**：树越深，能捕捉的 pattern 越复杂，bias 越低；但浅树可能连关键趋势都抓不到。
+- **Variance**：training data 的微小变化可能彻底改变树结构；深树会记住 noise。
+- ⭐ **可调性**：通过 `max_depth`、`min_samples_leaf` 等超参数，可以在 high-bias / high-variance 之间移动——这正是 bagging 和 boosting 使用不同深度树的原因。
+
+#### 6.8 Advantages vs Limitations
+
+| Advantages | Limitations |
+|---|---|
+| Interpretability：易可视化、易解释 | Overfitting：深树记住训练数据 |
+| Flexibility：numerical + categorical | High Variance：对数据变化敏感 |
+| Non-parametric：不假设数据分布 | Limited Expressiveness：单树难以建模复杂 pattern |
+| Feature Importance：自然识别重要特征 | Biased Splitting：偏向取值多的特征 |
+| Robust to Irrelevant Features：无关特征不会被 split | Suboptimal for Imbalanced Data：类别不平衡时偏向多数类 |
+| Fast Training / Prediction | Lack of Robustness to Noise：可能为噪声建分支 |
+
+- ⭐ **Feature importance** 是后续解释 ensemble 的关键：树 split 带来的 impurity reduction 可以累计成每个特征的重要性；Random Forest 会把这些重要性平均起来。
+
+---
+
+### 7. Bagging（Bootstrap Aggregation，自助聚合）
+
+#### 7.1 什么是 Bagging
+
+- **Bagging = Bootstrap + Aggregation**。
+- 目标：**improve model stability and accuracy by reducing variance**。
+- 做法：
+  1. 从训练集中**有放回抽样**（sampling with replacement）得到 $M$ 个 bootstrap samples；
+  2. 在每个 bootstrap sample 上**独立训练**一个 weak learner $f_m$；
+  3. **Aggregate**：
+     - Regression → **averaging**；
+     - Classification → **majority voting**。
+- 为什么有效：averaging 多个模型可以 **smooth out noise**、降低 overfitting；对 **high-variance models（如 decision trees）** 特别有效。
+- **Example algorithm：Random Forest（随机森林）**（下周详细讲）。
+
+#### 7.2 Bootstrapping（自助抽样）
+
+**定义**：由 **Bradley Efron（1979）** 提出的重采样方法——从原数据集 $D=\{\mathbf{x}_1,\dots,\mathbf{x}_N\}$ 中**有放回**地抽取 $N$ 个样本，得到 bootstrap sample。
+
+- 每个 bootstrap sample 与原数据集**同样大小**，但：
+  - 某些样本会出现多次（duplicates）；
+  - 某些样本可能完全不出现（excluded）。
+- 这种随机性引入 **diversity**：每个模型看到的数据略有不同，从而学到不同的 pattern。
+- ⭐ **为什么 bootstrap 重要**：除了为 bagging 制造多样本，它本身也是估计 **uncertainty**、提升 **robustness** 的工具，尤其在数据有限时（PDF p37）。
+
+**⚠️ 补充：OOB（out-of-bag）比例**。一个样本在一次抽取中不被选中的概率是 $1-1/N$；抽 $N$ 次都不被选中的概率为
+
+$$P(\text{never selected}) = \left(1-\frac{1}{N}\right)^N \longrightarrow e^{-1} \approx 0.368 \tag{9.15}$$
+
+即平均约 **36.8%** 的样本不会出现在某个 bootstrap sample 中，称为 **out-of-bag（OOB）** 样本。OOB 可以作为“免费的”验证集来估计泛化误差——这是 Random Forest 的一个重要特性（下周详细讲）。
+
+**四种 Bootstrap 技术（PDF p38–39）**：
+
+| 技术 | 做法 | 适用场景 |
+|---|---|---|
+| **Simple Bootstrap** | 有放回抽 $N$ 个，$D_i=\{\mathbf{x}_1^*,\dots,\mathbf{x}_N^*\}$，$\mathbf{x}_j^* \sim D$ | 默认；99% 的情况 |
+| **Stratified Bootstrap** | 按类别分层，第 $k$ 类以 $p_k=N_k/N$ 的比例抽样 | 多分类 / 类别不平衡，确保每个类都出现 |
+| **Poisson Bootstrap** | 对每个样本抽计数 $c_i \sim \operatorname{Poisson}(1)$，样本 $i$ 出现 $c_i$ 次 | 计数型重采样；某些现实过程服从 Poisson |
+| **Bayesian Bootstrap** | 每个样本权重 $w_i \sim \operatorname{Exponential}(1)$（或 Uniform(0,1)），$\tilde p_i = w_i / \sum_j w_j$ | 贝叶斯风格；几乎不用，了解即可 |
+
+- Transcript：简单 bootstrap 是 **99%** 的情况；stratified 用于“某些类样本很少，纯随机可能整个类消失”的场景；Poisson/Bayesian 属于“for completeness”，实际很少用。
+
+#### 7.3 Aggregation（聚合）
+
+**Regression（averaging，平均）**：
+
+$$\hat y = \frac{1}{M}\sum_{m=1}^{M}\hat f_m(\mathbf{x}) \tag{9.16}$$
+
+**Classification（majority voting，多数投票）**：
+
+$$\hat y = \arg\max_{k}\sum_{m=1}^{M}\mathbb{I}\left(\hat f_m(\mathbf{x}) = k\right) \tag{9.17}$$
+
+其中 $\mathbb{I}(\cdot)$ 是 indicator function（条件为真返回 1，否则 0）。
+
+**Voting（投票）vs Averaging（平均）对比**：
+
+| 场景 | 聚合方式 | 直觉 |
+|---|---|---|
+| **Regression** | **Averaging** | 连续输出取平均，平滑噪声 |
+| **Classification** | **Majority voting** | 每个模型投一票，得票最多的类胜出 |
+| **Binary classification** | 可用 sign of sum | 若类别编码为 $\pm1$，majority vote 等价于 $\operatorname{sign}\left(\sum_m \hat f_m\right)$ |
+
+**Key properties（PDF p41）**：
+
+| 性质 | 说明 |
+|---|---|
+| **Reduces Variance** | 多个模型 averaging，smooth out noise |
+| **Improves Stability** | diverse models 捕捉不同数据特征 |
+| **Bias Remains Unchanged** | bias reduction 很小；weak models 通常是 low-bias learners |
+
+- ⭐ 注意：这里的 “weak models are typically low-bias” 指的是 bagging 常用的**深树**（low bias, high variance）。“weak” 在 bagging 语境下更多指**单个模型不稳定**，而不是高 bias；boosting 才强调 high-bias 的 weak learners（如 stumps）。这是考试容易混淆的点。
+
+#### 7.4 其他 Aggregation 技术
+
+##### (a) Weighted Averaging
+
+$$\hat y = \sum_{m=1}^{M}\alpha_m \hat f_m(\mathbf{x}), \qquad \alpha_m \ge 0,\quad \sum_{m=1}^{M}\alpha_m = 1 \tag{9.18}$$
+
+- 更准确的模型给更高权重；权重通常通过 **cross-validation** 优化。
+- Bagging 是 $\alpha_m=1/M$ 的特例。
+
+##### (b) Differential Weighting
+
+$$\hat y_i = \sum_{m=1}^{M}\alpha_m(\mathbf{x}_i)\hat f_m(\mathbf{x}_i) \tag{9.19}$$
+
+- 权重随输入 $\mathbf{x}_i$ 变化：不同模型在不同区域各有所长。
+- 适用于 **heterogeneous data**，模型在不同 region 专业化。
+- Transcript 例子：医疗诊断中 false positive 和 false negative 的代价不对称，可以对不同样本使用不同权重。
+
+##### (c) Stacking（Stacked Generalization，堆叠泛化）
+
+**做法**：用一个 **meta-learner** $g(\cdot)$ 组合 base models 的输出。
+
+设 $M$ 个 base models 在 $N$ 个样本上的预测组成矩阵
+
+$$
+\mathbf{Z} =
+\begin{bmatrix}
+\hat f_1(\mathbf{x}_1) & \hat f_2(\mathbf{x}_1) & \cdots & \hat f_M(\mathbf{x}_1)\\
+\hat f_1(\mathbf{x}_2) & \hat f_2(\mathbf{x}_2) & \cdots & \hat f_M(\mathbf{x}_2)\\
+\vdots & \vdots & \ddots & \vdots\\
+\hat f_1(\mathbf{x}_N) & \hat f_2(\mathbf{x}_N) & \cdots & \hat f_M(\mathbf{x}_N)
+\end{bmatrix}
+$$
+
+meta-model 的输出为
+
+$$\hat y = g(\mathbf{Z}) = g\left(\hat f_1(\mathbf{x}), \hat f_2(\mathbf{x}), \dots, \hat f_M(\mathbf{x})\right) \tag{9.20}$$
+
+- 例：base models = decision trees + SVM + neural networks；meta-learner = logistic regression。
+- ⭐ **Transcript 补充**：stacking 在深度学习兴起后**用得少了**——deep learning 端到端就能学到类似（甚至更好）的表示，额外一层 meta-learner 收益有限。它更适合**组合不同类型的模型**（heterogeneous models）；如果 base models 全是 trees，通常没必要 stacking。Simon 的原话大意：“we never do this if we have all trees.”
+
+**四种 aggregation 对比**：
+
+| 方法 | 权重 | 是否随样本变化 | 典型用途 |
+|---|---|---|---|
+| **Simple averaging / majority vote** | $1/M$ | 否 | bagging 默认 |
+| **Weighted averaging** | $\alpha_m$（CV 学习） | 否 | 模型质量差异明显 |
+| **Differential weighting** | $\alpha_m(\mathbf{x})$ | 是 | 异质数据 / 不同区域专家 |
+| **Stacking** | meta-learner $g$ | 是（隐式） | 组合异质模型 |
+
+---
+
+### 8. ⭐ Bagging 的方差缩减推导（独立 vs 相关）
+
+这是本讲**最重要的数学部分**，也是理解 bagging 为什么有效的核心。
+
+#### 8.1 Setup 与假设
+
+设真实函数为 $f(\mathbf{x})$，第 $m$ 个 weak learner 的预测为
+
+$$\hat f_m(\mathbf{x}) = f(\mathbf{x}) + \varepsilon_m \tag{9.21}$$
+
+其中：
+
+- $\varepsilon_m$ 是 **zero-mean noise**：$\mathbb{E}[\varepsilon_m]=0$；
+- $\operatorname{Var}(\varepsilon_m)=\sigma^2$；
+- 先假设 $\varepsilon_m$ **i.i.d.（independent and identically distributed）**。
+
+Bagging 的聚合预测为
+
+$$\hat f_{\text{avg}}(\mathbf{x}) = \frac{1}{M}\sum_{m=1}^{M}\hat f_m(\mathbf{x}) \tag{9.22}$$
+
+#### 8.2 期望：Bias 不变
+
+由期望的线性性：
+
+$$\mathbb{E}\left[\hat f_{\text{avg}}\right] = \frac{1}{M}\sum_{m=1}^{M}\mathbb{E}\left[\hat f_m\right] = \frac{1}{M}\sum_{m=1}^{M}\left(f + \mathbb{E}[\varepsilon_m]\right) = f \tag{9.23}$$
+
+因此 $\hat f_{\text{avg}}$ 是 $f$ 的 **unbiased estimator**（在单个模型无偏的前提下）。
+
+- ⭐ **一般结论（⚠️ 补充）**：若单个模型有 bias，则
+
+$$\operatorname{Bias}\left[\hat f_{\text{avg}}\right] = \frac{1}{M}\sum_{m=1}^{M}\operatorname{Bias}\left[\hat f_m\right] \tag{9.24}$$
+
+即 **averaging 不会消除 bias，只会保留平均 bias**。这就是 bagging 对 high-bias 模型无效的原因。
+
+#### 8.3 独立模型的 Variance
+
+$$\operatorname{Var}\left(\hat f_{\text{avg}}\right) = \operatorname{Var}\left(\frac{1}{M}\sum_{m=1}^{M}\hat f_m\right) = \frac{1}{M^2}\sum_{m=1}^{M}\operatorname{Var}\left(\hat f_m\right) \tag{9.25}$$
+
+因为 $\operatorname{Var}(\hat f_m)=\sigma^2$，所以
+
+$$\boxed{\operatorname{Var}\left(\hat f_{\text{avg}}\right) = \frac{\sigma^2}{M}} \tag{9.26}$$
+
+- 推导关键：独立性使所有 cross terms $\operatorname{Cov}(\hat f_i,\hat f_j)=0$。
+- ⭐ **结论**：variance 按 $1/M$ 下降；$M$ 越大，ensemble 越稳定。Bias 保持 $f$ 不变。
+
+#### 8.4 相关模型的 Variance（更现实）
+
+现实中，模型训练数据重叠，误差**不独立**。设任意一对模型的 correlation 为 $\rho$：
+
+$$\operatorname{Cov}\left(\hat f_i,\hat f_j\right) = \rho\sigma^2 \qquad (i \ne j) \tag{9.27}$$
+
+展开 variance：
+
+$$
+\begin{aligned}
+\operatorname{Var}\left(\hat f_{\text{avg}}\right)
+&= \frac{1}{M^2}\left[\sum_{m=1}^{M}\operatorname{Var}(\hat f_m) + 2\sum_{1\le i<j\le M}\operatorname{Cov}(\hat f_i,\hat f_j)\right] \\
+&= \frac{1}{M^2}\left[M\sigma^2 + 2\binom{M}{2}\rho\sigma^2\right] \\
+&= \frac{\sigma^2}{M} + \frac{M(M-1)}{M^2}\rho\sigma^2 \\
+&= \sigma^2\left[\frac{1-\rho}{M} + \rho\right]
+\end{aligned}
+\tag{9.28}
+$$
+
+- ⭐ **两个极限**：
+  - $\rho=0$（完全独立）：$\operatorname{Var}=\sigma^2/M$，回到理想情况。
+  - $\rho=1$（完全相关）：$\operatorname{Var}=\sigma^2$，averaging **完全没有作用**。
+  - $0<\rho<1$：variance 介于两者之间；$M\to\infty$ 时，variance 收敛到 $\rho\sigma^2$，**不会到 0**。
+- ⭐ **实践含义**：
+  - 只增加 $M$ 不够；必须**降低 $\rho$**（增加 diversity）。
+  - Bagging 通过 bootstrap 降低 $\rho$；Random Forest 进一步通过**随机特征选择**降低 $\rho$。
+  - 数据量小时，bootstrap samples 几乎相同，$\rho$ 很高，增加 $M$ 很快遇到 **diminishing returns**。
+
+**Transcript 的具体例子**：只有 1,000 个数据点却想训练 1,000,000 个 weak learners——所有 bootstrap samples 几乎一样，模型高度相关，$\rho \to 1$，variance 不会下降。这说明 **ensemble 的收益受数据量限制**；数据太小时，简单模型可能更合适。
+
+#### 8.5 树的数量与 Diminishing Returns
+
+- Random Forest 的树数量 $M$ 是一个 hyperparameter。
+- Transcript 经验值：通常从 **50 到 500** 棵树，**sweet spot 在几百棵**；超过之后收益递减（因为 $\rho$ 已经固定，$\sigma^2[(1-\rho)/M+\rho]$ 的下界是 $\rho\sigma^2$）。
+- ⭐ 考试要点：**不是 $M$ 越大越好**；$M$ 的边际收益由 correlation $\rho$ 决定。
+
+#### 8.6 Bias 会发生什么
+
+- Bagging **primarily reduces variance, not bias**。
+- 因为 bagging 不改变每个 base model 的内部结构，只是把它们平均；由 (9.24)，bias 是各模型 bias 的平均。
+- 如果 base models 是 **unbiased**（如深树，low bias），ensemble 也近似 unbiased。
+- 如果 base models 是 **high-bias**（如线性回归），bagging 几乎不能改善 bias——“minimal improvement for high-bias models like linear regression unless combined with additional complexity”。
+- ⭐ **要降 bias，用 boosting**（Week 10–11），或使用更复杂的 weak models / 把 bagging 与 boosting 结合（PDF p56）。
+
+**Bagging 的适用性总结**：
+
+| Base learner | Bagging 效果 |
+|---|---|
+| **High variance, low bias**（深树） | ⭐ 最有效；variance 显著下降 |
+| **High bias, low variance**（线性回归、stump） | 效果有限；bias 不被平均掉 |
+| **Unstable models**（对数据敏感） | 有效 |
+| **Stable models** | 收益小 |
+
+---
+
+### 9. Bagging vs Boosting（提升法）：本周的定位
+
+> ⚠️ Boosting 的细节在 Week 10–11 展开；下表只做**定位性对比**，帮助理解为什么 Part 2 先讲 bagging。
+
+| 维度 | **Bagging** | **Boosting** |
+|---|---|---|
+| **Base learner** | high-variance、low-bias（如深树） | high-bias、low-variance（如 stumps / shallow trees） |
+| **训练方式** | 各模型**独立、可并行** | **顺序**训练，后一个依赖前一个 |
+| **样本** | bootstrap 重采样 | 调整样本权重 / 拟合残差 |
+| **权重 $\alpha_m$** | 通常 $1/M$（equal） | 根据 learner 表现调整（performance-dependent） |
+| **聚合** | averaging / majority vote | weighted sum |
+| **主要目标** | **降低 variance** | **降低 bias** |
+| **Overfitting** | 相对稳健；$M$ 过大收益递减 | 需要 shrinkage / early stopping / 正则化 |
+| **代表算法** | **Random Forest** | **AdaBoost、GBDT、XGBoost、LightGBM** |
+
+- ⭐ **一句话**：**Bagging 用“独立的多样性”降 variance；Boosting 用“顺序的纠错”降 bias。**
+
+**⭐ 为什么 bagging 用深树、boosting 用浅树？**
+
+- **Bagging** 的目标是降 variance，所以 base learner 应该是 **low-bias / high-variance 的深树**；averaging 会把 variance 压下去，而 bias 保持不变。
+- **Boosting** 的目标是降 bias，所以 base learner 应该是 **high-bias / low-variance 的浅树（stump）**；顺序纠错会逐步降低 bias。
+- 若反过来用：bagging 对高 bias 的 stump 几乎无效；boosting 对高 variance 的深树则容易过拟合。
+- 这也是“weak learner”在不同语境下含义不同的原因：bagging 的“weak”强调**不稳定**，boosting 的“weak”强调**简单、欠拟合**。
+
+**为什么先讲 bagging**：概念更简单（bootstrap + averaging），数学干净（$\sigma^2/M$），而且 Random Forest 是工业界最常用的 ensemble 之一。
+
+**Random Forest 预告（下周）**：
+
+- Random Forest = Bagging + **random feature selection at each split**。
+- **两个 randomness**（Simon 的面试题：“Why is it called Random Forest? What's the random in it?”）：
+  1. **Bootstrap sampling**：每棵树用不同的 bootstrap sample（row randomness）；
+  2. **Random feature subset**：每次 split 只从随机选出的 feature 子集中选最优 split（column randomness）。
+- 第二个 randomness 进一步**降低树之间的 correlation $\rho$**，从而让 (9.28) 的 variance 更接近 $\sigma^2/M$。
+- 大多数候选人只能说出第一个 randomness——这是 Simon 用来考察“是否真正理解 RF”的经典问题。
+
+---
+
+### 10. Python 实践：Iris + Decision Tree
+
+> 说明：PDF p52 只有 “Coding Examples” 的 section divider；以下内容按 Simon 课堂上用 **Google Colab** 现场演示的 notebook 重建（课程网站 “09 folder”），仅作学习参考。
+
+#### 10.1 工具与数据
+
+- **Google Colab**：无需本地 GPU，直接在浏览器运行。
+- 标准库：`pandas`（数据表）、`numpy`（数值计算）、`sklearn`（机器学习）。
+- **Iris dataset**：
+  - 150 个样本，3 个类别（**setosa / versicolor / virginica**），每类 50 个；
+  - 4 个特征：**sepal length、sepal width、petal length、petal width**；
+  - 最早由 **R. A. Fisher（1936）** 分析，是机器学习最经典的 toy dataset。
+
+#### 10.2 代码骨架
+
+```python
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+import matplotlib.pyplot as plt
+
+# 1. Load data
+iris = load_iris()
+X, y = iris.data, iris.target
+
+# 2. Train / test split (70 / 30)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+# 3. Shallow tree: max_depth = 2
+clf = DecisionTreeClassifier(
+    max_depth=2, criterion="gini", random_state=42
+)
+clf.fit(X_train, y_train)
+
+print("Train accuracy:", clf.score(X_train, y_train))
+print("Test accuracy: ", clf.score(X_test, y_test))
+
+plot_tree(clf, feature_names=iris.feature_names,
+          class_names=iris.target_names, filled=True)
+plt.show()
+```
+
+#### 10.3 课堂观察
+
+| 设置 | 结果 |
+|---|---|
+| `max_depth=2`，`criterion="gini"` | 第一次 split 在 **petal length = 2.45**，把 **setosa** 完全分开；第二次 split 在 **petal length ≈ 4.75**，区分 versicolor / virginica；准确率已经很高 |
+| `max_depth=3`，`criterion="gini"` | 所有训练样本被完美分类（小数据集上很容易） |
+| `max_depth=4` | 仍然完美，但 split 阈值越来越“人为”（如 petal width 的 1.6 / 1.75），**明显 overfitting** |
+| `criterion="entropy"` | 相同 depth 下 split 阈值与 Gini 略有不同；depth=3 时不一定完美；depth=4 才完美 → 同样是 overfitting |
+
+- ⭐ **关键教训**：
+  1. **先看数据**：`df.describe()` 看均值/标准差/分位数/异常值；画分布图看是否双峰——双峰特征往往能区分类别（Iris 的 petal length/width 就是典型）。
+  2. **固定 `random_state`**：保证结果可复现；如果换 seed 结果变化很大，说明数据/模型不稳定。
+  3. **小数据集上的 100% accuracy 不可信**：Iris 只有 150 个点，depth=3 就能完美分类，但这不代表泛化好；depth 越大越容易 overfit。
+  4. **Tree depth 是复杂度控制**：`max_depth`、`min_samples_leaf` 等参数决定 bias–variance 的位置；bagging/boosting 会选择不同深度的树。
+
+- **随机种子的梗**：Simon 提到很多教程把 `random_state` 设为 **42**——这是《The Hitchhiker's Guide to the Galaxy》里 “the answer to everything” 的梗；实际项目中应使用可复现的固定值，并记录在实验配置中。
+
+---
+
+### 11. ⭐ 考点速查表
+
+| 考点 | 要点 |
+|---|---|
+| **Ensemble definition** | 组合多个 weak learners 成更强模型；wisdom of the crowd；jury analogy |
+| **Condorcet Jury Theorem** | 每个 juror $p>1/2$ 且独立 → 人数越多，多数正确的概率越接近 1；$p=1/2$ 无效；$p<1/2$ 会放大错误 |
+| **General framework** | $F(\mathbf{x})=\Phi\left(\sum_m \alpha_m f_m(\mathbf{x})\right)$；$\Phi$ 是 output/activation function，$\alpha_m$ 是权重 |
+| **$\Phi$ 的选择** | binary → $\operatorname{sign}(z)$；multi-class → $\arg\max_k z_k$；regression → $z$ |
+| **Bagging vs Boosting 权重** | Bagging $\alpha_m=1/M$；Boosting $\alpha_m$ 按表现调整 |
+| **Bias definition** | $\operatorname{Bias}[\hat f]=\mathbb{E}[\hat f]-f$；high bias → underfit |
+| **Variance definition** | $\operatorname{Var}[\hat f]=\mathbb{E}[(\hat f-\mathbb{E}\hat f)^2]$；high variance → overfit |
+| **Bias–variance decomposition** | $\mathbb{E}[(y-\hat f)^2]=\operatorname{Bias}^2+\operatorname{Var}+\sigma^2$；$\sigma^2$ 不可消除 |
+| **Ensemble 的目标** | Bagging 降 variance；Boosting 降 bias |
+| **Weak learner 三原则** | Simplicity、Diversity、Moderate Performance；太强的 learner 会 dominate |
+| **为什么用 decision trees** | Flexible、fast、interpretable、natural diversity（high variance）、adaptive splits |
+| **Optimal tree** | 找最小且能正确分类所有点的树；**NP-hard**；实际用 greedy |
+| **Regression split** | $\operatorname{Var}(N)=\frac1n\sum(y_i-\bar y)^2$；$\Delta\operatorname{Var}=\operatorname{Var}(N)-[\frac{n_L}{n}\operatorname{Var}(N_L)+\frac{n_R}{n}\operatorname{Var}(N_R)]$ |
+| **Gini** | $\operatorname{Gini}(N)=1-\sum_k p_k^2$；二分类 pure=0，$p=0.5$ 时最大 0.5 |
+| **Entropy** | $\operatorname{Entropy}(N)=-\sum_k p_k\log_2 p_k$；二分类 pure=0，$p=0.5$ 时最大 1 bit |
+| **Gini vs Entropy** | 都衡量 impurity；通常给相似结果；没有绝对优劣；可互换尝试 |
+| **Tree bias–variance** | shallow → high bias, low variance；deep → low bias, high variance |
+| **Stopping criteria** | min samples split、min samples leaf、max leaf nodes、max impurity decrease；防 overfit + 提效率 |
+| **Bagging definition** | Bootstrap Aggregation；独立训练多个模型；regression averaging / classification majority vote |
+| **Bootstrap** | Efron 1979；有放回抽样；样本量与原数据相同；有重复、有遗漏 |
+| **OOB 比例** | $(1-1/N)^N \to e^{-1}\approx36.8\%$；可作为验证集 |
+| **Bootstrap 变体** | simple、stratified（按类比例）、Poisson($c_i\sim\operatorname{Poisson}(1)$)、Bayesian（权重 $\sim\operatorname{Exponential}(1)$） |
+| **Bagging aggregation** | regression $\hat y=\frac1M\sum\hat f_m$；classification $\hat y=\arg\max_k\sum_m\mathbb{I}(\hat f_m=k)$ |
+| **Weighted / differential / stacking** | $\alpha_m$ 固定 / $\alpha_m(\mathbf{x})$ / meta-learner $g(\mathbf{Z})$ |
+| **Independent variance** | $\operatorname{Var}(\hat f_{\text{avg}})=\sigma^2/M$；bias 不变 |
+| **Correlated variance** | $\operatorname{Var}(\hat f_{\text{avg}})=\sigma^2[(1-\rho)/M+\rho]$；$\rho=0\to\sigma^2/M$；$\rho=1\to\sigma^2$ |
+| **Diminishing returns** | $M\to\infty$ 时 variance 收敛到 $\rho\sigma^2$；数据少 → $\rho$ 高 → 加树没用 |
+| **Bagging bias** | 不降 bias；bias 是各模型 bias 的平均；high-bias 模型（linear regression）不适合 bagging |
+| **RF 两个 randomness** | bootstrap sampling（行）+ random feature selection at each split（列） |
+| **RF 树数量** | 50–500，sweet spot 几百；超过后 diminishing returns |
+| **Iris 实践** | 150 样本、3 类、4 特征；depth=2 已很好；depth=3 完美；depth=4 过拟合；entropy 与 Gini 阈值不同 |
+| **Quiz 3** | Week 12，15%，范围 Week 9–11；Week 12 前 1 小时 RL 内容不考 |
+
+---
+
+### 12. 本周要点小结
+
+- **课程切换**：Week 9 是 **Part 2（Ensemble Learning，L9–L13）** 的第一讲，讲师换成 **Simon Liu**（TrustDecision 首席数据与 AI 官、NTU 兼职副教授）。Part 1（Analytic Learning，L3–L8）结束。
+- **为什么 ensemble**：linear models 简单可解释，但无法处理 non-linear、feature interaction、outlier、多模态；ensemble 在 **interpretability–predictive power** 之间取得平衡（moderate interpretability + high predictive power + moderate overfitting risk）。
+- **直觉**：**wisdom of the crowd / Condorcet Jury Theorem**——每个 weak learner 略好于随机且相互独立时，多数投票会趋于正确；但独立性是强假设，真实模型存在 correlation。
+- **统一框架**：$F(\mathbf{x})=\Phi(\sum_m\alpha_m f_m(\mathbf{x}))$；bagging 用 equal weights，boosting 用 performance-dependent weights。
+- **Bias–variance**：$\mathbb{E}[(y-\hat f)^2]=\operatorname{Bias}^2+\operatorname{Var}+\sigma^2$；bagging 降 variance，boosting 降 bias。
+- **Decision trees**：最常用的 weak learner；greedy split；regression 用 variance reduction，classification 用 Gini / Entropy；shallow → high bias，deep → high variance；需要 stopping criteria 防 overfit。
+- **Bagging**：bootstrap 重采样 + aggregation；regression averaging、classification majority vote；**variance 降为 $\sigma^2[(1-\rho)/M+\rho]$**；bias 基本不变。
+- **关键数字/结论**：
+  - 独立模型 variance $=\sigma^2/M$；
+  - 完全相关时 averaging 无效；
+  - OOB 比例约 **36.8%**；
+  - RF 的第二个 randomness 是 **random feature selection at each split**；
+  - 树数量几百棵后收益递减。
+- **考试节奏**：**CA3 / Quiz 3 在 Week 12，占 15%，范围 Week 9–11**；Week 12 前 1 小时的 RL 内容**不考**；Final 60%，Part 2 约 1.5 题。
+
+---
+
+### 下一周预告
+
+> **Week 10 = Random Forest + Boosting + AdaBoost**（Simon Liu）。
+>
+> - **Random Forest**：bagging 的经典实现；两个 randomness——(1) bootstrap sampling（行采样），(2) **random feature selection at each split**（列采样）；进一步降低树之间的 correlation $\rho$；OOB 估计与 feature importance。
+> - **Boosting**：从 bagging 的“独立并行 + 降 variance”转向“顺序纠错 + 降 bias”；每个新模型关注之前模型犯错的样本。
+> - **AdaBoost**：最早的经典 boosting 算法之一；通过样本权重更新和模型权重 $\alpha_m$ 组合 weak learners（通常是 decision stumps）。
+> - 之后 Week 11 进入 **Gradient-Boosted Trees、XGBoost、LightGBM**；Week 12 前半讲 ensemble 与 reinforcement learning 的联系（**不考**），后半 **Quiz 3（CA3，15%，范围 Week 9–11）**。
+>
+> 预习建议：把本周的 **bias–variance 分解**、**bagging variance 公式 $\sigma^2[(1-\rho)/M+\rho]$**、**Gini/Entropy 计算**、**bootstrap/OOB** 先吃透——Week 10 的 RF 和 boosting 会反复用到这些概念。

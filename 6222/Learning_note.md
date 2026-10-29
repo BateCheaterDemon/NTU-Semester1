@@ -3108,3 +3108,1060 @@ $$
 
 > ⚠️ 具体以 Week 9 课件/转写为准。
 
+---
+
+## Week 9 — Topic 9 续：Further Development of CNN（Image Segmentation）＋ Topic 10：Deep Learning from CNN to Transformer
+
+> **本周主线**（转写开场原话，已按 PDF 修正 ASR）："Last week we studied CNN. In my opinion, the key role of the CNN is to make the **kernel learning go through all positions of the input data**, so that in the learning process, the kernel is learned from all points — for example, in the image, from all pixels, not fixed to a particular pixel. Because of that, the parameters are very robust and reliable. I believe this is the key difference from all past machine learning. This is why I think this point is some kind of **revolution** in machine learning."
+>
+> 本周分两大块：
+> 1. **Topic 9 续：Further Development of CNN**——老师用自己的 **image segmentation（图像分割）** 研究，说明如何在 CNN 之上做"further development"：**Context Contrasted Local (CCL) features → Gated Multi-scale Aggregation → Boundary Refinement**，以及 **Shape-Variant Convolution**。这些工作的共同思想是：**权重不再只由 training data 学定，而由具体 input 生成**——这正是本节后半 **Transformer attention** 的伏笔。
+> 2. **Topic 10：from CNN to Transformer**——正式讲 Transformer 的 **encoder-decoder** 结构、**self-attention**、**multi-head attention**、**pointwise feed-forward network**、**residual/skip connection**，以及 **ViT / Vision-Language Transformer**。
+>
+> ⚠️ 本周是 **Jiang Xudong 老师主讲部分（Topic 1–10）的最后一课**；Week 10–13 的 Topic 11–14 由 **Dr. Cheng Jun** 讲授。老师还在本周末尾**明确公布了 final exam 的题型与范围**（见 §19，极重要）。
+
+> **权威来源说明**：本周官方讲义为 `EE6222_lecturenote1to9.pdf` **第 310–341 页**：**Further Development of CNN（image segmentation）= p.310–317**；**Topic 10 "Deep Learning: from CNN to Transformer" = p.318–341**。Week 8 笔记 §12 的 Transformer 内容是"预告版"；**本周是正式讲授版**，新增了 **multi-head attention、embedding + positional encoding、residual connection、generative decoding、ViT、Vision-Language Transformer、期末考试范围** 等内容。转写 `week9.txt` 噪声仍然很重（尤其 `C n / SN / the N / arn` 都指 CNN，`prime` 同时可能是 kernel 或 pre-trained），以下一律以 PDF 的公式、结构图与老师课堂讲解为准。本周典型 ASR 错拼对照：
+
+| 转写噪声 | 正确术语 |
+|---|---|
+| C n / SN / the N / CN / arn / the s | **CNN**（convolutional neural network） |
+| near / neon / nel / nail / nals / nyls / nyer / ayer / mal / nay | **layer**（层；本周仍高频） |
+| prime / prim / prin（"prime learning"） | **kernel**（卷积核）；⚠️ "prin trend / prim trained" 则是 **pre-trained**（预训练），需按上下文区分 |
+| fit forward / ft forward / fd network / fit fd network | **feedforward（network）** |
+| nose / north / moss function | **loss（function）** |
+| arrow / ero / ro | **error** |
+| pulling | **pooling** |
+| china / chins | **channel** |
+| redo / renew / reno | **ReLU** |
+| greatly / grid / cog decent | **gradient descent** |
+| taste / ta / tasted data | **test / test data** |
+| twining / trending / turning data | **training data** |
+| correnation / crenation / corre | **correlation**（相关） |
+| mutate / match attention / mutate attention | **multi-head attention**（多头注意力） |
+| venue / V | **Value**（注意力中的 V） |
+| gauge sum / gaged sum | **gated sum**（门控求和） |
+| dint kernel | **dilated kernel**（空洞卷积核） |
+| impasse | **impulse**（冲激） |
+| gu / guine / gazing / gausin | **Gaussian**（高斯） |
+| pit convolution | **1×1 convolution** |
+| rent 101 / rent of 101 ayers | **ResNet-101**（101 层残差网络） |
+| bel / beling / enable / abeling | **label / labeling**（标注） |
+| objector recognition | **object recognition** |
+| neck / ak / train / ska | **lake / lake / terrain / sky**（分割示例中的类别） |
+| pur effect | **blur effect**（平均/模糊效应） |
+| sweeten our humans | **surpass humans**（超越人类） |
+| marching learning | **machine learning** |
+| quits / equations（"four quits"） | **questions**（题目） |
+| zoo of MAP | **theory of MAP** |
+| class designed | **classifiers**（分类器） |
+| A T GP | **ChatGPT** |
+| V IT / Vs transformer / IT | **ViT**（Vision Transformer） |
+| T P / P | **TPAMI**（IEEE Trans. on Pattern Analysis and Machine Intelligence） |
+| 1918 / 2070 | **2018 / 2017**（年份） |
+| single mold function | **sigmoid function** |
+| nnnar / nn linear | **nonlinear**（非线性） |
+| AARP / M ALP / MP | **MLP** |
+| compute / computation / compilation | **computer vision / computation**（按上下文） |
+
+### 1. 本周定位：从 "CNN 的进一步发展" 到 Transformer
+
+| 阶段 | 核心机制 | 权重从哪里来？ | 本周对应 |
+|---|---|---|---|
+| **MLP** | 全连接 weighted sum | 从 **training data** 学，训练后固定 | Week 8 |
+| **CNN** | convolution（卷积；parameter sharing，参数共享） | 从 **training data** 学，所有位置共享，训练后固定 | Week 8 + 本周前半 |
+| **CNN 的进一步发展** | gated sum / shape-variant convolution | ⚠️ **由具体 input 生成**（不是训练后固定） | 本周 §4–§7 |
+| **Transformer** | **attention（注意力）** | ⚠️ **attention 权重由具体 test input 生成**；只有 Q/K/V 投影与 FFN 的参数是学出来的 | 本周 §8–§18 |
+
+- 老师用一句话贯穿全课：**machine learning 的成功在于学到 general rule，而不是 overfit 到 training data 的 specific details**。CNN 用 **parameter sharing** 做到这一点；Transformer 则进一步让**加权求和的权重随 input 自适应**。
+- ⚠️ 老师特别强调：**"attention 的权重不是从 training data 学出来的"** 并不是说 Transformer 没有可学习参数——**Q/K/V 的线性投影矩阵、feed-forward 网络的矩阵仍然是可学习的**；不可学的是**由 Q 与 K 的点积算出来的那组 attention weights**。这一点是本周最容易混淆、也最常考的地方（§12.5、§16）。
+
+### 2. 回顾：CNN 的关键——kernel 走过所有位置
+
+#### 2.1 老师开场原话的逻辑链
+
+1. CNN 的 **kernel（卷积核 / filter）** 在**所有空间位置**上滑动 → 同一个 kernel 参数被**所有像素**使用。
+2. 因此这个参数不是由某一个特定像素决定的，而是由**所有像素共同训练**出来的。
+3. 所以学到的参数**非常 robust、reliable**，学到的是覆盖整个输入的 **general rule**，而不是 overfit 到某个局部细节。
+4. 这就是 CNN 相对过去 machine learning 的 **revolution**。
+5. 但也因为 CNN 是在**超大规模通用数据集**（如 ImageNet）上训练的，**具体应用**（如医学图像、特定场景分割）还需要用该应用的数据做 **fine-tune（微调）**，让网络 specific for your task。
+
+#### 2.2 三个必须记住的卷积尺寸公式
+
+**① 输出空间尺寸**（输入 $I\times I$，kernel $K\times K$，padding（填充）$P$，stride（步幅）$S$）：
+
+$$
+O=\left\lfloor\frac{I+2P-K}{S}\right\rfloor+1
+$$
+
+- **same padding**：$P=(K-1)/2$ 且 $S=1$ 时，$O=I$（空间尺寸不变）。
+- **pooling（池化）/ stride > 1**：空间尺寸按比例缩小。Week 8 的 VGG-Face 例子中，2×2 pooling 让长宽各减半、像素数只剩 $1/4$。
+
+**② 一个卷积层的参数量**（输入 $C_{in}$ 个 channel，输出 $C_{out}$ 个 channel）：
+
+$$
+\#\text{params}=(K_h K_w C_{in}+1)\times C_{out}
+$$
+
+- $+1$ 是每个输出 channel 的 **bias**。
+- ⚠️ 对比 MLP：若输入是 $P\times Q\times C_{in}$、输出 $P\times Q\times C_{out}$，全连接层参数量是 $(PQC_{in}+1)C_{out}$，约为 CNN 的 $PQ/(K_hK_w)$ 倍——这就是 **parameter sharing** 带来的正则化。
+
+**③ 感受野（receptive field）递推**：
+
+$$
+r_L=r_{L-1}+(K_L-1)\prod_{i=1}^{L-1}S_i,\qquad r_0=1
+$$
+
+- 对连续堆叠的 **3×3、stride 1** 卷积：$r_L=r_{L-1}+2=2L+1$，即 **3×3 → 5×5 → 7×7 → …**（Week 8 §10.3 的结论）。
+- 对 **1×1** 卷积：$K=1$，感受野**不增加**，只做跨 channel 的 weighted sum（Week 8 §10.6）。
+- ⚠️ 这解释了为什么"单层只看局部"不等于"CNN 只看局部"：层数一多，输出可以覆盖几乎整幅图像。
+
+#### 2.3 一句话复习 CNN 的本质
+
+$$
+\boxed{\;\text{CNN is a regularized MLP（CNN 是一种被强正则化的 MLP）}\;}
+$$
+
+- MLP：$o_j=\sum_i w_{ji}x_i$，每个输出位置有**各自独立**的权重。
+- CNN：$o_j=\sum_i w_i x_{j-i}$，**所有输出位置共享同一个 filter** $\mathbf{w}$。
+- 写成大矩阵时，CNN 的 $\mathbf{W}$ 有大量 **0**，且非零元在各列上**取值完全相同**（filter 被"搬到"不同位置）。
+
+### 3. Further Development of CNN：Image Segmentation（逐像素场景理解）
+
+#### 3.1 什么是 image segmentation
+
+- **Image segmentation（图像分割）** = **pixel-wise scene understanding（逐像素场景理解）**：把图像中的**每一个像素**分类到不同类别（人、建筑、天空、道路、草地……）。
+- 输出是一张 **segmentation map（分割图）**：不同颜色代表不同类别；颜色只是为了可视化，本身没有语义。
+- 与 **object recognition / image classification（物体识别 / 图像分类）** 的区别：
+
+| 任务 | 输入 | 输出 | 标注成本 |
+|---|---|---|---|
+| **Object recognition** | 一张图像 | **一个** class label（这张图是猫/狗/车） | 低：一张图一个 label |
+| **Image segmentation** | 一张图像 | **每个像素**一个 class label（$P\times Q$ 个 label） | 极高：需要逐像素人工标注 |
+
+- ⚠️ 老师强调：分割的标注**非常昂贵**，所以能拿到的分割训练集通常**很小**；用小数据集从零训练一个很深的网络**不够**。解决办法是 **transfer learning（迁移学习）**：
+  1. 先用**大规模分类数据集**（ImageNet，数百万张带 label 的真实图像）训练一个强大的 **pre-trained network（预训练网络）**；
+  2. 再在分割数据集上 **fine-tune（微调）**，并在网络顶部**加一些专门为分割设计的小网络/卷积层**。
+
+#### 3.2 例子：ResNet-101 + 分割头
+
+- 老师以 **ResNet-101**（101 层的 residual network，残差网络）为例：
+  - 输入：$200\times200\times3$ 的 RGB 图像；
+  - 经过许多 **convolution + pooling** block 后，最后的 feature map 空间尺寸变为 **16×16**，channel 数约 **2000**（转写数字；ResNet-101 标准最后一 stage 是 **2048** 个 channel）；
+  - 这个 16×16×2048 的 feature map 是在 ImageNet 上预训练得到的，**非常可靠**。
+- ⚠️ ResNet 的两个关键组件（背景补充）：
+  - **batch normalization（批归一化）**：对每个 mini-batch 的激活做归一化，稳定训练、允许更深网络；
+  - **skip connection / residual connection（残差跳连）**：$\mathbf{y}=\mathbf{x}+F(\mathbf{x})$，让梯度有直接通路（详见 §11）。
+- 问题：预训练网络是为 **object recognition** 训练的——它用**整张 16×16 feature map** 去预测**一个** class。而分割要预测**每个像素**的 class，不能只看一个像素，必须看它的 **neighborhood / context（邻域 / 上下文）**。
+- 因此需要在预训练网络之上**再加卷积层**，让每个输出位置收集**更大范围**的信息。这就引出三个必须解决的问题（外加另一项工作处理的 kernel 形状问题）→ 老师这几项工作的**核心贡献**：
+
+| 问题 | 现象 | 解决方法（§） |
+|---|---|---|
+| **① Context / average blur** | 只用大区域卷积 → 输出是大区域的"平均"，不同物体的特征不够 distinct | **Context Contrasted Local (CCL) features**（§4） |
+| **② Scale variation** | 物体有大有小；哪个尺度的特征更重要**因位置而异** | **Gated Multi-scale Aggregation**（§5） |
+| **③ Boundary ambiguity** | 边界两侧像素用大区域看"几乎一样"，无法准确定位边界 | **Boundary Refinement**（§6） |
+| **④ Kernel shape mismatch** | 固定方形 kernel 与物体形状不匹配 | **Shape-Variant Convolution**（§7） |
+
+> 前三条来自 **CVPR Oral 2018** 与 **IEEE TIP 2020** 的 segmentation 工作；第四条来自 **CVPR'19 Oral 2019**。三者的共同点：**加权求和的权重由具体 input 生成，而不是训练后固定**——这就是老师反复强调的"further development on top of CNN"。
+
+### 4. 贡献一：Context Contrasted Local (CCL) Features
+
+#### 4.1 动机：大区域卷积的 "average / blur effect"
+
+- 为了让每个像素看到更大的 **context（上下文）**，最直接的做法是在 16×16 feature map 上继续堆 **更大的卷积核 / 更深的卷积层**。
+- ⚠️ 但老师指出：如果输出**只**来自一个很大的区域，那么输出本质上是该区域信息的**平均（average）** → 产生 **blur effect（模糊效应，转写 "pur effect"）**。不同物体的特征会变得**不够 distinctive（可区分）**。
+- 直觉：只看一大片区域的平均颜色，很难区分"人"和"背景"；需要把**局部细节**与**周围环境**做**对比（contrast）**。
+
+#### 4.2 做法：local 与 context 的差值
+
+在预训练网络的最后一层（16×16 feature map）之上，接两个 **3×3** 卷积分支：
+
+| 分支 | 卷积类型 | 看到的信息 | 作用 |
+|---|---|---|---|
+| **Local branch** | 标准 **3×3 convolution** | 中心像素附近的小区域 | 保留**局部细节** |
+| **Context branch** | **dilated 3×3 convolution（空洞卷积）** | 9 个采样点散布在更大区域 | 收集**周围 context / surroundings** |
+
+- 然后把两个分支的输出**相减**：
+
+$$
+\boxed{\;\mathbf{F}_{CCL}(p)=\underbrace{\sum_{q\in\mathcal{N}_{d}(p)}w^{ctx}_{q}\mathbf{x}_q}_{\text{context (dilated)}}
+\;-\;\underbrace{\sum_{q\in\mathcal{N}_{3}(p)}w^{loc}_{q}\mathbf{x}_q}_{\text{local (3×3)}}\;}
+$$
+
+其中 $\mathcal{N}_{3}(p)$ 是以 $p$ 为中心的 3×3 邻域，$\mathcal{N}_{d}(p)$ 是 dilated kernel 覆盖的、范围更大但更稀疏的邻域。
+
+- ⚠️ **为什么相减有用**：大区域与小区域共享的那部分"平均/背景"成分会被**抵消**，剩下的正是**局部相对于周围的差异（contrast）**——这正是区分物体边界、纹理、显著区域的关键。
+- 老师的人眼类比：**"To identify a point, we need to compare this point with its surroundings."** 人类视觉判断一个点是什么，从来不是孤立地看这个点，而是把它与周围环境比较。这个"比较"在数学上就是**差值**。
+
+#### 4.3 Multi-level CCL
+
+- 一个 CCL block 只能提供一个尺度的对比；把**多个 CCL block 串联（chained）**，就得到 **multi-level context contrasted local features**。
+- 浅层 block 的 context 范围小，深层 block 的 context 范围大 → 多尺度、多层次的对比特征。
+- PDF p.311 的原话："Several blocks are chained to make multi-level context contrasted local features."
+
+| 层次 | 感受野 | 对比的"周围"范围 | 适合识别的结构 |
+|---|---|---|---|
+| 浅层 CCL | 小 | 近邻纹理 | 边缘、细纹理、小物体 |
+| 中层 CCL | 中 | 局部区域 | 物体部件 |
+| 深层 CCL | 大 | 大范围场景 | 物体整体、场景类别 |
+
+### 5. 贡献二：Gated Multi-scale Aggregation（门控多尺度聚合）
+
+#### 5.1 动机：不同位置需要不同尺度
+
+- 图像中的物体**尺度变化很大**：近处的人占大面积，远处的车只占很小面积。
+- CNN 的浅层感受野小、深层感受野大 → 不同层的 feature / classification score 天然代表**不同尺度**。
+- 一个自然的想法：把**多个尺度的 classification score** 聚合起来。**之前的工作**通常是把各层的 score **直接相加（simple sum）**：
+
+$$
+\mathbf{S}_{\text{old}}(p)=\sum_{l=1}^{L}\mathbf{s}_l(p)
+$$
+
+- ⚠️ 老师指出：**简单相加没有 selection（选择）功能**。对某些位置（如近处大物体）应该更信任**大尺度**；对另一些位置（如远处小物体）应该更信任**小尺度**。权重应该**因位置而异**。
+
+#### 5.2 信息图（information map）与自顶向下连接
+
+老师的设计分三步：
+
+1. **每个尺度层的所有 channel → 一张 information map**：
+   对第 $l$ 层的 feature map（$C_l$ 个 channel）做一次 **1×1 convolution**，把 $C_l$ 个 channel 压成**一张** map：
+
+   $$
+   \mathbf{g}_l(p)=\mathbf{w}_l^{T}\mathbf{f}_l(p)\in\mathbb{R}
+   $$
+
+   这张 map 在每个空间位置 $p$ 上的值，表示"**该位置应该更偏向大尺度还是小尺度**"。
+
+2. **加入自顶向下（top-down / reverse）连接**：
+   原来的信息流是 bottom-up（低层 → 高层）。老师额外把**高层的信息反向传回低层**，使高层语义与低层细节**平衡（balanced）**，而不是只让低层信息单方向流向高层。
+
+3. **归一化生成权重图**：
+   对每个位置 $p$、每个尺度 $l$，生成一个非负权重 $\alpha_l(p)$，并归一化：
+
+   $$
+   \sum_{l=1}^{L}\alpha_l(p)=1,\qquad \alpha_l(p)\ge 0
+   $$
+
+#### 5.3 Gated Sum 的定义
+
+> PDF p.312 只给出结构示意图；下面的公式是按老师课堂讲解整理的数学表达。
+
+$$
+\boxed{\;\mathbf{S}(p)=\sum_{l=1}^{L}\alpha_l(p)\,\mathbf{s}_l(p)\;}
+$$
+
+- $\mathbf{s}_l(p)$：第 $l$ 层（第 $l$ 个尺度）在位置 $p$ 的 **classification score map**；
+- $\alpha_l(p)$：由 input 生成的 **gate（门控权重）**；
+- $\mathbf{S}(p)$：融合后的最终 classification score map。
+
+#### 5.4 ⭐ 为什么叫 "gated sum" 而不是普通的 "weighted sum"
+
+老师先列出三种传统的权重确定方式，再给出本工作的第四种：
+
+| 方式 | 权重来源 | 特点 |
+|---|---|---|
+| **① 全 1** | 不设定 | 就是 simple sum，没有选择 |
+| **② 人工设计** | 人根据先验知识设定 | 不同输入、不同位置的最优尺度未知，人工很难设计 |
+| **③ 从 training data 学习** | MLP / CNN 的权重，训练后**固定** | 对所有 input 都用同一组权重，不能自适应 |
+| **④ 由具体 input 生成（本工作）** | **每个 input image 自己生成** | 不同图像、不同位置的权重都不同；**训练后不固定** |
+
+- ⚠️ 本工作用的是 ④：**权重 $\alpha_l(p)$ 由 individual input 生成，而不是从 training data 学出来的固定值**。
+- 因此老师把它命名为 **gated sum（门控求和）**：gate 的作用就是**根据当前输入选择/调节**不同尺度的贡献。
+- 关键卖点（也是论文被 CVPR Oral 接收的原因）：**不同图像中，大物体和小物体的位置完全不同，固定权重无法处理；只有 input-dependent 的权重才能自适应。**
+
+$$
+\boxed{\;\text{普通 weighted sum：权重 learned \& fixed；gated sum：权重 generated by input}\;}
+$$
+
+- ⚠️ 这与 Transformer 的 **attention** 在思想上是**同构的**：attention 也是"用 input 生成权重，再对所有 token 做 weighted sum"。老师特别说明：**他的 gated sum 工作（CVPR 2018）在 ViT（2020/2021）之前**，并不是从 Transformer 借来的；两者是**独立地走到了同一个 idea**。
+
+### 6. 贡献三：Boundary Refinement（边界细化，Multi-scale Gaussian Diffusions）
+
+#### 6.1 问题：边界像素与内部像素需要不同尺度
+
+- **内部像素（远离边界）**：它属于哪一类很明确，用**大尺度**信息更可靠——看得越多，判断越稳。
+- **边界像素（靠近两类交界）**：如果用一个大的方形窗口，窗口会**同时覆盖边界两侧**；两侧像素收集到的信息**几乎一样**，因此**无法准确判断边界到底在哪一侧**。
+- 结论：**边界附近必须用很小的尺度（small scale）**，才能区分两侧的细微差异；**远离边界才用大尺度**。
+- 问题变成：**如何自动地、逐像素地决定"用哪个尺度"？** 不能人工设计，因为边界位置随每张输入图像而变。
+
+#### 6.2 Multi-scale Gaussian Diffusion 的做法
+
+> PDF p.313 只给出示意图；下面的公式是按老师课堂讲解整理的数学表达。
+
+1. **先得到粗略分割结果（rough segmentation）**：网络先输出一个大致的分割图。
+2. **从粗分割提取粗略边界（rough boundary）**：两类标签交界处的像素即为边界。
+3. **把边界看成冲激（impulse）**：沿一条**穿过边界**的直线采样，边界位置的值是 1，其他位置是 0——这是一个 **1D impulse**。
+4. **用不同标准差 $\sigma$ 的 Gaussian 核去平滑这个 impulse**：
+
+   $$
+   g_\sigma(d)=\frac{1}{\sqrt{2\pi}\,\sigma}\exp\!\left(-\frac{d^{2}}{2\sigma^{2}}\right)
+   $$
+
+   其中 $d$ 是到粗略边界的距离。不同 $\sigma$ 得到**不同宽度的扩散曲线**（PDF p.313 的蓝/中/黄三条曲线）。
+5. **用曲线值作为不同尺度的权重**：
+
+   $$
+   w_s(d)=\frac{g_{\sigma_s}(d)}{\sum_{s'}g_{\sigma_{s'}}(d)},\qquad
+   \mathbf{S}(p)=\sum_{s}w_s\!\left(d_p\right)\mathbf{s}_s(p)
+   $$
+
+   - 靠近边界（$d$ 小）：小 $\sigma$ 的曲线值相对大 → **small scale 权重大**；
+   - 远离边界（$d$ 大）：大 $\sigma$ 的曲线衰减慢、值相对大 → **large scale 权重大**。
+
+- ⚠️ 这套权重同样是 **input-dependent** 的：每张图的粗分割不同 → 边界位置不同 → $d_p$ 不同 → 权重不同。**不是训练后固定的参数。**
+
+| 像素位置 | 到边界距离 $d$ | 主导尺度 | 原因 |
+|---|---|---|---|
+| 物体内部 | 大 | **large scale** | 大窗口信息更可靠，不易受噪声影响 |
+| 边界附近 | 小 | **small scale** | 大窗口会跨过边界，两侧信息混在一起，无法定位 |
+
+### 7. Shape-Variant Convolution（形状可变卷积，CVPR'19 Oral）
+
+#### 7.1 固定方形 kernel 的根本问题
+
+- 传统 convolution 的 kernel 是**固定的方形窗口**（3×3、5×5、7×7……）。
+- 考虑两个像素 $A$ 与 $B$：它们**空间上离得很远**，但**分别位于边界两侧**（例如 $A$ 在湖里，$B$ 在陆地上）。
+- 如果用一个**很大的方形 kernel**，$A$ 的窗口与 $B$ 的窗口会**大量重叠** → 两个输出**几乎一样** → 网络无法区分 $A$ 与 $B$ 属于不同类别。
+- 这不是靠"再加几层"就能解决的：只要 kernel 是固定方形，边界两侧的大窗口就必然重叠。
+
+#### 7.2 理想情况：kernel 形状随物体形状自适应
+
+- 理想的 kernel 应该**贴合物体的形状（shape-adaptive）**：
+  - 对湖里的像素 $A$，kernel 主要覆盖**湖面**；
+  - 对陆地上的像素 $B$，kernel 主要覆盖**陆地**。
+- 这样 $A$ 与 $B$ 的输出就会**完全不同**，边界两侧才能被正确区分。
+- PDF p.314 把 context 分成两类：
+  - **Spatial-Dependent Context**：用**预定义窗口**（如红色矩形）收集固定邻域；
+  - **Semantic-Dependent Context**：窗口形状**随语义相关性变化**（variant shapes according to the semantic correlation）。
+
+#### 7.3 如何生成形状掩码（shape mask）
+
+> PDF p.314–316 主要是示意图；下面的公式是按老师课堂讲解整理的数学表达。
+
+老师的做法：
+
+1. **先用 1×1 convolution 生成每个像素的 feature**（不改变空间位置，只做跨 channel 融合）。
+2. **计算中心像素与所有其他像素的 correlation（相关）**：
+   对中心像素 $p$ 和任意像素 $q$，计算它们 feature 的**点积**：
+
+   $$
+   c(p,q)=\mathbf{f}(p)^{T}\mathbf{f}(q)
+   $$
+
+   这得到一个 **correlation map / attention map**：值越大，说明 $q$ 与 $p$ 越相关（越可能属于同一物体）。
+3. **由 correlation map 生成 shape mask** $\mathbf{M}(p,q)$：把相关性高的像素保留在 kernel 内，相关性低的排除在外。
+4. **用 shape mask 去加权一个大方形 kernel**：
+
+   $$
+   \mathbf{W}_{\text{eff}}(p,q)=\mathbf{M}(p,q)\odot\mathbf{W}_{\text{sq}}(q-p),
+   \qquad
+   y(p)=\sum_{q}\mathbf{W}_{\text{eff}}(p,q)\,x(q)+b
+   $$
+
+   等价地，也可以把 mask 直接乘在输入上——数学上是一样的。
+5. **效果**：等效 kernel 的形状不再固定为方形，而是**随输入图像中物体的形状变化**。PDF p.316 的 "Four Visual Examples Shape Mask" 展示了车、道路、草地等不同区域生成的 mask：同一物体的像素权重高，不相关区域权重低。
+
+#### 7.4 审稿人的质疑与老师的 rebuttal
+
+- **质疑**：卷积本身就是 weighted sum；你现在再乘一个 mask，不过是**又加了一层 weight**。这有什么本质区别？
+- **老师 rebuttal**：
+  - **convolution 的权重**：从**整个 training data** 学出来，训练后**固定**；对所有 input 都一样。
+  - **shape mask**：由**individual input image** 生成；不同图像 → 不同 mask → 不同权重。
+  - 所以两者**完全不同**：一个是 **learned & fixed**，一个是 **input-generated & adaptive**。
+- ⚠️ 这个 rebuttal 与 §5 的 gated sum 完全一致，也是理解 Transformer attention 的钥匙。
+
+#### 7.5 ⭐ 与 attention 的关系：shape mask 就是 attention map
+
+- 老师原话（转写修正）：**"The attention and the correlation are exactly the same, no difference, only different name."**
+- 在这个工作中：
+  - **correlation map** = 像素之间的相关；
+  - **shape mask** = 用相关生成的权重图；
+  - 这两者在 Transformer 里就叫 **attention map**。
+- 所以老师把 §4–§7 放在 Transformer 之前讲，是**刻意铺垫**：
+  1. **gated sum**：用 input 生成多尺度融合权重；
+  2. **boundary refinement**：用 input 的粗分割生成尺度权重；
+  3. **shape-variant convolution**：用 input 的像素相关生成 kernel mask；
+  4. **Transformer attention**：用 input 的 Q/K 相关生成 token 权重。
+- 四者共享同一个核心：**weighted sum 的权重由具体 input 生成，而不是训练后固定**。
+
+> ⚠️ PDF p.317 还有一页 **"Labeling De-noising in Decoding Process"**（高层 error 偏位置不准、低层 error 偏类别噪声；用不同层的分类结果去噪），但老师课堂明确说 **"This one I skip"**，本周未展开；考试也不在重点范围内。
+
+**本部分参考文献**（PDF p.310、p.314）：
+
+- H. Ding, X.D. Jiang, B. Shuai, A. Liu, G. Wang, "Context Contrasted Feature and Gated Multi-scale Aggregation for Scene Segmentation," **CVPR Oral 2018**.
+- H. Ding, X. Jiang, B. Shuai, A. Liu, G. Wang, "Semantic Segmentation with Context Encoding and Multi-Path Decoding," **IEEE Transactions on Image Processing (TIP), 2020**.
+- H. Ding, X. Jiang, B. Shuai, A. Liu, G. Wang, "Semantic Correlation Promoted Shape-Variant Context for Segmentation," **CVPR'19 Oral, 2019**.
+
+### 8. 从 CNN 到 Transformer：Topic 10 的三个问题
+
+#### 8.1 Transformer 的定位
+
+- **Transformer** 是一个 **sequence-to-sequence** 的神经网络结构：输入一个 **sequence（序列）**，输出另一个 sequence。
+  - 序列可以是 **speech（语音）**、**text（文本）**、**time series（时间序列）**，也可以是图像的 **patch/token 序列**。
+- 在 Transformer 之前，处理序列的主流模型是 **RNN（recurrent neural network，循环神经网络）** 及其改进 **LSTM（long short-term memory，长短期记忆网络）**。
+  - RNN/LSTM 必须**一个 token 一个 token 顺序处理**（sequential），难以并行。
+  - Transformer 的关键优势：**把所有 token 并行（parallelly）处理** → 训练更快、效果更好。
+- Transformer 最初为 **NLP（natural language processing，自然语言处理）** 发明；现在也被引入 **computer vision**，并在很多任务上超过 CNN。
+- 力量来源：**Attention module（注意力模块）**——捕捉序列中**每个 word/token 与其余所有 token 的关系**。
+- 原始论文：**"Attention Is All You Need"**（Google 团队，NeurIPS 2017）。
+
+#### 8.2 PDF p.319 提出的三个问题
+
+1. **Transformer 到底怎么工作？Is attention really everything?**（真的只需要 attention，别的都不需要？）
+2. **它与 CNN 有什么关系？**
+3. **能否简单地说："CNN 只捕捉 local information，而 Transformer 捕捉 global information，所以 Transformer 更强"？**
+
+⚠️ 老师对第 3 个问题的回答是**明确的"不能"**（详见 §8.3）。这也是 Week 8 §10.5 已经埋下的伏笔。
+
+#### 8.3 ⭐ 驳斥 "local vs global" 的解释
+
+| 流行说法 | 老师的反驳 |
+|---|---|
+| "CNN 只捕捉 local information，所以有局限" | ⚠️ **错**。单层 convolution 确实只看局部，但 CNN 可以有**几百层**；每层感受野逐层扩大（§2.2），最后输出**已经覆盖几乎整幅输入图像**。所以"CNN 只看局部"只在单层意义下成立，对深层 CNN 不成立。 |
+| "Transformer 捕捉 global information，所以更强" | ⚠️ **不充分**。如果真的"global 就一定好"，那么 **MLP 本来就是 fully connected（全连接 = 完全 global）**，理应最强；但 MLP 恰恰**表现最差**（overfitting）。 |
+| — | ⚠️ 老师的正面解释：**CNN 的 global information 是从整个 training dataset 学出来的**（PDF p.320 原话："Global information learnt by CNN is on the whole training dataset."）；而 **Transformer 的 global information 是由具体 test input 动态生成的**。两者的差别不在 "local vs global"，而在 **权重是否随 input 自适应**。 |
+
+#### 8.4 ⭐ 三种 weighted sum 的本质对比（本周最核心的一张表）
+
+| 模型 | 输出形式 | 权重来源 | 训练后权重是否固定？ | 能否适应不同 input？ |
+|---|---|---|---|---|
+| **MLP** | $o_j=\sum_i w_{ji}x_i$ | 从 **training data** 学 | ✅ 固定 | ❌ 对所有 input 用同一组权重 |
+| **CNN** | $o_j=\sum_i w_i x_{j-i}$ | 从 **training data** 学，空间共享 | ✅ 固定 | ❌ 对所有 input 用同一组 filter |
+| **Transformer attention** | $z_i=\sum_j a_{ij}\mathbf{v}_j$ | **由当前 input 的 Q/K 计算** | ❌ **不固定** | ✅ 不同 input → 不同 $a_{ij}$ |
+
+- ⚠️ 老师把这一点称为 Transformer 的 **revolution**：**"The weighted sum is performed with weights generated by the individual input, not learned from the training data."**
+- 也正因如此，Transformer 能**adapt to the input**：即使 test input 有很多 variation，它仍能表现良好，因为每次都会**重新生成**一组适合当前输入的权重。
+
+### 9. Transformer 总体结构：Encoder + Decoder
+
+#### 9.1 整体架构
+
+- Transformer = **一个 encoder stack（编码器堆叠）** + **一个 decoder stack（解码器堆叠）**。
+- 每个 stack 内的 encoder/decoder **结构完全相同**；可以有几个、几十个甚至上百个。因此**只需要研究一个 encoder 和一个 decoder**。
+- 数据流：
+  1. 输入 sequence 的所有 token **并行**送入第一个 encoder；
+  2. 第一个 encoder 的输出送入第二个 encoder……直到最后一个 encoder；
+  3. **最后一个 encoder 的输出**作为 **Key 与 Value**，送入**每一个 decoder**；
+  4. decoder 还接收**前一个 decoder 的输出 / 已生成的 token**；
+  5. 最后一个 decoder 的输出经过一个**简单的 linear classification**，得到下一个 token。
+
+- PDF p.321 的机器翻译例子：输入一句英文，输出另一种语言的译文；所有 word/token **parallelly** 输入，输出是 decoder 输出的**线性分类**。
+
+#### 9.2 Encoder 内部结构
+
+一个 encoder block 只有两个主函数（PDF p.323、p.327）：
+
+| 顺序 | 模块 | 作用 |
+|---|---|---|
+| 1 | **Self-attention（自注意力）** | 让每个 token 关注**同一序列中的所有 token**，捕捉上下文关系 |
+| 2 | **Add & Norm（残差 + 归一化）** | $\mathbf{x}\leftarrow\mathrm{Norm}(\mathbf{x}+\mathrm{SelfAttn}(\mathbf{x}))$ |
+| 3 | **Pointwise feed-forward network（逐点前馈网络）** | 对每个 token **独立**做非线性变换 |
+| 4 | **Add & Norm** | $\mathbf{x}\leftarrow\mathrm{Norm}(\mathbf{x}+\mathrm{FFN}(\mathbf{x}))$ |
+
+- ⚠️ **self-attention 的 Q、K、V 都来自同一个输入序列**——所以叫 "self"（自己关注自己）。
+- ⚠️ 每个子层（attention / FFN）外面都包着 **residual skip-connection（残差跳连）**，后面接 **normalization**（PDF 原话："Both the Attention and Feed-forward layers have a residual skip-connection."）。
+
+#### 9.3 Decoder 内部结构
+
+一个 decoder block 比 encoder 多一个 attention（PDF p.323、p.328）：
+
+| 顺序 | 模块 | Q 来自 | K, V 来自 | 作用 |
+|---|---|---|---|---|
+| 1 | **Self-attention** | decoder 当前输入（已生成的 token） | 同左 | 让已生成的部分互相看 |
+| 2 | **Add & Norm** | — | — | — |
+| 3 | **Encoder-Decoder attention（交叉注意力）** | decoder self-attention 的输出 | **最后一个 encoder 的输出** | 让 decoder 在生成时"查询"输入序列 |
+| 4 | **Add & Norm** | — | — | — |
+| 5 | **Pointwise feed-forward network** | 每个 token 独立 | — | 非线性变换 |
+| 6 | **Add & Norm** | — | — | — |
+
+- ⚠️ 三种 attention（encoder self-attention、decoder self-attention、encoder-decoder attention）的**内部计算完全相同**；**唯一的区别是 Q/K/V 的来源不同**。
+- 老师原话："Although the names are different, the structure of this attention is also identical to self-attention. The difference is only the input."
+
+#### 9.4 Encoder vs Decoder 对比
+
+| 对比项 | Encoder | Decoder |
+|---|---|---|
+| attention 数量 | 1 个 self-attention | 2 个：self-attention + encoder-decoder attention |
+| Q/K/V 来源 | 全部来自 encoder 输入 | self-attention：全来自 decoder；cross-attention：Q 来自 decoder，K/V 来自 encoder |
+| 是否生成输出 | 否，只编码 | 是，逐个生成 token |
+| 是否使用位置编码 | 是 | 是 |
+| 输出用途 | 送入所有 decoder 的 K/V | 经 linear classifier 得到下一个 token |
+
+### 10. 输入表示：Token → Embedding → Matrix
+
+#### 10.1 从 token 到 feature vector
+
+- **Token**：序列中的一个基本单位。NLP 中是一个 word / sub-word；CV 中可以是图像的一个 **patch**。
+- 最朴素的做法：给每个 token 一个**不同的整数编号**。⚠️ 老师指出这**不够好**：整数编号无法表达语义相似性——"cat" 和 "dog" 的编号可能相差很远，但语义很近；编号大小也没有物理意义。
+- 正确做法：**embedding（嵌入）**——把每个 token 映射成一个**feature vector（特征向量）**：
+
+  $$
+  \mathbf{x}_i=\mathrm{Embed}(w_i)\in\mathbb{R}^{K}
+  $$
+
+  - 语义相近的 token，其 feature vector 在空间中**距离近**；语义远的距离远。
+  - 标准 Transformer 中 $K=512$（老师课堂举例；实际模型可不同）。
+  - 这样"距离"才有意义，后续的 dot product / attention 才有物理含义。
+
+#### 10.2 Positional encoding（位置编码）
+
+- 只有 token 的 embedding 还不够：不加 positional encoding 时，attention 对 token 顺序是 **permutation-equivariant（置换等变）** 的——把 token 打乱，输出只跟着同样打乱，模型**无法区分谁在前谁在后**。
+- 因此要给每个位置 $i$ 再加一个 **positional encoding vector（位置编码向量）** $\mathbf{p}_i$：
+
+  $$
+  \mathbf{x}_i=\mathrm{Embed}(w_i)+\mathbf{p}_i
+  $$
+
+- 这样 feature vector 同时包含**语义信息**（word meaning）与**位置信息**（第几个 token）。
+- ⚠️ 老师课堂没有展开正弦/余弦位置编码的公式，只强调"**位置也要用 feature vector 表示，再与词义 vector 相加**"。
+
+#### 10.3 矩阵表示（贯穿 Transformer 的核心）
+
+把所有 token 的 feature vector 按行排成矩阵：
+
+$$
+\mathbf{X}=
+\begin{bmatrix}
+\mathbf{x}_1\\
+\mathbf{x}_2\\
+\vdots\\
+\mathbf{x}_N
+\end{bmatrix}
+\in\mathbb{R}^{N\times K}
+$$
+
+- **一行 = 一个 token**；$N$ 个 token，每个 $K$ 维。
+- ⚠️ 老师反复强调：**"In this matrix, one row is one token. This is very, very important — never be confused."**
+- Transformer 内部所有运算都是**矩阵乘法**；**这个矩阵的大小（$N\times K$）在整个 Transformer 中保持不变**（除非显式做投影改变特征维，但 token 数 $N$ 不变）。
+- 因此理解 Transformer 的关键，就是理解**每一步矩阵乘法到底对"行（token）"和"列（feature）"做了什么**。
+
+| 表示 | 形状 | 含义 |
+|---|---|---|
+| 一个 token | $1\times K$ 行向量 | 一个 word / patch 的特征 |
+| 整个输入 $\mathbf{X}$ | $N\times K$ | $N$ 个 token 的 feature 矩阵 |
+| $\mathbf{Q},\mathbf{K},\mathbf{V}$ | $N\times K$ | 每个 token 的三个投影向量，仍是一行一个 token |
+| attention 输出 $\mathbf{Z}$ | $N\times K$ | 每个 token 的新 feature，一行一个 token |
+
+### 11. Residual Connection（残差连接 / Skip Connection）
+
+#### 11.1 定义
+
+Transformer 的**每一个** attention / feed-forward 子层都使用 **residual connection**：
+
+$$
+\boxed{\;\mathbf{y}=\mathbf{x}+F(\mathbf{x})\;}
+$$
+
+- $\mathbf{x}$：子层的输入；
+- $F(\mathbf{x})$：子层（attention 或 FFN）学到的变换；
+- $\mathbf{y}$：子层输出（再过 normalization）。
+
+#### 11.2 为什么残差连接重要
+
+- 把上式改写：
+
+  $$
+  F(\mathbf{x})=\mathbf{y}-\mathbf{x}
+  $$
+
+  即：**子层只需要学习"输出相对于输入的差异（residual，残差）"，而不是从头学习整个输出。** 老师原话："The output of this unit is just the difference between the final output and the input. This makes the training easier."
+
+- **梯度视角**（为什么能训练很深）：
+
+  $$
+  \frac{\partial\mathbf{y}}{\partial\mathbf{x}}
+  =\mathbf{I}+\frac{\partial F(\mathbf{x})}{\partial\mathbf{x}}
+  $$
+
+  反向传播时，梯度中永远包含一个 **identity term（恒等项）$\mathbf{I}$**，可以直接从深层流回浅层，**不会因为连乘而消失** → 缓解 **vanishing gradient（梯度消失）**。
+
+- **集成视角**：残差连接让网络可以"跳过"某些层；如果某一层没用，网络可以把 $F(\mathbf{x})$ 学成 0，等价于**恒等映射**，不会变差。
+
+#### 11.3 与 ResNet 的关系
+
+- 这个思想来自 **ResNet（residual network，残差网络）**。
+- ResNet 用 **skip connection** 把输入直接加到卷积输出上，使 100+ 层的网络可以稳定训练；Transformer 把同一思想用在 attention / FFN 子层上。
+- ⚠️ 注意区分：
+  - **ResNet 的 skip connection**：连接的是**同一个 block 的输入与输出**；
+  - **Transformer 的 residual connection**：连接的是**同一个子层的输入与输出**；
+  - 两者数学形式相同，都是 $\mathbf{y}=\mathbf{x}+F(\mathbf{x})$。
+
+### 12. ⭐⭐ Self-Attention 的计算（本周最核心）
+
+#### 12.1 第一步：Q / K / V 线性投影
+
+给定输入矩阵 $\mathbf{X}\in\mathbb{R}^{N\times K}$，用**三个可学习的权重矩阵**做线性投影：
+
+$$
+\boxed{\;\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\qquad
+\mathbf{K}=\mathbf{X}\mathbf{W}_k,\qquad
+\mathbf{V}=\mathbf{X}\mathbf{W}_v\;}
+$$
+
+逐 token 写：
+
+$$
+\mathbf{q}_i=\mathbf{x}_i\mathbf{W}_q,\qquad
+\mathbf{k}_i=\mathbf{x}_i\mathbf{W}_k,\qquad
+\mathbf{v}_i=\mathbf{x}_i\mathbf{W}_v,\qquad i=1,2,\ldots,N
+$$
+
+| 符号 | 名称 | 含义 |
+|---|---|---|
+| $\mathbf{Q}$ | **Query（查询）** | 当前 token "想找什么" |
+| $\mathbf{K}$ | **Key（键）** | 每个 token "能被什么找到" |
+| $\mathbf{V}$ | **Value（值）** | 每个 token "实际提供的内容" |
+| $\mathbf{W}_q,\mathbf{W}_k,\mathbf{W}_v$ | 可学习投影矩阵 | 从 training data 学出来 |
+
+- ⚠️ **所有 token 共享同一套 $\mathbf{W}_q,\mathbf{W}_k,\mathbf{W}_v$**：第 $i$ 个 token 的 $\mathbf{q}_i$ 只由 $\mathbf{x}_i$ 与**同一个** $\mathbf{W}_q$ 决定。
+- 这正是 PDF p.331 的原话："**All tokens share the same learnable parameter: any single learnable parameter goes through all tokens or is learned from all tokens. 1×1 Convolution of CNN!**"
+- 换句话说：Q/K/V 投影就是**对每个 token 做一次 1×1 convolution**——Transformer 的可学习部分仍然沿用 CNN 的 parameter sharing 思想。
+
+#### 12.2 第二步：Attention score = Q 与 K 的点积
+
+$$
+\boxed{\;\mathbf{R}=\mathbf{Q}\mathbf{K}^{T}\;}
+$$
+
+- $\mathbf{R}\in\mathbb{R}^{N\times N}$，第 $(i,j)$ 个元素：
+
+  $$
+  r_{ij}=\mathbf{q}_i\cdot\mathbf{k}_j=\sum_{d=1}^{K}q_{i,d}\,k_{j,d}
+  $$
+
+- **物理意义**：$\mathbf{q}_i$ 与 $\mathbf{k}_j$ 的**点积 = 相似度 / 相关性（similarity / correlation）**。值越大，说明 token $i$ 与 token $j$ 越相关，$j$ 对 $i$ 越重要。
+- ⚠️ **与 covariance matrix 的类比**（PDF p.332 原话："Covariance Matrix!!!"）：
+  - $\mathbf{Q}\mathbf{K}^{T}$ 的形状与 $\mathbf{X}\mathbf{X}^{T}$ 一样，都是 $N\times N$ 的 **Gram / correlation matrix**；
+  - 区别在**求和的维度语义**：covariance 通常对**样本**求和，而 attention 是对**同一对 token 的 feature 维**求和；
+  - 老师强调："Attention is just the same as correlation. Nothing new."——**attention 没有发明新的数学，只是给"相关矩阵"换了个名字。**
+
+#### 12.3 第三步：归一化（softmax + scaling）
+
+- 老师课堂明确说：在 $\mathbf{Q}\mathbf{K}^{T}$ 之后、乘 $\mathbf{V}$ 之前，要做**归一化**；但"**this normalization is very simple, it does not change any physical meaning**"，所以没有展开。
+- 标准写法是 **softmax（归一化指数函数）** 加 **$\sqrt{d_k}$ 缩放**：
+
+  $$
+  \mathbf{A}=\mathrm{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{T}}{\sqrt{d_k}}\right),
+  \qquad
+  a_{ij}=\frac{\exp\!\left(r_{ij}/\sqrt{d_k}\right)}{\sum_{j'=1}^{N}\exp\!\left(r_{ij'}/\sqrt{d_k}\right)}
+  $$
+
+  - softmax 让每行的权重**非负且和为 1** → 成为真正的"加权平均"；
+  - $\sqrt{d_k}$ 防止 $d_k$ 很大时点积数值过大、softmax 饱和。
+- ⚠️ **PDF 的写法省略了 softmax 与 scaling**，直接写 $\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$；这是**简化表述**，考试若要求严格公式，应写 softmax 版本，并注明老师课件的简化形式。
+
+#### 12.4 第四步：用 attention 权重对 Value 加权求和
+
+$$
+\boxed{\;\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}\quad\text{（PDF 简化式）}\;}
+$$
+
+严格写法：
+
+$$
+\mathbf{Z}=\mathbf{A}\mathbf{V},\qquad
+\mathbf{z}_i=\sum_{j=1}^{N}a_{ij}\,\mathbf{v}_j
+$$
+
+逐项展开（PDF p.335）：
+
+$$
+\mathbf{z}_i=\sum_{j=1}^{N}\left(\mathbf{q}_i\cdot\mathbf{k}_j\right)\mathbf{v}_j
+\quad\text{（未归一化版本）}
+$$
+
+- ⚠️ **核心解读**（老师反复讲）：
+  1. **每个输出 token $\mathbf{z}_i$ 都是所有输入 token 的 weighted sum** → 从第一层开始就**捕捉 global information**（不是像 CNN 那样逐层扩大感受野）。
+  2. **权重 $a_{ij}$ 是 token $i$ 与 token $j$ 的相关性**：$j$ 与 $i$ 越相关，$j$ 的 Value 对 $i$ 的输出贡献越大。
+  3. 因此 attention 的输出是**所有 token 的线性组合（linear combination）**，组合系数由当前输入决定。
+
+#### 12.5 ⭐⭐ 最关键的区别：attention 权重不是学出来的
+
+> **PDF p.334 原话**："Each output token is weighted sum of all input tokens, capturing global information. **Different from MLP and CNN, weights are not learnt by training data. They are flexibly generated by specific test input. Attention itself is not learnable.**"
+
+这句话要拆成两层理解，**考试极易混淆**：
+
+| 成分 | 是否可学习？ | 说明 |
+|---|---|---|
+| $\mathbf{W}_q,\mathbf{W}_k,\mathbf{W}_v$ | ✅ **可学习** | 从 training data 学，训练后固定；所有 token 共享 |
+| attention weights $\mathbf{A}$（即 $a_{ij}$） | ❌ **不可学习** | 由当前 input 的 $\mathbf{Q}\mathbf{K}^{T}$ **现场计算**出来；不同 input → 不同 $\mathbf{A}$ |
+| feed-forward 的 $\mathbf{W}_1,\mathbf{W}_2,\mathbf{W}_3$ | ✅ **可学习** | 从 training data 学，所有 token 共享 |
+
+- 所以"**attention itself is not learnable**"指的是：**没有一组"attention 参数"被训练出来**；attention 权重是**前向计算时由 Q/K 现算的**。
+- ⚠️ 但要注意：$\mathbf{A}$ 依赖可学习的 $\mathbf{W}_q,\mathbf{W}_k$，所以训练会**间接影响** $\mathbf{A}$ 的分布；老师强调的是 **$\mathbf{A}$ 没有自己独立的、训练后固定的参数**，而不是"训练对 $\mathbf{A}$ 完全没影响"。
+- ⚠️ 这与 MLP/CNN 的本质区别：
+  - MLP/CNN：权重在**训练时**确定，**推理时对所有 input 都一样**；
+  - Transformer：Q/K/V 投影在训练时确定，但**最终的加权系数在推理时由每个 input 重新生成**。
+- 老师把这一点视为 Transformer 的 **revolution**：网络可以 **adapt to the input**，因此对输入的变化（different variations）更 robust。
+
+#### 12.6 一个直观例子
+
+- 输入 "Hi how are you?"，输出 "I am fine."（PDF p.337 的 generative 示例）。
+- attention 会发现：
+  - 输入中的 "how" 与输出中的 "fine" 高度相关（问候 → 回答）；
+  - 输入中的 "you" 与输出中的 "I" 高度相关（问答双方对应）。
+- 虽然 "you" 在输入中是**最后一个 token**，"I" 在输出中是**第一个 token**，attention **不受位置限制**——它会计算**所有 token 对**的相关性。这正是 attention 相对 RNN 的优势：**不需要按顺序一步步传递信息**。
+
+### 13. Multi-head Attention（多头注意力）
+
+#### 13.1 做法
+
+- 只做一次 attention 可能只捕捉一种"关系"；**multi-head attention** 用**多组不同的投影矩阵**并行做多次 attention：
+
+$$
+\mathrm{head}_m=\mathrm{Attention}\!\left(\mathbf{X}\mathbf{W}_q^{(m)},\mathbf{X}\mathbf{W}_k^{(m)},\mathbf{X}\mathbf{W}_v^{(m)}\right),
+\qquad m=1,2,\ldots,h
+$$
+
+$$
+\mathrm{MultiHead}(\mathbf{X})=\mathrm{Concat}\left(\mathrm{head}_1,\ldots,\mathrm{head}_h\right)\mathbf{W}_o
+$$
+
+- 每组 $\mathbf{W}_q^{(m)},\mathbf{W}_k^{(m)},\mathbf{W}_v^{(m)}$ 都从 training data 学；**不同 head 学到不同的"关注方式"**（例如一个 head 关注语法关系、一个关注语义相似、一个关注位置邻近……）。
+- 最后把所有 head 的输出 **拼接（concatenate）**，再用 $\mathbf{W}_o$ 投影回一个矩阵。
+
+#### 13.2 老师的课堂表述
+
+- 转写中的 "mutate / match attention" = **multi-head attention**。
+- 老师原话大意："Given a single input matrix, we can generate **three copies** (Q/K/V); of course we can generate **six copies, nine copies, twelve copies**. Then each three copies perform one attention; finally we merge the outputs into one matrix."
+- PDF p.329："Multiple attention heads in each encoder and decoder."
+- ⚠️ 每个 head 的 Q/K/V 仍然是 **1×1 convolution**（所有 token 共享该 head 的投影参数）。
+
+### 14. Pointwise Feed-forward Network（逐点前馈网络）
+
+#### 14.1 结构
+
+attention 输出 $\mathbf{Z}$ 之后，接一个**逐 token 独立**的前馈网络：
+
+$$
+\boxed{\;\mathbf{Y}=h\!\left(h\!\left(h\!\left(\mathbf{Z}\mathbf{W}_1\right)\mathbf{W}_2\right)\mathbf{W}_3\right)\;}
+$$
+
+逐 token 写：
+
+$$
+\mathbf{y}_i=h\!\left(h\!\left(h\!\left(\mathbf{z}_i\mathbf{W}_1\right)\mathbf{W}_2\right)\mathbf{W}_3\right),
+\qquad i=1,2,\ldots,N
+$$
+
+- $h(\cdot)$ 是**非线性激活函数**，PDF 明确说中间使用 **ReLU**。
+- 通常有两层线性变换 + 一个 ReLU（PDF 写三层矩阵，是为了强调"可以堆多层"；标准 Transformer 是两层 linear + 一层 ReLU）。
+
+#### 14.2 ⭐ 为什么叫 "pointwise"，为什么不是 MLP
+
+| 特性 | MLP | Transformer 的 pointwise FFN |
+|---|---|---|
+| 输出与输入的关系 | 每个输出是**所有输入**的 weighted sum | 每个输出 token **只依赖自己的输入 token** |
+| 是否跨 token 混合 | ✅ 是（全连接） | ❌ 否（逐 token 独立） |
+| 参数共享 | ❌ 无共享（每个输出有自己的权重行） | **所有 token 共享同一套 $\mathbf{W}_1,\mathbf{W}_2,\mathbf{W}_3$** |
+| 等价操作 | 全连接 | **1×1 convolution**（沿 token 维逐点） |
+
+- ⚠️ PDF p.336 原话："**Feed-forward network of the transformer is Pointwise, which is not MLP. Pointwise means that each single learnable parameter goes through all inputs. It comes again from the key concept, 1×1 convolution of CNN.**"
+- ⚠️ 老师特别批评 ViT 原论文：**"This paper calls this feed-forward network as MLP. In my opinion, it is wrong. It's not MLP."** 原因就是：MLP 的输出混合所有输入，而这里每个 token 独立处理，只是参数共享——本质是 **1×1 convolution**。
+
+### 15. Encoder-Decoder Attention 与生成过程
+
+#### 15.1 Encoder-Decoder Attention（交叉注意力）
+
+- 在 decoder 的 cross-attention 中：
+  - **Query** 来自 decoder 下方的 **self-attention 输出**；
+  - **Key 与 Value** 来自**最后一个 encoder 的输出**。
+- 公式与 self-attention **完全相同**：
+
+  $$
+  \mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}
+  \qquad\text{（简化式）}
+  $$
+
+  $$
+  \mathbf{z}_i=\sum_{j}\left(\mathbf{q}_i\cdot\mathbf{k}_j\right)\mathbf{v}_j
+  $$
+
+- 物理意义：decoder 在生成每个 token 时，用当前的 Query 去**查询输入序列的所有 token（Key/Value）**，从而决定"现在应该关注输入的哪一部分"。
+- 机器翻译例子：生成西班牙语 "La bola es azul" 时，生成 "bola" 的 Query 会去关注英文输入 "The ball is blue" 中的 "ball"。
+
+#### 15.2 生成过程（Transformer is a generative model）
+
+- Transformer 是**自回归（autoregressive）**的生成模型：**一次生成一个 token**，然后把新生成的 token **追加到 decoder 输入**，再生成下一个。
+- 流程：
+  1. 输入 sequence 送入 encoder，得到固定不变的 encoder 输出；
+  2. decoder 先根据 encoder 输出 + 起始 token，生成**第一个**输出 token；
+  3. 把第一个输出 token 作为 decoder 的新输入，生成**第二个** token；
+  4. 重复，直到生成结束符或达到最大长度。
+- ⚠️ **encoder 的输出在每一步都相同**；变化的只是 decoder 已经生成的 token 序列。
+- PDF p.337 把整体写成：
+
+  $$
+  \mathbf{Y}=f\!\left(f\!\left(f\!\left(\mathbf{Z}\mathbf{W}_1\right)\mathbf{W}_2\right)\mathbf{W}_3\right)
+  $$
+
+  其中 $\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$，$\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\ \mathbf{K}=\mathbf{X}\mathbf{W}_k,\ \mathbf{V}=\mathbf{X}\mathbf{W}_v$。
+
+| 阶段 | 输入 | 输出 | 说明 |
+|---|---|---|---|
+| **Training** | 完整输入序列 + 完整目标序列（teacher forcing） | 每个位置的预测 | 可并行计算所有位置的 loss |
+| **Inference** | 输入序列 + 已生成的前缀 | 下一个 token | 逐个生成，不能并行 |
+
+### 16. ⭐⭐ MLP vs CNN vs Transformer：三代模型的本质对比
+
+#### 16.1 总表
+
+| 对比维度 | **MLP** | **CNN** | **Transformer** |
+|---|---|---|---|
+| **基本运算** | fully-connected weighted sum | convolution（local weighted sum + channel 求和） | **attention（global weighted sum）** + pointwise FFN |
+| **权重来源** | 从 training data 学 | 从 training data 学，空间共享 | Q/K/V 投影与 FFN 从 training data 学；**attention 权重由 test input 现算** |
+| **训练后权重是否固定** | ✅ 固定 | ✅ 固定 | ⚠️ **投影/FFN 固定，attention 权重不固定** |
+| **能否适应不同 input** | ❌ | ❌ | ✅ **不同 input → 不同 attention 权重** |
+| **感受野 / 范围** | 全连接（global） | 单层 local；**多层后覆盖整图** | **第一层就覆盖所有 token（global）** |
+| **参数共享** | 无（每个输出位置独立权重） | **filter 在所有空间位置共享** | **投影/FFN 在所有 token 上共享** |
+| **正则化方式** | 无 → 容易 overfit | **parameter sharing 强正则** | parameter sharing + **input-adaptive attention** |
+| **位置信息** | 无显式位置概念 | 由空间结构隐式表示 | 需要 **positional encoding** |
+| **典型 overfitting 表现** | 最严重（double spiral） | 被 parameter sharing 抑制 | attention 随 input 变化，泛化更强 |
+| **典型应用** | 传统分类/回归 | 图像分类、检测、分割 | NLP、ViT、多模态 |
+
+#### 16.2 三代模型的演进逻辑
+
+$$
+\text{MLP（自由权重 → overfit）}
+\;\longrightarrow\;
+\text{CNN（parameter sharing → 强正则）}
+\;\longrightarrow\;
+\text{Transformer（input-adaptive attention → 自适应）}
+$$
+
+- **MLP**：每个输出位置有独立权重，自由度最大，但最容易 overfit；理论上是 universal approximator，实践中崩。
+- **CNN**：用 **parameter sharing** 强制所有位置共享同一组 filter，大幅减少自由度 → 强正则 → 学到 general rule。这是 CNN 成功的真正原因（Week 8 §10）。
+- **Transformer**：在保留 parameter sharing（Q/K/V、FFN 都是 1×1 convolution）的同时，让**加权系数由 input 动态生成** → 既能学 general rule，又能**适应每个具体输入**。
+
+#### 16.3 "Is attention really everything?" 的答案
+
+- **attention 是 Transformer 的力量来源**：它让每个输出 token 成为所有输入 token 的加权和，权重由 input 的相关性决定。
+- **但 attention 不是"全部"**：
+  1. **Q/K/V 投影、FFN** 仍然是可学习的，而且本质上都是 **1×1 convolution**；
+  2. **residual connection** 保证深层可训练；
+  3. **positional encoding** 提供顺序信息；
+  4. **multi-head** 让模型同时关注多种关系；
+  5. **encoder-decoder 结构** 支持 sequence-to-sequence 生成。
+- 老师更准确的说法是：**"Attention 是 Transformer 区别于 MLP/CNN 的关键，但 Transformer 的可学习模块仍然沿用 CNN 的 convolution 思想。"**（PDF p.341 最后一条）
+
+### 17. ViT 与 Vision-Language Transformer
+
+#### 17.1 Vision Transformer (ViT)：把图像变成 token 序列
+
+- Transformer 的输入必须是 **sequence of tokens**；图像是 **2D 网格**，所以第一步是**把图像转成序列**。
+- ViT 的做法非常直接：
+  1. 把图像**切成固定大小的 patch**（例如 $16\times16$）；
+  2. 把每个 patch 内的所有像素**展平（flatten）**成一个向量；
+  3. 每个 patch 的向量 = 一个 **token**；
+  4. 加上 **positional encoding**；
+  5. 送入 **Transformer encoder**；
+  6. 最后接一个 **linear classifier**，输出图像类别。
+- 公式：
+
+  $$
+  \mathbf{x}_i=\mathrm{Flatten}(\text{patch}_i)\in\mathbb{R}^{P^2 C},
+  \qquad
+  \mathbf{X}=[\mathbf{x}_1;\ldots;\mathbf{x}_N]\in\mathbb{R}^{N\times P^2C}
+  $$
+
+  其中 $P\times P$ 是 patch 大小，$C$ 是 channel 数，$N$ 是 patch 数。
+- ⚠️ **图像分类只需要 encoder，不需要 decoder**：因为输入是图像、输出是**一个类别**，不是另一个序列。decoder 是用来生成序列的（翻译、问答等）。
+
+#### 17.2 ViT vs CNN（PDF p.339）
+
+| 对比项 | **CNN** | **Vision Transformer (ViT)** |
+|---|---|---|
+| 输入 | 图像 / feature map | patch 序列 |
+| 核心运算 | convolution（local → global by depth） | self-attention（global from layer 1） |
+| 大数据集表现 | 有长期验证的良好记录，处理大规模数据高效 | **在大规模数据上 pre-train 后，多个 benchmark 超过 SOTA CNN** |
+| 训练算力 | 相对高效 | 原论文称**所需算力更少**（after large-scale pre-training） |
+| 优势场景 | 各类 CV 任务，成熟稳定 | **需要 global dependencies 与 contextual understanding 的场景** |
+| 位置信息 | 由卷积/空间结构隐式提供 | 必须显式加 positional encoding |
+
+- ⚠️ PDF 在 "global(?)" 处**打了问号**——这与 §8.3 的讨论呼应：老师**不认为** "local vs global" 是 Transformer 优于 CNN 的完整解释。
+- ⚠️ 老师对 ViT 的**个人评价**：
+  - ViT 把图像简单切成 patch、展平成 token 的做法**很粗糙**；"**In my opinion, this is not a good way to generate tokens from the image. We should have some other better way.**"
+  - 但即便如此简单的 tokenization，Transformer 已经能超过 CNN——这更说明 **attention 机制的强大**。
+  - 老师还批评 ViT 原论文把 pointwise FFN 叫作 **MLP** 是**错误的**（§14.2）。
+
+#### 17.3 Vision-Language Transformer（VLT）：referring segmentation
+
+- 老师的另一项工作：**Vision-Language Transformer（视觉-语言 Transformer）**，用于 **referring segmentation（指代分割）**。
+- 任务：给一张图像 + 一句自然语言指令（如 "the small elephant on the left"），分割出语言所指的物体。
+- 需要同时处理**视觉信息**与**语言信息**：
+
+| 模态 | 处理方式 |
+|---|---|
+| **Image** | 先过 **CNN** 提取 visual features（得到 image token 序列） |
+| **Language** | 先做 **embedding**，得到 language token 序列 |
+| **Fusion** | 在 language tokens 与 image tokens 之间做 **cross-attention（交叉注意力）** |
+| **Query generation** | 用 cross-attention 的输出生成一个 **query**，它同时包含语言语义与图像信息 |
+| **Decoder** | 用该 query 去查询 image transformer decoder，输出分割结果 |
+
+- 核心公式仍是 attention：
+
+  $$
+  \mathbf{z}_i=\sum_j\left(\mathbf{q}_i\cdot\mathbf{k}_j\right)\mathbf{v}_j
+  $$
+
+  只是这里的 $i$ 可能来自 language，$j$ 来自 image（或反之），所以叫 **cross-attention**。
+- 发表：**ICCV 2021**；扩展版 **IEEE TPAMI**, vol. 45, no. 6, pp. 7900–7916, Jun. 2023；老师课堂称已被引用 **700+** 次。
+
+### 18. ⭐ Deep Learning 的官方总结（PDF p.341）
+
+PDF 最后一页 "Conclusion of Deep Learning" 给出 8 条，是**整个 Topic 9–10 的收束**，也是期末复习的纲领：
+
+| # | 结论 | 解读 |
+|---|---|---|
+| 1 | **The success of AI lies in Machine Learning.** | 当前 AI 的成功本质上依赖 machine learning，而不是手工规则 |
+| 2 | **The success of Machine Learning lies in learning general rules, not overfitting to specific details of training data.** | 学 general rule 才是关键；overfit 细节必然失败 |
+| 3 | **This is realized by learning in convolution with minimum filter size ⇒ CNN.** | 用**最小 filter（3×3、1×1）**做 convolution，让每个参数走过所有位置 → CNN |
+| 4 | **Hence, many convolutional layers are required by capturing large area of information ⇒ Deep learning.** | 小 filter 要覆盖大区域，只能靠**很多层** → deep learning |
+| 5 | **Deep learning is facilitated by the simplest nonlinear activation function ReLU.** | 层多 → backprop 路径长 → 必须用最简单的非线性 ReLU 防止 vanishing gradient |
+| 6 | **Every single learned parameter of CNN going through all inputs greatly enhances the learning generalization.** It captures information by weights learned from training data, however, **limits its capability**. | parameter sharing 提升泛化；但权重**从 training data 学、训练后固定**，无法适应每个具体 input → 这是 CNN 的**能力上限** |
+| 7 | **Transformer captures global information by non-learnable attention modules.** Different from MLP and CNN, the way to capture global information is **not learned from the training data set. It is specified by the specific test input.** | attention 权重由 test input 生成；这是 Transformer 相对 CNN 的**革命性区别** |
+| 8 | **All learnable modules of transformer exploits the concept of convolution!** | Q/K/V 投影、FFN 都是 **1×1 convolution / pointwise**；Transformer 的可学习部分仍然沿用 CNN 思想 |
+
+- ⚠️ 第 6–8 条是老师整个课程的**核心观点**，也是 Week 8–9 的主线：
+  - CNN 用 **parameter sharing** 解决 overfitting；
+  - 但 CNN 的权重**固定**，不能随 input 自适应；
+  - Transformer 用 **input-generated attention weights** 解决这一点；
+  - 同时 Transformer 的**可学习部分仍然是 convolution**（1×1）。
+- 一句话总结：
+
+$$
+\boxed{\;\text{CNN 的 revolution = parameter sharing；Transformer 的 revolution = input-adaptive attention。}\;}
+$$
+
+### 19. ⭐⭐ 期末考试范围与题型（Week 9 末公布，极重要）
+
+#### 19.1 课程考核构成（PDF p.3）
+
+| 成分 | 占比 | 说明 |
+|---|---|---|
+| **Final Examination** | **60%** | 期末笔试 |
+| **CA（Continuous Assessment）** | **40%** | 见下 |
+| ┗ Quiz | **10%** | Week 7，课堂内 30 分钟 |
+| ┗ Assignment 1 | **15%** | take-home mini-project + report（Jiang 部分） |
+| ┗ Assignment 2 | **15%** | take-home mini-project + report（Cheng Jun 部分） |
+
+#### 19.2 Final exam 的题型（老师原话整理）
+
+- **4 道题，3 小时**。
+- 其中 **3 道题来自 Jiang Xudong 部分（Topic 1–10）**，**第 4 题由另一位老师出**。
+- **前 3 题**：用**数学表达式 / 数值计算**来回答，**不要求英文 essay**；考的是**理解（understanding）**，不是**记忆（memorization）**。
+  - 老师原话："I will never test your skills, but I test your understanding. Based on your understanding, you should be able to figure out how to solve the question."
+  - 即使题目看起来是数值计算，也不是考"算术"，而是考"**你是否知道该怎么算、为什么这样算**"。
+- **第 4 题**：用**英文句子**回答；不要求漂亮英文，**踩到 key points 就给分**。
+
+#### 19.3 前 3 题的来源（明确）
+
+| 题号 | 来源 Topic | 内容 | 备注 |
+|---|---|---|---|
+| **Q1** | **Topic 3** | **Image denoising and enhancement** | 老师明确说："**more on the enhancement part than the denoising part**" |
+| **Q2** | **Topic 5** | **MAP decision and classifiers** | 基于 MAP 理论的各种 classifier |
+| **Q3** | **Topic 9 + Topic 10** | **Neural networks, CNN, Transformer** | 重点在 **deep learning 部分**（MLP → CNN → Transformer 的核心概念与公式） |
+| **Q4** | 另一位老师 | 英文简答 | 用 English sentences 答 key points |
+
+#### 19.4 不考的 Topic（按老师课堂宣布）
+
+- 老师原话（转写整理）："**The first topic and the second topic, both are not in the final exam. The third topic, image noise and enhancement, will be in the final exam, where the fourth topic, sixth topic ... also not in the final exam. The MAP rule and different classifiers designed based on the theory of MAP is within the scope of the final exam. And then the next few topics, two topics are not in the final exam.**"
+- 结合"Q1=Topic 3、Q2=Topic 5、Q3=Topic 9+10"可以确定：
+  - ✅ **考**：Topic 3、Topic 5、Topic 9、Topic 10；
+  - ❌ **不考**：Topic 1、Topic 2、Topic 4、Topic 6、Topic 7、Topic 8。
+- ⚠️ 转写在这段有重复/漏词（"fourth topic six topic and six topic"），但**三道题的来源是老师逐题点名说的**，以上表为准。若老师之后在 NTULearn 发布正式范围，以官方通知为准。
+
+#### 19.5 复习建议（按老师原话）
+
+1. **不要背公式**：要理解公式**怎么来的、每一项的物理意义**；考试时能**自己写出来**。
+2. **重点深入**：Topic 3 的 **enhancement**、Topic 5 的 **MAP/classifier**、Topic 9–10 的 **NN/CNN/Transformer**。
+3. **练习用数学表达**：能写出 convolution、backprop、attention 等关键公式，并说明符号含义。
+4. **Q4 用英文答 key points**：不需要长篇大论，踩点即可。
+5. **Assignment 不要逾期**：老师特别提醒 "don't forget to submit your assignment before the deadline."
+
+### 20. ⭐ 本周考点速查
+
+| 考点 | 要点 | 节号 |
+|---|---|---|
+| **CNN 的核心** | kernel 走过所有位置；所有像素共同训练同一参数 → robust、general rule、revolution | §2 |
+| **卷积输出尺寸** | $O=\lfloor(I+2P-K)/S\rfloor+1$；same padding $P=(K-1)/2,S=1$ → $O=I$ | §2.2 |
+| **卷积参数量** | $(K_hK_wC_{in}+1)C_{out}$；远小于同尺寸 MLP | §2.2 |
+| **感受野递推** | $r_L=r_{L-1}+(K_L-1)\prod_{i<L}S_i$；3×3 stride 1 → $2L+1$ | §2.2 |
+| **Image segmentation** | 逐像素分类；标注昂贵；用 pre-trained network（ResNet-101）+ fine-tune | §3 |
+| **ResNet-101 例子** | 输入 200×200×3；最终 16×16×约 2000 channel；ImageNet 预训练 | §3.2 |
+| **CCL** | local 3×3 与 dilated 3×3 的**差值** = 局部与周围的 contrast；多层 chained → multi-level | §4 |
+| **Gated sum** | $\mathbf{S}(p)=\sum_l\alpha_l(p)\mathbf{s}_l(p)$；$\alpha_l(p)$ 由 **input** 生成，不是训练后固定 | §5 |
+| **为什么叫 gated** | 权重随 input/位置变化，起"选择尺度"的门控作用；普通 weighted sum 权重固定 | §5.4 |
+| **Boundary refinement** | 粗分割 → 边界 impulse → 不同 $\sigma$ 的 Gaussian 扩散 → 小/中/大尺度权重；边界附近用小尺度 | §6 |
+| **Shape-variant convolution** | 1×1 conv 算像素相关 → shape mask → 加权大方形 kernel；mask 随 input 变化 | §7 |
+| **Shape mask = attention** | correlation map 就是 attention map；"attention and correlation are exactly the same" | §7.5 |
+| **Transformer 定位** | sequence-to-sequence；RNN/LSTM 顺序处理，Transformer 并行 | §8.1 |
+| **三个问题** | 怎么工作？attention 是否一切？local vs global 能否解释？ | §8.2 |
+| **驳斥 local/global** | CNN 多层可覆盖整图；MLP 全连接却最差；CNN 的 global 是从整个 training set 学的 | §8.3 |
+| **三种 weighted sum** | MLP/CNN 权重 learned & fixed；Transformer attention 权重 input-generated | §8.4 |
+| **Encoder/Decoder** | 同构 stack；last encoder → 所有 decoder 的 K/V；decoder 还接收已生成 token | §9 |
+| **Encoder block** | self-attention → add & norm → pointwise FFN → add & norm | §9.2 |
+| **Decoder block** | self-attention → cross-attention（Q 来自 decoder，K/V 来自 encoder）→ FFN | §9.3 |
+| **Token/Embedding** | token → feature vector（标准 512 维）；语义相近 → 距离近 | §10.1 |
+| **Positional encoding** | $\mathbf{x}_i=\mathrm{Embed}(w_i)+\mathbf{p}_i$；否则 attention 不知道顺序 | §10.2 |
+| **输入矩阵** | $\mathbf{X}\in\mathbb{R}^{N\times K}$，一行一个 token；大小在 Transformer 中不变 | §10.3 |
+| **Residual** | $\mathbf{y}=\mathbf{x}+F(\mathbf{x})$；子层只学残差；梯度含 $\mathbf{I}$，缓解 vanishing gradient | §11 |
+| **Q/K/V** | $\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\mathbf{K}=\mathbf{X}\mathbf{W}_k,\mathbf{V}=\mathbf{X}\mathbf{W}_v$；所有 token 共享 → **1×1 convolution** | §12.1 |
+| **Attention score** | $\mathbf{R}=\mathbf{Q}\mathbf{K}^{T}$；$r_{ij}=\mathbf{q}_i\cdot\mathbf{k}_j$；相似度/相关；类比 covariance | §12.2 |
+| **Softmax** | $\mathbf{A}=\mathrm{softmax}(\mathbf{Q}\mathbf{K}^{T}/\sqrt{d_k})$；PDF 简化省略 | §12.3 |
+| **Attention 输出** | $\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$（简化）；$\mathbf{z}_i=\sum_j a_{ij}\mathbf{v}_j$；所有输入 token 的加权和 → global | §12.4 |
+| **⭐ attention 权重** | **不由 training data 学**；由 test input 的 Q/K 现算；attention itself non-learnable | §12.5 |
+| **可学习部分** | Q/K/V 投影、FFN 的 $\mathbf{W}$ 是可学习的；attention weights 不是 | §12.5 |
+| **Multi-head** | 多组 Q/K/V 并行 attention，concat 后 $\mathbf{W}_o$ 融合 | §13 |
+| **Pointwise FFN** | $\mathbf{Y}=h(h(h(\mathbf{Z}\mathbf{W}_1)\mathbf{W}_2)\mathbf{W}_3)$；逐 token 独立，参数共享；**不是 MLP，是 1×1 conv** | §14 |
+| **Cross-attention** | Q 来自 decoder，K/V 来自 encoder；公式同 self-attention | §15.1 |
+| **Generative** | 一次生成一个 token，输出反馈为下一步输入；encoder 输出不变 | §15.2 |
+| **ViT** | 图像切 patch → flatten → token 序列 → encoder → classifier；只需 encoder | §17.1 |
+| **ViT vs CNN** | ViT 大规模预训练后超过 CNN、算力更少；CNN 成熟高效；"global(?)" 存疑 | §17.2 |
+| **VLT** | image tokens + language tokens → cross-attention → query → decoder 分割；ICCV'21/TPAMI'23 | §17.3 |
+| **Deep learning 总结** | 8 条结论：AI→ML→general rule→CNN→deep→ReLU→parameter sharing→Transformer attention | §18 |
+| **考试范围** | 4 题 3 小时；Q1 Topic 3、Q2 Topic 5、Q3 Topic 9+10；Q4 英文简答；Topic 1/2/4/6/7/8 不考 | §19 |
+| **考试形式** | 前 3 题数学表达/数值计算，考理解不考记忆；Q4 英文踩点 | §19.2 |
+
+### 21. 本周要点小结
+
+- **CNN 的进一步发展**：老师用自己的 image segmentation 研究（三项主要贡献 + Shape-Variant Convolution）说明，在 CNN 之上还可以做**input-adaptive weighting**：
+  - **CCL**：local 与 dilated context 的**差值**，突出局部与周围的 contrast，避免大区域平均导致的 blur；
+  - **Gated multi-scale aggregation**：不同位置需要不同尺度；权重 $\alpha_l(p)$ 由**当前 input** 生成，而不是训练后固定，故称 **gated sum**；
+  - **Boundary refinement**：用粗分割边界 + **multi-scale Gaussian diffusion** 自动给边界附近小尺度、远离边界大尺度；
+  - **Shape-variant convolution**：用像素间 **correlation** 生成 **shape mask**，让 kernel 形状随物体形状变化；mask 就是 **attention map**。
+- **共同主线**：这四项工作的权重都**由具体 input 生成**，不是从 training data 学完就固定——这正是 Transformer **attention** 的思想先声。
+- **Transformer 结构**：**encoder stack + decoder stack**；encoder 是 self-attention + pointwise FFN，decoder 多一个 encoder-decoder attention；每个子层都有 **residual connection** 与 normalization。
+- **输入表示**：token → **embedding**（标准 512 维）→ 加 **positional encoding** → 排成 $N\times K$ 矩阵，一行一个 token；整个 Transformer 中矩阵大小不变。
+- **Self-attention**：
+  - $\mathbf{Q}=\mathbf{X}\mathbf{W}_q,\ \mathbf{K}=\mathbf{X}\mathbf{W}_k,\ \mathbf{V}=\mathbf{X}\mathbf{W}_v$，所有 token 共享 → **1×1 convolution**；
+  - $\mathbf{R}=\mathbf{Q}\mathbf{K}^{T}$ 是 token 两两相关（类比 covariance）；
+  - $\mathbf{A}=\mathrm{softmax}(\mathbf{Q}\mathbf{K}^{T}/\sqrt{d_k})$，$\mathbf{Z}=\mathbf{A}\mathbf{V}$；PDF 简化为 $\mathbf{Z}=\mathbf{Q}\mathbf{K}^{T}\mathbf{V}$；
+  - **每个输出 token 是所有输入 token 的加权和 → global information**。
+- **⭐⭐ 最核心的考点**：**attention 的权重不是从 training data 学出来的，而是由具体 test input 的 Q/K 现算的**；可学习的是 Q/K/V 投影与 FFN，attention 本身 non-learnable。这是 Transformer 相对 MLP/CNN 的 **revolution**。
+- **Transformer 的可学习模块仍是 convolution**：Q/K/V 投影与 pointwise FFN 都是 **1×1 convolution**；pointwise FFN **不是 MLP**，因为每个 token 独立处理、参数共享。
+- **ViT**：图像切 patch → token 序列 → Transformer encoder → classifier；大规模预训练后超过 CNN，但 tokenization 方式仍较粗糙。**VLT** 把 vision + language 结合，用于 referring segmentation。
+- **期末考试**（极重要）：4 题 3 小时；Q1 Topic 3（enhancement 为主）、Q2 Topic 5（MAP/classifier）、Q3 Topic 9+10（NN/CNN/Transformer）；Q4 英文简答。Topic 1/2/4/6/7/8 不考。前 3 题考**理解 + 数学表达**，不考死记。
+
+### 22. 下一周预告
+
+- **本周是 Jiang Xudong 老师 Topic 1–10 的最后一课**。从 **Week 10** 起，课程进入 **Dr. Cheng Jun** 主讲部分（PDF p.2）：
+
+| Week | Topic | 内容 |
+|---|---|---|
+| **Week 10** | **Topic 11** | **Video Analysis**（视频分析） |
+| **Week 11** | **Topic 12** | **Video Recognition**（视频识别） |
+| **Week 12** | **Topic 13** | **Three-dimensional Machine Perception**（三维机器感知） |
+| **Week 13** | **Topic 14** | **Three-dimensional Machine Vision**（三维机器视觉） |
+
+- **Week 9 没有新的录播预告内容**（老师只说 "from next week, another lecturer from the Research Institute will come to give you the lectures for Topic 11 to 14"）；上表来自 PDF 第 2 页的 Course Content，是权威课程安排。
+- **期末复习建议**（按老师原话）：
+  1. 重点复习 **Topic 3（enhancement）、Topic 5（MAP/classifier）、Topic 9–10（NN/CNN/Transformer）**；
+  2. 不要背公式，要能**从理解出发写出数学表达式**；
+  3. 用 Week 8–9 笔记中的公式表与对比表自测：卷积尺寸、感受野、backprop、Q/K/V、attention、softmax、residual；
+  4. Q4 用英文答 **key points**，不需要漂亮英文；
+  5. **Assignment 不要逾期**。
+- ⚠️ 若 NTULearn 之后发布正式的 final exam scope / sample questions，以官方通知为准；本节 §19 是老师课堂口头宣布的整理。
+
+
+
+

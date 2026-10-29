@@ -2861,3 +2861,1259 @@ plot_interesting_test_results(test_images, test_labels, predictions, class_names
 ### 下一周预告
 
 **Week 9 继续 Part 2（Neural Network 的 training）**。课件本讲末尾留下两条明说的线索：① 老师课堂上说 §9.2 那套 **3 层 = 4 + 2 + 1 的设计"how to get it"会下次讲**（即"如何系统地设计多个 hidden neuron 的边界"）；② 讲完 §10 的 **universal approximation**（2-layer MLP 逼近任意连续函数）后，自然进入"**这些 weight 和 bias 到底怎么求出来**"——也就是 **forward propagation（本周已出现）+ backpropagation + SGD** 的训练部分。本周只做了"人手工设计权重"（OR/AND/XOR 都是手算出来的），老师已明确预告"in general, we don't train network this way"，训练方法将是后续重点。此外请注意 **Quiz 2 范围是 Week 8–11**，本周内容（neuron 模型、linear separability、XOR 需多层、universal approximation）属于必考基础。
+
+---
+
+## Week 9 — Part 2.1（续）：多层网络设计、Forward Propagation 与 Universal Approximation
+
+本周继续 Wang Lipo 的 **Part 2.1: Introduction to Neural Networks and Deep Learning**。Week 8 停在 universal approximation 的结论页，并预告"§9.2 的 3 层 4+2+1 设计 how to get it 下次讲"；本周先把这笔账还上：完整推导 **4+2+1 三层网络**每个 neuron 的 weight 与 bias，再讲 **training 的定义**、**forward propagation（前向传播）** 的逐层计算与矩阵形式，最后用"矩形脉冲"给出 **universal approximation** 的直观证明。
+
+> ⚠️ **进度说明（很重要）**：本周转写 `week8-9/week9.txt` 在 forward propagation 之后结束，老师原话是 **"we can continue the next episode. We continue next time."**——**backpropagation 本周只做了预告，正式推导在 Week 10**。因此本笔记 §9 的 backpropagation / gradient descent / SGD 完整推导，是**为 Week 10 "Training Deep Networks" 和 Quiz 2 预先整理的数学准备**，已明确标注，不是本周课堂内容。Week 1 进度表把 Week 9 写成 "Deep Learning (CNN)"，实际进度比表慢：本周仍在 Part 2.1，CNN 与 training 顺延到后面。
+
+> **权威来源说明**：本节由 `week8-9/week9.txt` 录播转写整理，并以 `week8-9/Part 2.1_Intro_NN_DL(1).pdf`（Wang Lipo，50 页）核对。注意：**该 PDF 只包含 Week 8 的 50 页**，到 universal approximation 为止，没有 training/backprop 的幻灯片；因此本周的 4+2+1 设计细节、forward propagation 数值例、training/inference 讨论主要来自转写，公式与网络结构仍以 PDF 第 40–50 页为准，notebook `mlp_mnist_tf.ipynb` 仅作辅助。转写是 ASR 输出，术语错拼极多，下表是本周典型对照。
+
+**本周 ASR 错拼对照表**
+
+| 转写 | 正确 | 说明 |
+|---|---|---|
+| new network / near network / neo network / newer / ne never / near newer | **neural network** | 本周最高频错拼 |
+| neuron 的各种变体：neon / uro / nero / ero / mon / murals / near newer | **neuron(s)** | 单复数都有 |
+| lat | **one / slide**（指代） | "very important lat" 指 XOR 那张图，不是术语 |
+| Minsky and Pepper | **Minsky and Papert** | 与 Week 8 一致 |
+| Perception / precept | **perceptron** | single-layer perceptron |
+| x problem / X all problem / X war / x or | **XOR problem** | Exclusive-OR |
+| end / n / and（动词用法） | **AND** | 如 "do a end" = "do an AND" |
+| war / or（动词用法） | **OR** | 如 "do a war" = "do an OR" |
+| swash / streure / stretchhl | **threshold** | bias / threshold 同义 |
+| weight actor / void vector / wait invector | **weight vector** | $W$ |
+| hyperpne | **hyperplane** | 高维决策边界 |
+| se neurons | **three neurons** | XOR 最小解 |
+| Sigma / C moi / sim / Sigmoi / sikmoi | **sigmoid** | $\sigma(x)=1/(1+e^{-x})$ |
+| heat layer / heated layer / hen layer / hey | **hidden layer** | 输入与输出之间 |
+| Romaart / David Romard | **Rumelhart（David Rumelhart）** | backpropagation 的普及者 |
+| Back publication | **backpropagation** | BP |
+| Paul verbals | **Paul Werbos** | 老师提到的更早提出者 |
+| Yan Lacoon / Yan Lac | **Yann LeCun** | 手写数字识别 / 早期 CNN |
+| met lab / metab / meta / Mt lab | **MATLAB** | MAT = matrix |
+| EI | **AI** | artificial intelligence |
+| Chch BD / gibty | **ChatGPT / GPT** | 老师举例 |
+| School of trip | **School of EEE** | 与 Week 8 一致 |
+| Millennian price problem | **Millennium Prize Problem** | 千禧年大奖难题 |
+| the u, R / Room / Brandon | **ReLU** | rectified linear unit |
+| sock market | **stock market** | 股价预测 |
+| inco | **input** | 如 "this input is [1, -1]" |
+| 62a0 82 | **[0.982, 0.12]** | 玩具网络的输出 |
+| break out（疑） | **black box** | 口语"神经网络像黑箱" |
+
+> **术语提醒**：老师课上把 weight 和 bias 口语称为 **"hyperparameters of neural network"**。严格按机器学习术语，**weight 和 bias 是 parameters（参数）**，由训练数据学习得到；**hyperparameters（超参数）** 是训练前人为设定的量（层数、每层 neuron 数、learning rate、batch size、epoch 数、activation 选择、optimizer 等）。考试按标准术语作答，见 §4.2。
+
+### 0. 本周定位与行政信息
+
+| 项目 | 内容 |
+|---|---|
+| 本周实际内容 | ① 回顾 linear separability / XOR / Minsky-Papert；② **4+2+1 三层网络完整设计**（Week 8 承诺的 "how to get it"）；③ **training 的定义**：找 weights + biases；④ **forward propagation** 逐层计算与矩阵形式；⑤ **universal approximation** 的直观证明；⑥ deep network 的含义 |
+| 未讲内容 | **backpropagation、gradient descent、SGD** 本周只预告，下周正式讲（见 §9 的预习） |
+| Wooclap | 本周老师终于开了 Wooclap：**答对答错都算 attendance**——"If you get it right, you get the attendance. But if you get it wrong, you also get attendance. Because I'm just going to recall the participation, not the score." 题目内容转写未记录 |
+| 考试计算 | 老师明确说考试可能要求**用笔和计算器手算 forward pass**："in the exam, you may have to do this kind of stuff... you just use your pen... maybe a calculator." **Python 编程不考**（与 Week 8 一致），但 forward propagation 的数值计算要会 |
+| MATLAB 插曲 | 老师感叹早年 MATLAB  licence 贵、要排队；Python 免费后 everyone can do neural network。MATLAB 的 "MAT" 就是 matrix——矩阵运算才是重点（§5.6） |
+| PG survey paper | 老师建议 PG 学生可把 **universal approximation for ReLU** 作为 survey paper 题目：经典定理要求 bounded & continuous，而 ReLU 无界；"如果有人证出来，你可以写篇论文" |
+
+### 1. 回顾：linear separability、XOR 与 Minsky-Papert
+
+Week 8 已详细讲过，这里只保留本周老师 recap 的逻辑链，作为 §2 的铺垫。
+
+#### 1.1 单层为什么不行
+
+单个 neuron 的决策边界是
+
+$$
+W^{T}p + b = 0,
+$$
+
+一条直线（高维为 hyperplane）。**同一层里放多个 neuron 也没用**：设第 $i$ 个 neuron 输出 $W_i^{T}p+b_i$，把它们线性组合给下一层，得到
+
+$$
+\sum_i \alpha_i\bigl(W_i^{T}p+b_i\bigr)
+= \Bigl(\sum_i \alpha_i W_i\Bigr)^{T}p+\sum_i \alpha_i b_i
+= \tilde{W}^{T}p+\tilde{b},
+$$
+
+仍然是线性式。老师原话："**Linear plus linear plus linear is still linear.**" 所以单层（无论多少 neuron）只能解决 **linearly separable** 问题。
+
+#### 1.2 XOR：最著名的反例
+
+| $p_1$ | $p_2$ | XOR |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+四个点落在两条对角线上，任何一条直线都无法把 $\{0,1\}$ 与 $\{1,0\}$ 和 $\{0,0\}$ 与 $\{1,1\}$ 完全分开。
+
+#### 1.3 Minsky & Papert 的对与错
+
+- **对的**：single-layer perceptron 不能解决 XOR；同一层加多少 neuron 都不行。
+- **错的**：他们书末用一段 conjecture 断言"多层也一样不行"——论证是"one nothing plus another nothing is nothing"。
+- **后果**：全世界信了约 20 年，神经网络研究进入 **第一次 AI winter**。
+- **本周要展示的**：多层不仅能做，而且**非常简单**——XOR 只需 **3 个 neuron、2 层**；一般的线性不可分区域用 **3 层 4+2+1** 就能解决。
+
+> ⭐ 老师反复强调的方法论："You should not believe people telling you things no matter how famous they are... you don't believe until you see a proof." 这也是他讲这段历史的用意。
+
+### 2. ⭐ 3 层 4+2+1 网络：Week 8 承诺的 "how to get it"
+
+Week 8 的 Example 1 是一个**线性不可分**问题：class 1 的点落在两个互相分离的矩形区域里，class 0 在其余地方。课件直接给出了 3 层、7 个 neuron 的解（4 + 2 + 1），但老师说 **"I don't have time to show you how you get it, but we can show you next time."** 本周兑现。
+
+#### 2.1 问题与设计思路
+
+设输入 $p=\begin{bmatrix}p_1\\p_2\end{bmatrix}$，两个 class 1 区域是：
+
+- **左下矩形**：$p_1\le 0.5,\ p_2\le 0.75$；
+- **右上矩形**：$p_1\ge 1.5,\ p_2\ge 0.25$。
+
+设计思路与 Week 8 §10.2 的 universal approximation 构造完全一致：
+
+| 层 | neuron 数 | 作用 | 逻辑 |
+|---|---|---|---|
+| 第 1 个 hidden layer | 4 | 每个矩形用 2 条边切出来 | 半平面（half-plane） |
+| 第 2 个 hidden layer | 2 | 每个矩形把 2 条边合起来 | **AND** |
+| Output layer | 1 | 两个矩形合起来 | **OR** |
+
+即：**先用半平面切出凸区域，再用 AND 合成凸区域，最后用 OR 合并多个凸区域**。这正是"1-layer = half-plane；2-layer = 单个 convex region；3-layer = arbitrary region"的具体实现。
+
+#### 2.2 第一层：4 个 neuron 切出两个矩形
+
+每个 neuron 仍由 **weight vector $W_i$ + bias $b_i$** 完全描述。规则：
+
+1. 决策边界与 $W_i$ **正交**；
+2. $W_i$ **指向正激活（输出 1）的一侧**；
+3. 边界过某已知点 $p_0$ 时，用 $W_i^{T}p_0+b_i=0$ 解出 $b_i$。
+
+| neuron | $W_i$ | 边界过点 | 边界方程 | 解得 $b_i$ | 正激活区域 |
+|---|---|---|---|---|---|
+| #1 | $\begin{bmatrix}-1\\0\end{bmatrix}$ | $(0.5,\ 0)$ | $-p_1+b_1=0$ | $b_1=0.5$ | $p_1\le 0.5$ |
+| #2 | $\begin{bmatrix}0\\-1\end{bmatrix}$ | $(0,\ 0.75)$ | $-p_2+b_2=0$ | $b_2=0.75$ | $p_2\le 0.75$ |
+| #3 | $\begin{bmatrix}1\\0\end{bmatrix}$ | $(1.5,\ 0)$ | $p_1+b_3=0$ | $b_3=-1.5$ | $p_1\ge 1.5$ |
+| #4 | $\begin{bmatrix}0\\1\end{bmatrix}$ | $(0,\ 0.25)$ | $p_2+b_4=0$ | $b_4=-0.25$ | $p_2\ge 0.25$ |
+
+**逐条推导**（以 #1、#3 为例，其余同理）：
+
+- #1：边界是竖线 $p_1=0.5$，$W_1$ 必须水平；要让它指向 $p_1<0.5$ 的一侧（正激活），取 $W_1=[-1,0]^T$。代入边界点 $(0.5,0)$：
+
+$$
+W_1^{T}p_0+b_1=[-1,\ 0]\begin{bmatrix}0.5\\0\end{bmatrix}+b_1=-0.5+b_1=0
+\Rightarrow b_1=0.5.
+$$
+
+- #3：边界是竖线 $p_1=1.5$，正激活在 $p_1>1.5$ 一侧，取 $W_3=[1,0]^T$。代入 $(1.5,0)$：
+
+$$
+W_3^{T}p_0+b_3=[1,\ 0]\begin{bmatrix}1.5\\0\end{bmatrix}+b_3=1.5+b_3=0
+\Rightarrow b_3=-1.5.
+$$
+
+> ⭐ **为什么 $W$ 可以取 $\pm1$ 这种"随便"的值？** 因为 $W$ 与 $b$ 同乘一个正常数，决策边界不变（Week 8 §5.3 第 5 条）。例如 #1 取 $W=[-2,0]$，则 $b=1$，仍是同一条线。所以真正重要的只有**方向**和**边界位置**。
+
+#### 2.3 第二层：2 个 AND neuron
+
+第一层输出 $h_1,\dots,h_4\in\{0,1\}$。第二层要做 **AND**：只有两个输入同时为 1，输出才为 1。
+
+**#5 = AND(#1, #2)**：权重只连 #1、#2，#3、#4 的权重为 0：
+
+$$
+W_5^{T}=\begin{bmatrix}1&1&0&0\end{bmatrix},\qquad b_5=-1.5.
+$$
+
+为什么 $b=-1.5$？设两个输入之和为 $s=h_1+h_2\in\{0,1,2\}$，neuron 计算 $s-1.5$，再过 step function（$\ge0$ 输出 1）：
+
+| $h_1$ | $h_2$ | $s$ | $s-1.5$ | 输出 |
+|---|---|---|---|---|
+| 0 | 0 | 0 | $-1.5$ | 0 |
+| 1 | 0 | 1 | $-0.5$ | 0 |
+| 0 | 1 | 1 | $-0.5$ | 0 |
+| 1 | 1 | 2 | $0.5$ | **1** |
+
+一般地，若约定 $z>0$ 输出 1，AND 两个二值输入的 bias 只需满足
+
+$$
+-2<b\le -1;
+$$
+
+若约定 $z\ge0$ 输出 1，则条件改为 $-2<b<-1$。$-1.5$ 在两种约定下都成立，只是方便的选择。**bias 就是老师说的"bar"**：两个输入必须一起跨过它。
+
+**#6 = AND(#3, #4)**：同理
+
+$$
+W_6^{T}=\begin{bmatrix}0&0&1&1\end{bmatrix},\qquad b_6=-1.5.
+$$
+
+**#5 与 #6 的物理含义**：
+
+- #5 输出 1 $\iff$ $p_1\le0.5$ **且** $p_2\le0.75$（左下矩形）；
+- #6 输出 1 $\iff$ $p_1\ge1.5$ **且** $p_2\ge0.25$（右上矩形）。
+
+#### 2.4 第三层：1 个 OR neuron
+
+**#7 = OR(#5, #6)**：
+
+$$
+W_7^{T}=\begin{bmatrix}1&1\end{bmatrix},\qquad b_7=-0.5.
+$$
+
+验证：设 $s=h_5+h_6$，
+
+| $h_5$ | $h_6$ | $s-0.5$ | 输出 |
+|---|---|---|---|
+| 0 | 0 | $-0.5$ | 0 |
+| 1 | 0 | $0.5$ | **1** |
+| 0 | 1 | $0.5$ | **1** |
+| 1 | 1 | $1.5$ | **1** |
+
+一般地，若约定 $z>0$ 输出 1，OR 的 bias 只需满足 $-1<b\le0$；若约定 $z\ge0$ 输出 1，则为 $-1\le b<0$。$-0.5$ 在两种约定下都成立，是方便的选择。两个矩形任意一个命中，输出就是 1——这正是 OR 的逻辑。
+
+#### 2.5 矩阵形式与"零权重"的全连接
+
+把三层写成矩阵（这里的 $W^{(l)}$ 直接采用"行 = neuron、列 = 输入"的 $n_l\times n_{l-1}$ 约定；课件把第一层的 $4\times2$ 矩阵记作 $W_1^{T}$）：
+
+$$
+W^{(1)}=
+\begin{bmatrix}
+-1 & 0\\
+0 & -1\\
+1 & 0\\
+0 & 1
+\end{bmatrix},\qquad
+b^{(1)}=\begin{bmatrix}0.5\\0.75\\-1.5\\-0.25\end{bmatrix};
+$$
+
+$$
+W^{(2)}=
+\begin{bmatrix}
+1 & 1 & 0 & 0\\
+0 & 0 & 1 & 1
+\end{bmatrix},\qquad
+b^{(2)}=\begin{bmatrix}-1.5\\-1.5\end{bmatrix};
+$$
+
+$$
+W^{(3)}=\begin{bmatrix}1 & 1\end{bmatrix},\qquad b^{(3)}=-0.5.
+$$
+
+于是 forward propagation 就是
+
+$$
+h_1=\sigma\bigl(W^{(1)}p+b^{(1)}\bigr)\in\mathbb{R}^{4},\qquad
+h_2=\sigma\bigl(W^{(2)}h_1+b^{(2)}\bigr)\in\mathbb{R}^{2},\qquad
+\hat{y}=\sigma\bigl(W^{(3)}h_2+b^{(3)}\bigr)\in\mathbb{R}^{1},
+$$
+
+其中 $\sigma$ 是 step function。
+
+> ⭐ **为什么 $W^{(2)}$ 里有那么多 0？** 因为 #5 只需要 #1、#2，#6 只需要 #3、#4。物理上本来可以不连，但为了写成规整的矩阵、让每一层"全连接"，就把不需要的连接权重设为 **0**。课件原话："the extra 0 weights effectively ignore #3 and #4." 这既是矩阵化的技巧，也是后面 **CNN 稀疏/局部连接** 的思想起点。
+
+> ⭐ **解不唯一**：每个 neuron 的 $W_i,b_i$ 可以同乘正常数；边界在不改变分类的前提下也能小幅移动。课件在 OR/AND/XOR 三处都写了 "not unique"。
+
+### 3. XOR 的两种解法
+
+#### 3.1 最小解：2 层 3 neuron
+
+结构：**2 个 hidden neuron + 1 个 output neuron**，共 3 个 neuron、2 层。
+
+| neuron | $W$ | $b$ | 正激活条件 | 作用 |
+|---|---|---|---|---|
+| hidden #1 | $\begin{bmatrix}1\\1\end{bmatrix}$ | $-0.5$ | $p_1+p_2>0.5$ | 排除 $(0,0)$ |
+| hidden #2 | $\begin{bmatrix}-1\\-1\end{bmatrix}$ | $1.5$ | $p_1+p_2<1.5$ | 排除 $(1,1)$ |
+| output | $\begin{bmatrix}1\\1\end{bmatrix}$ | $-1.5$ | $h_1+h_2>1.5$ | **AND** |
+
+**边界推导**：
+
+- hidden #1：边界 $p_1+p_2=0.5$，过 $(0.5,0)$ 或 $(0,0.5)$；$W=[1,1]^T$ 指向右上方（正激活一侧）。代入 $(0.5,0)$：$0.5+b=0\Rightarrow b=-0.5$。
+- hidden #2：边界 $p_1+p_2=1.5$，过 $(1.5,0)$；$W=[-1,-1]^T$ 指向左下方（正激活一侧）。代入 $(1.5,0)$：$-1.5+b=0\Rightarrow b=1.5$。
+- output：AND 两个 hidden 输出，$W=[1,1]^T$，$b=-1.5$（与 §2.3 的 AND 完全一样）。
+
+**逐点验证**（step function，$\ge0$ 输出 1）：
+
+| $p$ | $h_1$ | $h_2$ | $h_1+h_2-1.5$ | $\hat{y}$ | XOR |
+|---|---|---|---|---|---|
+| $(0,0)$ | 0 | 1 | $-0.5\to0$ | 0 | 0 ✓ |
+| $(0,1)$ | 1 | 1 | $0.5\to1$ | 1 | 1 ✓ |
+| $(1,0)$ | 1 | 1 | $0.5\to1$ | 1 | 1 ✓ |
+| $(1,1)$ | 1 | 0 | $-0.5\to0$ | 0 | 0 ✓ |
+
+> ⭐ **逻辑读法**：hidden #1 = NOT$(0,0)$，hidden #2 = NOT$(1,1)$，输出层做 AND → NOT$(0,0)$ AND NOT$(1,1)$ = XOR。**3 个 neuron 就够了**——这就是 MIT 两位教授 20 年没"看见"的解。
+
+#### 3.2 3 层 7 neuron 解：通用构造的雏形
+
+老师还给了 XOR 的另一种解法：**第一层 4 个 neuron，第二层 2 个 AND，第三层 1 个 OR**，共 7 个 neuron、3 层。
+
+- 对 class 1 的两个点 $(0,1)$、$(1,0)$，各用**一个小矩形**框住；
+- 每个矩形需要若干半平面（2D 内部点需 $2^2=4$ 条边；但 XOR 的点在数据域 $[0,1]^2$ 的**角上**，数据域边界已经提供了两条边，所以每个点只需 **2 个 neuron**）；
+- 两个矩形分别用一个 AND neuron 合成；
+- 最后用一个 OR neuron 把两个矩形并起来。
+
+所以第一层共 $2+2=4$ 个 neuron，第二层 2 个，第三层 1 个——正好是 **4+2+1** 拓扑。课件原话：这个解法 **"less efficient, but useful for universal approximation"**——它不省 neuron，但它展示了"任意区域 = 多个凸区域之并"的通用配方。
+
+> ⭐ **角点 vs 内部点**：如果 class 1 的点在数据域内部，需要 $2^d$ 个半平面把它围成一个封闭小盒（2D 是 4 条边）；在角上，数据域的两条边界免费提供两条边，所以只要 $d=2$ 个 neuron。这解释了为什么 XOR 的 3 层解只需要 4 个第一层 neuron，而一般 2D 点需要 4 个/点。
+
+#### 3.3 两种解对比
+
+| 解法 | 层数 | neuron 数 | 优点 | 缺点 |
+|---|---|---|---|---|
+| 2 层 3 neuron | 2 | 3 | **最省**，直接利用 XOR 的几何对称性 | 只适用于这个特殊问题，不易推广 |
+| 3 层 7 neuron（4+2+1） | 3 | 7 | **通用配方**：任意区域 = 凸区域之并 | neuron 更多，是"存在性"构造 |
+
+考试若问"用最少 neuron 解 XOR"，答 3 个、2 层；若问 universal approximation 的构造思想，答 4+2+1（或更一般的 $N\cdot2^d+N+1$）。
+
+### 4. 什么是 training？weights、biases 与 inference
+
+#### 4.1 Training = 找 weights 和 biases
+
+老师在讲完 4+2+1 的逐层设计后，突然点题：
+
+> "This is actually **training**. ... Training is to get the **weights and bias**. These are called hyperparameters of neural network. You get these parameters weight and bias to get a neural network to do what you want to do."
+
+这句话是后半学期的分水岭：
+
+- 前面 OR / AND / XOR / 4+2+1 的 $W,b$ 都是**人用手算出来的**——老师称为"训练"，但其实是**手工设计**；
+- 真正的 training 是**给定数据，让算法自动把 $W,b$ 找出来**；
+- 数据就是 **(input, output) pair**：对 4+2+1，数据是"哪些点应该输出 1、哪些应该输出 0"；对 XOR，是那 4 行 truth table；对 MNIST，是 60,000 张图 + 标签。
+
+> ⭐ 老师对"你们没看到我训练"的解释："Well, you might say, Oh, I didn't see you train neural network. How is a training? Well, you have to know what is training. Training is to get the weights and bias." 手工画线、解 bias，本质上也是在"定参数"，只是用的是人的几何直觉，不是优化算法。
+
+#### 4.2 parameters vs hyperparameters（术语澄清）
+
+老师口语把 $W,b$ 叫 **hyperparameters**；标准术语不是这样。考试请用下表：
+
+| 术语 | 定义 | 例子 |
+|---|---|---|
+| **parameter**（参数） | 模型内部、由训练数据**学习**得到的变量 | weight $W$、bias $b$ |
+| **hyperparameter**（超参数） | 训练前**人为设定**、控制训练过程或模型结构的量 | 层数 $L$、每层 neuron 数、activation 选择、learning rate $\eta$、batch size、epoch 数、optimizer、正则化系数 |
+
+所以："4+2+1" 里的 4、2、1 是 hyperparameters（结构）；每个 neuron 的 $W_i,b_i$ 是 parameters（要被训练的东西）。
+
+#### 4.3 Training 与 inference 两个阶段
+
+| 阶段 | weight/bias | 做什么 | 目的 |
+|---|---|---|---|
+| **training** | **更新** | forward pass → loss → backward → update | 从数据中学 $W,b$ |
+| **inference**（推断） | **冻结（frozen）** | 只做 forward pass | 对新输入给预测 |
+
+老师原话："Once you've done that, you let the neural [network] **fix**—you can call it **frozen**. You've frozen your network. Don't change the weight and bias, nothing changes anymore. And now you want it to do **inference**."
+
+> ⭐ ChatGPT 的例子：训练阶段学参数；部署/考试阶段冻结参数，输入一句话，forward 一遍，输出答案。老师说这就是 "train, inference, train, inference" 的循环。
+
+#### 4.4 手工设计 vs 学习；泛化问题
+
+| 维度 | 手工设计（本周的 4+2+1 / XOR） | 学习（真正的 training） |
+|---|---|---|
+| 参数来源 | 人画边界、解方程 | 数据 + 优化算法 |
+| 适用维度 | 2D 玩具问题 | 高维图像/语音/文本 |
+| 可扩展性 | 每换一个问题都要重新画 | 同一套算法可复用 |
+| 精度 | 玩具问题上可 100% | 真实问题通常达不到 100%，"acceptable accuracy" 即可 |
+
+老师用 ImageNet 说明"为什么不能靠手工/暴力构造"：
+
+- 1 million 张训练图，每张 1000×1000 ≈ 1 million 像素；
+- 如果按 universal approximation 的构造，每个点要 $2^d$ 个第一层 neuron（$d=10^6$），数量是天文数字；老师用极粗略的口径说"**至少 10^12 个 neuron**"；
+- 更糟的是**没有泛化**：这个构造本质上把每张训练图"记"在一个小盒子里；换一张稍微不同的图，就落在所有盒子外面，输出错误。
+
+> ⭐ 结论：universal approximation 只保证"**存在**一个足够大的网络能做"，不保证"**高效**"或"**能泛化**"。这正是接下来要学 training 和 CNN 的原因。
+
+### 5. ⭐ Forward propagation（前向传播）
+
+#### 5.1 定义
+
+**Forward propagation（前向传播）**：输入从第 1 层逐层传到第 $L$ 层，每一层的输出成为下一层的输入，中间没有任何反馈或循环。老师原话："It's like some kind of propagation of sigma... people will call this **forward propagation**."
+
+对一个 $L$ 层网络：
+
+$$
+a^{(0)}=x
+\;\longrightarrow\;
+z^{(1)}=W^{(1)}a^{(0)}+b^{(1)}
+\;\longrightarrow\;
+a^{(1)}=f_1(z^{(1)})
+\;\longrightarrow\;
+\cdots
+\;\longrightarrow\;
+\hat{y}=a^{(L)}.
+$$
+
+> **Motivating example（老师的引子）**：手写数字识别。输入是一张 $16\times16=256$ 像素的小图（像素排成一列作为输入向量），输出层放 **10 个 neuron**，分别对应数字 0–9。老师说这是 **Yann LeCun** 最早为 post office 做**邮政编码识别**时用的任务，也是早期 **CNN** 的著名应用——输入是"一堆像素"，输出是"10 类之一"，这正是 classification 的标准设定。后面的 forward propagation 数值例，就是在这个设定下"输入 → 逐层算 → 10 类得分"的缩小版。
+
+#### 5.2 单层公式
+
+对第 $l$ 层（$n_{l-1}$ 个输入、$n_l$ 个 neuron）：
+
+$$
+z^{(l)}=W^{(l)}a^{(l-1)}+b^{(l)},\qquad
+a^{(l)}=f_l\bigl(z^{(l)}\bigr),
+$$
+
+其中
+
+- $W^{(l)}\in\mathbb{R}^{n_l\times n_{l-1}}$：第 $l$ 层的 weight matrix，**每一行对应一个 neuron**；
+- $b^{(l)}\in\mathbb{R}^{n_l}$：bias vector；
+- $z^{(l)}\in\mathbb{R}^{n_l}$：**local field / pre-activation**（加权和，未过 activation）；
+- $f_l$：activation function，**逐元素**作用；
+- $a^{(l)}\in\mathbb{R}^{n_l}$：该层输出（activation）。
+
+单个 neuron 就是
+
+$$
+z=\sum_{j=0}^{m}w_j a_j+b,\qquad a=f(z),
+$$
+
+与 Week 8 §2.2 完全一致（$a_0=+1$ 吸收 bias）。
+
+> ⭐ **层数怎么数**：**输入层的节点不是 neuron**——它们没有 weight、bias，也没有 activation，只是把特征值传给第一层，所以不计入层数。**hidden layer（隐藏层）** 是输入与输出之间的层，"hidden" 指它的输出不直接暴露给外界。因此课程里的 **"2-layer network" = 1 个 hidden layer + 1 个 output layer**；"3-layer network" = 2 个 hidden + 1 个 output。老师特意纠正："This is not input neuron; people say input neuron—it's misleading. There is no neuron here because there is no operation."
+
+#### 5.3 数值例 1：2-2 sigmoid 网络
+
+考虑一个最简单的单层网络：2 个输入、2 个 neuron、sigmoid activation。
+
+$$
+x=\begin{bmatrix}1\\-1\end{bmatrix},\qquad
+W=\begin{bmatrix}1&-2\\-1&1\end{bmatrix},\qquad
+b=\begin{bmatrix}1\\0\end{bmatrix}.
+$$
+
+**逐 neuron 计算**：
+
+第一个 neuron：
+
+$$
+z_1=1\cdot1+(-2)\cdot(-1)+1=1+2+1=4,
+\qquad
+a_1=\sigma(4)=\frac{1}{1+e^{-4}}\approx0.982.
+$$
+
+第二个 neuron：
+
+$$
+z_2=(-1)\cdot1+1\cdot(-1)+0=-1-1=-2,
+\qquad
+a_2=\sigma(-2)=\frac{1}{1+e^{2}}\approx0.119.
+$$
+
+所以
+
+$$
+a=\sigma(Wx+b)=\sigma\left(\begin{bmatrix}4\\-2\end{bmatrix}\right)
+=\begin{bmatrix}0.982\\0.119\end{bmatrix}.
+$$
+
+> 转写里的 "62a0 82" 就是 **[0.982, 0.12]** 的 ASR 乱码。老师特意说："The output will be very close to one, not exactly one... 0.98... this will be close to zero... 0.12."
+
+**矩阵形式**：
+
+$$
+z=Wx+b,\qquad a=\sigma(z)\quad\text{(elementwise)}.
+$$
+
+这是一个非线性映射 $f:\mathbb{R}^2\to\mathbb{R}^2$。虽然每层只是"矩阵乘 + 逐元素非线性"，但多层复合后可以表示很复杂的函数。
+
+> ⭐ 如果还有下一层，就把 $a$ 当作新的输入，重复 $z'=W'a+b'$、$a'=\sigma(z')$。**整个网络就是同一个操作重复 $L$ 次。**
+
+#### 5.4 数值例 2：4+2+1 网络逐层验证
+
+用 §2.5 的 $W^{(1)},b^{(1)},W^{(2)},b^{(2)},W^{(3)},b^{(3)}$，activation 取 step function：
+
+$$
+\sigma(z)=\mathbf{1}[z\ge0].
+$$
+
+取 $p=\begin{bmatrix}0\\1\end{bmatrix}$：
+
+**第 1 层**：
+
+$$
+W^{(1)}p=
+\begin{bmatrix}-1&0\\0&-1\\1&0\\0&1\end{bmatrix}
+\begin{bmatrix}0\\1\end{bmatrix}
+=\begin{bmatrix}0\\-1\\0\\1\end{bmatrix},
+$$
+
+$$
+z^{(1)}=W^{(1)}p+b^{(1)}
+=\begin{bmatrix}0\\-1\\0\\1\end{bmatrix}
++\begin{bmatrix}0.5\\0.75\\-1.5\\-0.25\end{bmatrix}
+=\begin{bmatrix}0.5\\-0.25\\-1.5\\0.75\end{bmatrix},
+\qquad
+h_1=\sigma(z^{(1)})=\begin{bmatrix}1\\0\\0\\1\end{bmatrix}.
+$$
+
+**第 2 层**：
+
+$$
+W^{(2)}h_1=
+\begin{bmatrix}1&1&0&0\\0&0&1&1\end{bmatrix}
+\begin{bmatrix}1\\0\\0\\1\end{bmatrix}
+=\begin{bmatrix}1\\1\end{bmatrix},
+$$
+
+$$
+z^{(2)}=W^{(2)}h_1+b^{(2)}
+=\begin{bmatrix}1\\1\end{bmatrix}
++\begin{bmatrix}-1.5\\-1.5\end{bmatrix}
+=\begin{bmatrix}-0.5\\-0.5\end{bmatrix},
+\qquad
+h_2=\sigma(z^{(2)})=\begin{bmatrix}0\\0\end{bmatrix}.
+$$
+
+**第 3 层**：
+
+$$
+z^{(3)}=W^{(3)}h_2+b^{(3)}=0-0.5=-0.5,
+\qquad
+\hat{y}=\sigma(-0.5)=0.
+$$
+
+结果 $\hat{y}=0$，与"$(0,1)$ 不在两个矩形内"一致。✓
+
+**多取几个点验证**（step 用 $\ge0$）：
+
+| $p$ | $z^{(1)}$ | $h_1$ | $z^{(2)}$ | $h_2$ | $z^{(3)}$ | $\hat{y}$ | 期望 |
+|---|---|---|---|---|---|---|---|
+| $(0,1)$ | $[0.5,-0.25,-1.5,0.75]$ | $[1,0,0,1]$ | $[-0.5,-0.5]$ | $[0,0]$ | $-0.5$ | 0 | 0 ✓ |
+| $(0.25,0.25)$ | $[0.25,0.5,-1.25,0]$ | $[1,1,0,1]$ | $[0.5,-0.5]$ | $[1,0]$ | $0.5$ | 1 | 1 ✓ |
+| $(0.75,0.5)$ | $[-0.25,0.25,-0.75,0.25]$ | $[0,1,0,1]$ | $[-0.5,-0.5]$ | $[0,0]$ | $-0.5$ | 0 | 0 ✓ |
+| $(1.75,0.5)$ | $[-1.25,0.25,0.25,0.25]$ | $[0,1,1,1]$ | $[-0.5,0.5]$ | $[0,1]$ | $0.5$ | 1 | 1 ✓ |
+
+> ⭐ **考试提示**：老师明确说考试可能让你**手算 forward pass**。步骤固定：$z^{(l)}=W^{(l)}a^{(l-1)}+b^{(l)}$ → 过 activation → 下一层。注意矩阵行是 neuron、列是输入；bias 逐行加。若某个点恰好落在边界上（$z=0$），用 $\ge0$ 还是 $>0$ 可能改变该 neuron 的输出，但通常不影响最终分类；课件说 "whether it's $>0$ or $\ge0$ doesn't matter in practice."
+
+#### 5.5 一般 $L$ 层网络的 forward propagation
+
+$$
+\boxed{
+\begin{aligned}
+a^{(0)}&=x,\\
+z^{(l)}&=W^{(l)}a^{(l-1)}+b^{(l)},\\
+a^{(l)}&=f_l\bigl(z^{(l)}\bigr),\qquad l=1,2,\dots,L,\\
+\hat{y}&=a^{(L)}.
+\end{aligned}}
+$$
+
+**维度表**：
+
+| 量 | 维度 | 说明 |
+|---|---|---|
+| $a^{(l)}$ | $n_l\times1$ | 第 $l$ 层输出；$n_0$ = 输入维度，$n_L$ = 输出维度 |
+| $W^{(l)}$ | $n_l\times n_{l-1}$ | 第 $l$ 层 weight matrix |
+| $b^{(l)}$ | $n_l\times1$ | 第 $l$ 层 bias |
+| $z^{(l)}$ | $n_l\times1$ | pre-activation |
+
+**mini-batch 版本**（$m$ 个样本同时算）：
+
+$$
+A^{(0)}=X\in\mathbb{R}^{n_0\times m},\qquad
+Z^{(l)}=W^{(l)}A^{(l-1)}+b^{(l)}\mathbf{1}_m^{T},\qquad
+A^{(l)}=f_l(Z^{(l)}),
+$$
+
+其中 $\mathbf{1}_m$ 是全 1 列向量，$b^{(l)}\mathbf{1}_m^{T}$ 把 bias **广播**到每个样本。这样一次矩阵乘就算完整个 batch——这是 GPU 喜欢的形式。
+
+#### 5.6 矩阵形式为什么重要
+
+老师花了很长一段讲这件事，核心就三句：
+
+1. **写法紧凑**：一层的"每个 neuron 各自加权求和"被写成 $z=Wa+b$，比逐 neuron 写清楚得多。
+2. **计算高效**：矩阵乘法可以被 BLAS、GPU 高度并行化。老师原话："Once you put into a matrix, **everything becomes easy**."
+3. **硬件契合**：GPU 本来是为图形渲染（大量矩阵运算）设计的；神经网络也全是矩阵运算，所以 GPU 能把训练加速几个数量级。老师说这个"GPU + neural network"的联想花了大家约 10 年才普遍意识到——这正是 Week 8 §4.4 讲的 deep learning 三大驱动力之一。
+
+> MATLAB 的名字就来自 **MAT**rix；老师感叹早年 MATLAB licence 贵、要排队，Python 免费后 "everything's free... you can do neural network, AI, whatever."
+
+#### 5.7 Inference：冻结权重后的 forward pass
+
+- **Training**：forward → loss → backward → update（Week 10 讲）。
+- **Inference**：$W,b$ 冻结，只做 forward。老师原话："You frozen your network... nothing changes anymore... you have an input... see the neural network output... that's your inference."
+- 对 4+2+1 玩具问题，训练集上可以做到 **100% accuracy**；对真实问题（如 ChatGPT），做不到 100%，只要 **accuracy acceptable** 即可。
+
+### 6. ⭐ Universal approximation（本周的直观证明）
+
+Week 8 已给出结论；本周老师用"切盒子 / 矩形脉冲"给出**非严格但直观**的证明，并强调定理的边界条件。
+
+#### 6.1 Classification：1/2/3 层能表示的区域
+
+| 网络层数（不计输入层） | hidden layer 数 | 能表示的 decision region | 直观 |
+|---|---|---|---|
+| **1-layer** | 0 | **half-plane**（半平面） | 一条直线切一刀 |
+| **2-layer** | 1 | **单个 convex region**（凸区域） | 多条半平面取交（AND） |
+| **3-layer** | 2 | **任意区域**（arbitrary，含非凸、不连通、带洞） | 多个凸区域取并（OR） |
+
+> 课件原文："Note that a 2-layer network can generate only a **single convex decision region**." 所以 §2 的两个分离矩形**必须**用 3 层；XOR 的 2 层 3-neuron 解之所以可行，是因为它用两个半平面的**交**直接构造了一个凸区域（带状），再在输出层做 AND——它并没有试图用单个凸区域去表示 XOR 的两个分离点，而是用了"两个半平面 + AND"的特殊结构。更一般地，2 层网络的每个输出 neuron 只能给出一个凸区域。
+
+#### 6.2 3 层 MLP 的构造性证明
+
+设：
+
+- 输入维度 $d$；
+- 两个 class $C_1,C_2$；
+- $C_1$ 有 $N$ 个数据点。
+
+**构造**：
+
+1. **第 1 个 hidden layer**：对 $C_1$ 的每个点，用 **$2^d$ 个 neuron** 切一个很小的凸区域（2D 时 $2^d=4$，正好对应围住一个小矩形的 4 条边；更高维的严格几何解释不是本课重点，记住课件这个计数即可）。按课件口径记：**每组 $2^d$ 个第一层 hidden neuron**。
+2. **第 2 个 hidden layer**：每个 neuron 做一个 **AND**，把一组 $2^d$ 个半平面合成为一个凸区域。$N$ 个点 → $N$ 个 AND neuron。
+3. **Output layer**：一个 **OR** neuron，把 $N$ 个凸区域并起来。任意一个盒子命中，输出就是 $C_1$。
+
+**总数**：
+
+$$
+\underbrace{N\cdot 2^d}_{\text{第 1 个 hidden layer}}
++\underbrace{N}_{\text{第 2 个 hidden layer}}
++\underbrace{1}_{\text{output}}.
+$$
+
+2D 时就是 $4N+N+1$（XOR 的两个点在数据域角上，数据域边界免费提供两条边，所以 §3.2 只需 7 个；一般内部点才按 $4N+N+1$ 计）。只要盒子足够小、$N$ 足够大，任何 decision region 都能被任意精度逼近——这就是 **universal approximation for classification**。
+
+> ⭐ 这个证明是**存在性**的：它告诉你"能"，不告诉你"怎么高效地找"。老师原话："The universal approximation theorem doesn't tell you how to do it. It just tells you you can do it."
+
+#### 6.3 为什么这个构造不实用：$10^{12}$ 个 neuron 与记忆
+
+老师用 ImageNet 算了一笔账：
+
+- $N=10^6$ 张训练图；
+- 每张图 $1000\times1000\approx10^6$ 像素，即 $d=10^6$；
+- 按构造，第一层需要 $N\cdot2^d$ 个 neuron——这是天文数字；老师用极粗略的"每像素至少 1 个 neuron"口径说"**至少 $10^{12}$ 个**"，已经远超任何实际模型；
+- 而且这是**死记硬背**：每个训练图有自己的小盒子，换一张稍微不同的图就落在所有盒子外，**没有 generalization**。
+
+> ⭐ 所以 universal approximation 的意义是"**理论上的底气**"：神经网络不是瞎试，它原则上能表示任何函数/区域。但真正要做的是**高效训练**（backprop + SGD）和**利用数据结构的架构**（CNN），而不是暴力构造。老师原话："There are good ways, smart ways to do it. You don't do brute force."
+
+#### 6.4 Function approximation：2 层 MLP 与"矩形脉冲"
+
+Classification 之外，神经网络还擅长 **regression / function approximation**（如用历史价格预测明天股价）。
+
+**定理（课件版）**：
+
+> A hidden layer of **nonconstant, bounded, and continuous** neurons (with weights and biases), plus a **linear output neuron** (with weights but **without bias**) can approximate **any continuous function** to any arbitrary accuracy if there are enough hidden neurons.
+
+注意这里是 **2-layer network**：1 个 hidden layer + 1 个 linear output layer；输入层不计。
+
+**直观证明（back-of-the-napkin）**：
+
+1. **单个 step neuron 给出一个台阶**。取
+
+$$
+s(z)=\mathbf{1}[z\ge0],
+$$
+
+一个 weight 为 $w$、bias 为 $-wt$ 的 neuron 计算 $s(w(x-t))$：$x<t$ 输出 0，$x>t$ 输出 1，台阶在 $t$。
+
+2. **两个错开的台阶相减得到一个矩形脉冲**。取
+
+$$
+\phi_{\Delta,t}(x)=s\bigl(w(x-t)\bigr)-s\bigl(w(x-t-\Delta)\bigr).
+$$
+
+第一个 neuron 在 $t$ 处上升，第二个在 $t+\Delta$ 处上升；相减后，只在 $[t,t+\Delta)$ 区间内为 1，其余为 0——一个宽度 $\Delta$、高度 1 的矩形。
+
+3. **多个脉冲加权求和，拼出阶梯函数**：
+
+$$
+g(x)=\sum_{k=1}^{K}c_k\,\phi_{\Delta,t_k}(x).
+$$
+
+每个脉冲的高度 $c_k$ 对应函数在该小区间的值；$K$ 个脉冲就是 $K$ 段阶梯。
+
+4. **把宽度 $\Delta$ 缩小**，阶梯越来越细；对连续函数 $f$，当 $\Delta\to0$、$K\to\infty$ 时，$g\to f$ 任意精度。
+
+5. **输出层是线性的**：它只做 $\sum_k c_k(\cdot)$，没有 bias，也没有非线性——这正是定理要求的 "linear output neuron (with weights but without bias)"。
+
+> ⭐ 老师把这种证明叫 **"back of the napkin" proof**（餐巾纸上的证明）：在 McDonald's 拿张餐巾纸就能写。严格的数学证明约 **30 页**，非常 dense；课上说 "we're not going to do it."
+
+#### 6.5 定理的严格条件与边界
+
+| 条件 | 含义 | 反例/注意 |
+|---|---|---|
+| **nonconstant** | hidden activation 不能是常数 | 常数 neuron 的输出与输入无关，什么也表示不了 |
+| **bounded** | 输出有界 | **ReLU** 无界（$z\to+\infty$ 时输出 $\to+\infty$），严格按定理不满足；老师课上把它列为"是否有 universal approximation 证明"的开放问题 |
+| **continuous** | 输出连续 | **step function** 在 0 处跳变，不连续；老师指出严格按定理它也不满足，但实际中 step function 网络仍然能做很多事 |
+| **linear output neuron** | 输出层线性、可无 bias | 课件版定理的设定；用非线性输出"应该也能 work"，但老师说他没见到证明 |
+| **enough hidden neurons** | neuron 足够多 | 定理只说"存在"，不给出具体数量 |
+
+> ⭐ **充分条件 ≠ 必要条件**：step function 不满足"连续"，不代表它不能逼近；ReLU 不满足"有界"，也不代表它不能。定理给的是**一类充分条件**。考试若问"定理的条件"，按课件答 nonconstant, bounded, continuous + linear output without bias；若问"step/ReLU 行不行"，答"课件把严格证明留作开放问题，但实践中 step/ReLU 非常常用"。
+
+#### 6.6 定理没有告诉你的事
+
+老师逐条列了 universal approximation 的"无能"：
+
+| 问题 | 定理是否回答 |
+|---|---|
+| 需要多少 hidden neuron？ | ❌ 不知道；只能试：5 个、20 个、25 个、30 个…… |
+| 怎么找到 $W,b$？ | ❌ 不知道；这是 training / backprop 的事 |
+| 用几层最好？ | ❌ 不知道；1 层够不够、2 层够不够、要不要更深，没有理论答案 |
+| 每个 neuron 用什么 activation？ | ❌ 只知道"非恒定"这类很弱的条件；具体选择靠经验 |
+| 训练效率、泛化能力？ | ❌ 完全不保证；暴力构造甚至会死记硬背 |
+
+> ⭐ 老师原话："It's frustrating. Sometimes people say neural network is like a black box... some trick. Somebody knows a trick... Unfortunately, so far it's like that." 这就是为什么后半学期要讲 training 和 architecture，而不是停在"存在性"。
+
+### 7. Deep network 到底"深"在哪里
+
+| 概念 | 传统说法 | 现代理解 |
+|---|---|---|
+| **shallow network** | 1–2 个 hidden layer | 仍指层数少 |
+| **deep network** | >2 个 hidden layer；早期 9 层就算"非常深"，"only crazy people will use nine layers" | **不只是层数多**，而是"层以什么方式组织"——对图像就是 **CNN** 的 convolution / pooling 等结构 |
+| 深度 vs 宽度 | 100 个 neuron 放一层，还是 50+50，还是 25+25+25+25？ | **没有理论答案**；老师："Nobody knows. You just try." |
+
+要点：
+
+- Universal approximation 说 **1–2 个 hidden layer 原则上足够**，但"足够"不等于"高效"：同样的函数，深网络可能用少得多的参数表示。
+- 老师强调："Deep network in the general sense is **not just more layers**... it's **how the layers are done**." 对图像，CNN 的层有特定结构（局部连接、权重共享），不是随便堆全连接层。
+- 课程进度：本周仍在 NN 基础；接下来先讲 **training**（Week 10–11），再讲 **CNN / deep architectures**（Week 12 左右）。Week 1 表把 CNN 放在 Week 9，是原计划，实际顺延。
+
+### 8. 本周要点小结
+
+- **4+2+1 三层网络的完整设计**：第 1 层 4 个 neuron 用半平面切出两个矩形（$W$ 定方向、$b$ 定位置）；第 2 层 2 个 AND neuron（$W=[1,1,0,0]$ 或 $[0,0,1,1]$，$b=-1.5$）；第 3 层 1 个 OR neuron（$W=[1,1]$，$b=-0.5$）。
+- **AND / OR 的 bias 选择**：AND 需 $-2<b\le-1$；OR 需 $-1<b\le0$。bias 就是"门槛/bar"。
+- **XOR 最小解**：2 层、3 个 neuron（2 hidden + 1 output）；hidden #1 排除 $(0,0)$，hidden #2 排除 $(1,1)$，输出层 AND。3 层 4+2+1 也能解，且是 universal 构造的雏形。
+- **Training 的定义**：从数据中找 **weights + biases**；它们是 **parameters**，不是 hyperparameters。Training 后 **freeze**，进入 **inference**（只做 forward）。
+- **Forward propagation**：$a^{(0)}=x$，$z^{(l)}=W^{(l)}a^{(l-1)}+b^{(l)}$，$a^{(l)}=f_l(z^{(l)})$；逐层重复，直到 $\hat{y}=a^{(L)}$。矩阵形式 $Z=WA+b$ 是 GPU 加速的关键。
+- **数值例**：2-2 sigmoid 网络 $W=\begin{bmatrix}1&-2\\-1&1\end{bmatrix}$、$b=[1,0]^T$、$x=[1,-1]^T$ → $a=[0.982,0.119]^T$；4+2+1 网络对 $p=(0,1)$ → $\hat{y}=0$。
+- **Universal approximation（classification）**：1 层 half-plane；2 层单个 convex region；3 层任意区域。构造：$N\cdot2^d$ 个第一层 neuron + $N$ 个 AND + 1 个 OR。
+- **Universal approximation（function）**：2 层 MLP（nonconstant, bounded, continuous hidden + linear output without bias）可任意精度逼近任意连续函数；直观证明用"两个错开 step 相减 = 矩形脉冲，多个脉冲拼函数"。
+- **定理的局限**：只保证存在，不保证高效/泛化；不告诉你 neuron 数、层数、$W,b$ 怎么求。暴力构造会死记硬背，$10^6$ 张图 × $10^6$ 像素需要至少 $10^{12}$ 个 neuron（老师口径），不可行。
+- **Backprop 本周只预告**：老师明确说 "we can continue the next episode"；正式推导在 Week 10。§9 是预习，不是本周课堂内容。
+
+---
+
+### 9. ⚠️ 衔接 Week 10：Backpropagation、Gradient Descent 与 SGD 完整数学准备
+
+> **再次说明**：以下内容**不是 Week 9 课堂讲授**。`week9.txt` 在 forward propagation 后结束，老师原话 "we can continue the next episode. We continue next time." 本节是为 Week 10 **Training Deep Networks** 和 **Quiz 2（Week 8–11）** 预先整理的完整推导；Week 10 上课时再对照老师版本。已掌握 forward propagation 的读者可以把它当作下一讲的预习。
+
+#### 9.1 为什么需要 backprop
+
+Forward propagation 只回答"给定 $W,b$，输出是什么"。Training 要回答相反的问题：
+
+> 给定训练数据 $\{(x_k,y_k)\}_{k=1}^{m}$，如何调整所有层的 $W^{(l)},b^{(l)}$，使输出 $\hat{y}_k$ 尽量接近 $y_k$？
+
+做法：
+
+1. 定义 **loss function（损失函数）** $L(W,b)$ 衡量预测与目标的差距；
+2. 用 **gradient descent（梯度下降）** 沿负梯度方向更新参数；
+3. 用 **backpropagation（反向传播）** 高效计算 $\partial L/\partial W^{(l)}$、$\partial L/\partial b^{(l)}$——即**链式法则（chain rule）** 在计算图上的反向应用。
+
+> ⭐ 为什么不能直接数值求导？参数有 $P$ 个，数值差分要对每个参数做一次 forward（或两次），复杂度 $O(P)$ 次网络前传；backprop 一次 forward + 一次 backward 就能得到**所有**参数的梯度，复杂度与一次 forward 同阶。这是神经网络能训练的关键。
+
+#### 9.2 Loss function（损失函数）
+
+| 任务 | 输出层 activation | 常用 loss | 公式（单样本） |
+|---|---|---|---|
+| **regression**（回归） | linear（identity） | **MSE**（mean squared error） | $L=\frac12\sum_i(y_i-\hat{y}_i)^2$ |
+| **binary classification**（二分类） | sigmoid | **BCE**（binary cross-entropy） | $L=-\sum_i\bigl[y_i\log\hat{y}_i+(1-y_i)\log(1-\hat{y}_i)\bigr]$ |
+| **multi-class classification**（多分类） | softmax | **CE**（cross-entropy） | $L=-\sum_i y_i\log\hat{y}_i$ |
+
+- $y_i$ 是 **one-hot** 标签（正确类为 1，其余为 0）；
+- $\hat{y}_i$ 是模型给出的概率；
+- 多分类时 $\sum_i\hat{y}_i=1$，$\sum_i y_i=1$。
+- 若把 MSE 用于 sigmoid 输出，梯度含 $\sigma'$，饱和区梯度很小；**cross-entropy + sigmoid/softmax** 的梯度会化简为 $\hat{y}-y$，数值上更稳定（见 §9.7）。
+
+#### 9.3 Gradient descent 与 weight update
+
+**Gradient descent（梯度下降）** 的更新规则：
+
+$$
+\boxed{
+W^{(l)}\leftarrow W^{(l)}-\eta\,\frac{\partial L}{\partial W^{(l)}},\qquad
+b^{(l)}\leftarrow b^{(l)}-\eta\,\frac{\partial L}{\partial b^{(l)}}}
+$$
+
+其中 $\eta>0$ 是 **learning rate（学习率）**。
+
+- 梯度 $\partial L/\partial W$ 指向 loss **上升最快**的方向；取负号就是下降最快方向。
+- $\eta$ 控制步长：太大会越过最小值、震荡甚至发散；太小则收敛慢。
+- 对所有层、所有 neuron、所有 weight/bias 同时做这个更新，就完成一次 **weight update（权重更新）**。
+
+#### 9.4 Chain rule：从标量例子开始
+
+先看一个 neuron：
+
+$$
+z=wx+b,\qquad \hat{y}=\sigma(z),\qquad L=\frac12(y-\hat{y})^2.
+$$
+
+要求 $\partial L/\partial w$。链式法则逐段乘：
+
+$$
+\frac{\partial L}{\partial w}
+=
+\frac{\partial L}{\partial \hat{y}}
+\cdot
+\frac{\partial \hat{y}}{\partial z}
+\cdot
+\frac{\partial z}{\partial w}.
+$$
+
+逐项算：
+
+$$
+\frac{\partial L}{\partial \hat{y}}=-(y-\hat{y}),\qquad
+\frac{\partial \hat{y}}{\partial z}=\sigma'(z)=\hat{y}(1-\hat{y}),\qquad
+\frac{\partial z}{\partial w}=x.
+$$
+
+所以
+
+$$
+\boxed{
+\frac{\partial L}{\partial w}=-(y-\hat{y})\,\sigma'(z)\,x
+}
+$$
+
+同理
+
+$$
+\frac{\partial L}{\partial b}=-(y-\hat{y})\,\sigma'(z).
+$$
+
+> ⭐ 这就是 backprop 的全部思想：**从 loss 往回，一层一层乘上局部导数**。多层的区别只是链条更长、需要复用中间量。
+
+#### 9.5 两层网络的完整 backprop 推导
+
+考虑一个 2 层网络（1 个 hidden layer + 1 个 output layer）：
+
+$$
+x\in\mathbb{R}^{n_0},\qquad
+z^{(1)}=W^{(1)}x+b^{(1)},\qquad
+a^{(1)}=\sigma(z^{(1)}),
+$$
+
+$$
+z^{(2)}=W^{(2)}a^{(1)}+b^{(2)},\qquad
+\hat{y}=\sigma(z^{(2)}).
+$$
+
+Loss 取 MSE：
+
+$$
+L=\frac12\sum_i(y_i-\hat{y}_i)^2.
+$$
+
+**定义误差项（error term）**：
+
+$$
+\delta^{(l)}\equiv\frac{\partial L}{\partial z^{(l)}}.
+$$
+
+##### 第 2 层（output layer）
+
+对每个输出分量 $i$：
+
+$$
+\delta_i^{(2)}
+=
+\frac{\partial L}{\partial z_i^{(2)}}
+=
+\frac{\partial L}{\partial \hat{y}_i}
+\cdot
+\frac{\partial \hat{y}_i}{\partial z_i^{(2)}}
+=
+-(y_i-\hat{y}_i)\,\sigma'(z_i^{(2)})
+=
+(\hat{y}_i-y_i)\,\sigma'(z_i^{(2)}).
+$$
+
+写成向量（$\odot$ 为逐元素乘）：
+
+$$
+\boxed{
+\delta^{(2)}=(\hat{y}-y)\odot\sigma'(z^{(2)})
+}
+$$
+
+对 weight 的偏导，注意 $z_i^{(2)}=\sum_j W_{ij}^{(2)}a_j^{(1)}+b_i^{(2)}$，所以 $\partial z_i^{(2)}/\partial W_{ij}^{(2)}=a_j^{(1)}$：
+
+$$
+\frac{\partial L}{\partial W_{ij}^{(2)}}
+=
+\frac{\partial L}{\partial z_i^{(2)}}
+\cdot
+\frac{\partial z_i^{(2)}}{\partial W_{ij}^{(2)}}
+=
+\delta_i^{(2)}a_j^{(1)}
+$$
+
+$$
+\boxed{
+\frac{\partial L}{\partial W^{(2)}}=\delta^{(2)}\bigl(a^{(1)}\bigr)^{T}
+}
+$$
+
+对 bias：
+
+$$
+\frac{\partial L}{\partial b_i^{(2)}}=\delta_i^{(2)}
+\qquad\Longrightarrow\qquad
+\boxed{\frac{\partial L}{\partial b^{(2)}}=\delta^{(2)}}.
+$$
+
+##### 第 1 层（hidden layer）
+
+要把误差从 $z^{(2)}$ 传回 $z^{(1)}$。对 hidden 分量 $j$：
+
+$$
+\delta_j^{(1)}
+=
+\frac{\partial L}{\partial z_j^{(1)}}
+=
+\sum_i
+\frac{\partial L}{\partial z_i^{(2)}}
+\cdot
+\frac{\partial z_i^{(2)}}{\partial a_j^{(1)}}
+\cdot
+\frac{\partial a_j^{(1)}}{\partial z_j^{(1)}}.
+$$
+
+逐项：
+
+$$
+\frac{\partial L}{\partial z_i^{(2)}}=\delta_i^{(2)},\qquad
+\frac{\partial z_i^{(2)}}{\partial a_j^{(1)}}=W_{ij}^{(2)},\qquad
+\frac{\partial a_j^{(1)}}{\partial z_j^{(1)}}=\sigma'(z_j^{(1)}).
+$$
+
+所以
+
+$$
+\delta_j^{(1)}
+=
+\left(\sum_i \delta_i^{(2)}W_{ij}^{(2)}\right)\sigma'(z_j^{(1)})
+=
+\left[(W^{(2)})^{T}\delta^{(2)}\right]_j\sigma'(z_j^{(1)}).
+$$
+
+向量形式：
+
+$$
+\boxed{
+\delta^{(1)}=(W^{(2)})^{T}\delta^{(2)}\odot\sigma'(z^{(1)})
+}
+$$
+
+于是
+
+$$
+\boxed{
+\frac{\partial L}{\partial W^{(1)}}=\delta^{(1)}x^{T}
+}
+\qquad
+\boxed{
+\frac{\partial L}{\partial b^{(1)}}=\delta^{(1)}
+}
+$$
+
+> ⭐ **检查维度**：$\delta^{(2)}\in\mathbb{R}^{n_2}$，$a^{(1)}\in\mathbb{R}^{n_1}$，所以 $\delta^{(2)}(a^{(1)})^T\in\mathbb{R}^{n_2\times n_1}$，与 $W^{(2)}$ 同形；$(W^{(2)})^T\delta^{(2)}\in\mathbb{R}^{n_1}$，与 $\delta^{(1)}$ 同形。维度对得上，公式就大概率没写错。
+
+#### 9.6 向量化与一般 $L$ 层公式
+
+对 $L$ 层网络，定义
+
+$$
+\delta^{(l)}=\frac{\partial L}{\partial z^{(l)}},\qquad l=1,\dots,L.
+$$
+
+**输出层**（$l=L$）：
+
+$$
+\delta^{(L)}=\nabla_{\hat{y}}L\odot f_L'(z^{(L)}).
+$$
+
+**反向递推**（$l=L-1,\dots,1$）：
+
+$$
+\boxed{
+\delta^{(l)}=(W^{(l+1)})^{T}\delta^{(l+1)}\odot f_l'(z^{(l)})
+}
+$$
+
+**参数梯度**：
+
+$$
+\boxed{
+\frac{\partial L}{\partial W^{(l)}}=\delta^{(l)}\bigl(a^{(l-1)}\bigr)^{T}
+}
+\qquad
+\boxed{
+\frac{\partial L}{\partial b^{(l)}}=\delta^{(l)}
+}
+$$
+
+**更新**：
+
+$$
+W^{(l)}\leftarrow W^{(l)}-\eta\,\delta^{(l)}\bigl(a^{(l-1)}\bigr)^{T},
+\qquad
+b^{(l)}\leftarrow b^{(l)}-\eta\,\delta^{(l)}.
+$$
+
+**mini-batch**（$m$ 个样本）取平均：
+
+$$
+\frac{\partial L}{\partial W^{(l)}}=\frac1m\sum_{k=1}^{m}\delta_k^{(l)}\bigl(a_k^{(l-1)}\bigr)^{T},
+\qquad
+\frac{\partial L}{\partial b^{(l)}}=\frac1m\sum_{k=1}^{m}\delta_k^{(l)}.
+$$
+
+> ⭐ **记忆口诀**：**forward 存 $a$，backward 传 $\delta$；weight 梯度 = 本层 $\delta$ 乘上层 $a$ 的转置；bias 梯度 = 本层 $\delta$。** 这就是所有深度学习框架 `loss.backward()` 做的事。
+
+#### 9.7 Cross-entropy + softmax 的化简
+
+多分类最常用 **softmax + cross-entropy**：
+
+$$
+\hat{y}_i=\frac{e^{z_i}}{\sum_j e^{z_j}},\qquad
+L=-\sum_i y_i\log\hat{y}_i.
+$$
+
+**结论**：
+
+$$
+\boxed{
+\delta_i^{(L)}=\frac{\partial L}{\partial z_i}=\hat{y}_i-y_i
+}
+$$
+
+即 $\delta^{(L)}=\hat{y}-y$。推导（用 $\sum_i y_i=1$）：
+
+$$
+\frac{\partial L}{\partial z_i}
+=
+-\frac{y_i}{\hat{y}_i}\hat{y}_i(1-\hat{y}_i)
++\sum_{j\ne i}\frac{y_j}{\hat{y}_j}\hat{y}_j\hat{y}_i
+=
+-y_i(1-\hat{y}_i)+\hat{y}_i\sum_{j\ne i}y_j
+=
+-y_i+\hat{y}_i(y_i+\sum_{j\ne i}y_j)
+=
+\hat{y}_i-y_i.
+$$
+
+**sigmoid + BCE** 同理：
+
+$$
+\delta^{(L)}=\hat{y}-y.
+$$
+
+> ⭐ 这就是为什么分类任务几乎都用 cross-entropy 而不是 MSE：**梯度形式极简，且不会因为 sigmoid/softmax 饱和而消失**。
+
+**常用组合表**：
+
+| 任务 | 输出 activation | loss | $\delta^{(L)}$ |
+|---|---|---|---|
+| regression | linear | MSE | $\hat{y}-y$ |
+| binary classification | sigmoid | BCE | $\hat{y}-y$ |
+| multi-class | softmax | CE | $\hat{y}-y$ |
+
+#### 9.8 数值例：对 §5.3 的玩具网络做一次梯度下降
+
+用 §5.3 的网络：
+
+$$
+x=\begin{bmatrix}1\\-1\end{bmatrix},\quad
+W=\begin{bmatrix}1&-2\\-1&1\end{bmatrix},\quad
+b=\begin{bmatrix}1\\0\end{bmatrix},\quad
+\hat{y}=a=\begin{bmatrix}0.982\\0.119\end{bmatrix}.
+$$
+
+设目标 $y=\begin{bmatrix}1\\0\end{bmatrix}$，loss 用 MSE：
+
+$$
+L=\frac12\bigl[(1-0.98201)^2+(0-0.11920)^2\bigr]
+=\frac12(0.0003235+0.0142093)
+\approx0.007266.
+$$
+
+**Step 1：算 $\delta$**。
+
+$$
+\sigma'(z_1)=\hat{y}_1(1-\hat{y}_1)=0.98201\times0.017986\approx0.017663,
+$$
+$$
+\sigma'(z_2)=\hat{y}_2(1-\hat{y}_2)=0.11920\times0.88080\approx0.104993.
+$$
+
+$$
+\delta=(\hat{y}-y)\odot\sigma'(z)
+=
+\begin{bmatrix}0.98201-1\\0.11920-0\end{bmatrix}
+\odot
+\begin{bmatrix}0.017663\\0.104993\end{bmatrix}
+=
+\begin{bmatrix}-0.017986\times0.017663\\0.11920\times0.104993\end{bmatrix}
+\approx
+\begin{bmatrix}-0.0003177\\0.0125155\end{bmatrix}.
+$$
+
+**Step 2：算梯度**。
+
+$$
+\frac{\partial L}{\partial W}=\delta x^{T}
+=
+\begin{bmatrix}-0.0003177\\0.0125155\end{bmatrix}
+\begin{bmatrix}1&-1\end{bmatrix}
+=
+\begin{bmatrix}
+-0.0003177 & 0.0003177\\
+0.0125155 & -0.0125155
+\end{bmatrix},
+$$
+
+$$
+\frac{\partial L}{\partial b}=\delta=
+\begin{bmatrix}-0.0003177\\0.0125155\end{bmatrix}.
+$$
+
+**Step 3：取 $\eta=0.1$ 更新**。
+
+$$
+W\leftarrow W-\eta\frac{\partial L}{\partial W}
+=
+\begin{bmatrix}
+1.0000318 & -2.0000318\\
+-1.0012516 & 1.0012516
+\end{bmatrix},
+$$
+
+$$
+b\leftarrow b-\eta\frac{\partial L}{\partial b}
+=
+\begin{bmatrix}
+1.0000318\\
+-0.0012516
+\end{bmatrix}.
+$$
+
+**Step 4：检查 loss 是否下降**（新的 forward）：
+
+$$
+z'_1=1.0000318\cdot1+(-2.0000318)\cdot(-1)+1.0000318\approx4.0000953,
+$$
+$$
+z'_2=(-1.0012516)\cdot1+1.0012516\cdot(-1)+(-0.0012516)\approx-2.0037547,
+$$
+$$
+\hat{y}'\approx[0.982015,\ 0.118809],\qquad
+L'\approx\frac12[(0.017985)^2+(0.118809)^2]\approx0.007220.
+$$
+
+$L'<L$，说明这一步方向正确（下降量很小，因为 $\eta$ 小且输出已接近目标）。
+
+> ⭐ 这个例子说明：**backprop 的公式不神秘，就是链式法则 + 矩阵转置**。考试若给一个小网络和 target，要求"算一次 forward、一次 backward、一次 update"，按 §9.5 的公式逐步代入即可。
+
+#### 9.9 SGD、mini-batch、epoch、learning rate
+
+**三种梯度下降**：
+
+| 方法 | 每次更新用的样本数 | 梯度 | 优点 | 缺点 |
+|---|---|---|---|---|
+| **Batch GD**（批量梯度下降） | 全部 $m$ | 精确（全数据平均） | 稳定、方向准 | 每步慢、内存大；大数据集不可行 |
+| **SGD**（stochastic gradient descent） | 1 | 单样本，噪声大但无偏 | 更新快、可跳出局部极小/鞍点 | 波动大、收敛不稳定 |
+| **Mini-batch GD** | $B$（32/64/128/256…） | batch 平均 | GPU 友好、方差与速度折中 | 需要选 $B$；实践标准 |
+
+**四个容易混的概念**：
+
+| 术语 | 定义 |
+|---|---|
+| **batch size** $B$ | 一次 forward/backward 用多少样本 |
+| **iteration / step** | 一次参数更新（处理一个 batch） |
+| **epoch** | 把整个训练集完整遍历一次 |
+| **iterations per epoch** | $\lceil m/B\rceil$ |
+
+例：$m=60{,}000$，$B=128$ → 每个 epoch 约 $469$ 次 iteration。
+
+**Learning rate $\eta$**：
+
+| $\eta$ | 现象 |
+|---|---|
+| 太大 | loss 震荡、爆炸、出现 NaN；可能越过最小值 |
+| 太小 | 收敛极慢；容易停在平坦区/局部极小 |
+| 合适 | loss 平滑下降，train/val 都改善 |
+
+常见做法（Week 10–11 会展开）：learning rate decay（step decay、exponential decay、cosine annealing）、warmup、SGD + momentum、Adam / RMSProp 等自适应 optimizer。典型初值：$0.1$、$0.01$、$0.001$；实际靠 validation loss 调。
+
+#### 9.10 训练技巧速查
+
+| 现象 | 可能原因 | 对策 |
+|---|---|---|
+| loss 完全不降 | learning rate 太小；标签/数据 bug；梯度算错 | 调大 $\eta$；检查数据 pipeline；gradient check |
+| loss 爆炸 / NaN | $\eta$ 太大；数值溢出 | 调小 $\eta$；gradient clipping；输入归一化 |
+| train accuracy 高、val 低 | **overfitting** | 更多数据、data augmentation、weight decay、dropout、early stopping |
+| train/val 都低 | **underfitting** | 更大模型、更多 epoch、更好特征、调 $\eta$ |
+| 深层网络梯度消失 | sigmoid 导数 $\le0.25$，连乘后趋 0 | ReLU、合理初始化（Xavier/He）、batch norm、residual connection |
+| 训练太慢 | batch 太小、没用 GPU、Python 循环 | 增大 batch、GPU、向量化 |
+
+> ⭐ **Gradient check**（调试技巧）：用数值差分
+> $$
+> \frac{\partial L}{\partial\theta}\approx\frac{L(\theta+\epsilon)-L(\theta-\epsilon)}{2\epsilon}
+> $$
+> 与 backprop 结果比较；相对误差小于 $10^{-4}$ 左右通常说明实现正确。只在调试时用，训练时不用（太慢）。
+
+#### 9.11 Backprop 的直觉与复杂度
+
+- **直觉**：backprop 是 **reverse-mode automatic differentiation**（反向模式自动微分）在神经网络上的特例。它把网络看成一个计算图，从 loss 出发，沿边反向传播"局部导数 × 上游梯度"。
+- **复用**：$\delta^{(l)}$ 只算一次，就被用来算 $W^{(l)}$ 和 $b^{(l)}$ 的梯度，并继续往 $l-1$ 传——动态规划，避免重复计算。
+- **复杂度**：一次 forward 约 $O(\sum_l n_l n_{l-1})$；一次 backward 同阶（常数约 2–3 倍）。相比数值差分的 $O(P)$ 次 forward，backprop 是神经网络可训练的根本原因。
+- **内存**：backward 需要 forward 时保存的 $a^{(l)}$、$z^{(l)}$；深层大模型因此显存吃紧（activation checkpointing 是常用技巧）。
+
+### 10. 考点速查与自测
+
+#### 10.1 术语速查
+
+| 英文术语 | 中文 | 一句话 |
+|---|---|---|
+| **forward propagation** | 前向传播 | 输入逐层算到输出 |
+| **backpropagation (BP)** | 反向传播 | 用链式法则从 loss 往回算梯度 |
+| **chain rule** | 链式法则 | $\frac{\partial L}{\partial w}=\frac{\partial L}{\partial \hat{y}}\frac{\partial \hat{y}}{\partial z}\frac{\partial z}{\partial w}$ |
+| **gradient** | 梯度 | loss 对参数的偏导向量 |
+| **gradient descent** | 梯度下降 | $W\leftarrow W-\eta\nabla L$ |
+| **SGD** | 随机梯度下降 | 用单样本/小 batch 的噪声梯度更新 |
+| **learning rate** | 学习率 | 步长 $\eta$ |
+| **loss function** | 损失函数 | 衡量预测与目标差距 |
+| **weight update** | 权重更新 | 用梯度改 $W,b$ |
+| **epoch** | 轮次 | 遍历整个训练集一次 |
+| **batch / mini-batch** | 批 | 一次更新用的样本集合 |
+| **parameter** | 参数 | $W,b$，由训练学习 |
+| **hyperparameter** | 超参数 | 层数、宽度、$\eta$、batch size 等，训练前设定 |
+| **hidden layer** | 隐藏层 | 输入与输出之间的层 |
+| **inference** | 推断 | 冻结参数，只做 forward |
+| **universal approximation** | 万能逼近 | 足够多 neuron 可任意精度逼近函数/区域 |
+| **MLP** | 多层感知机 | multi-layer perceptron，即多层全连接网络 |
+| **convex decision region** | 凸决策区域 | 2 层网络能表示的单个区域 |
+
+#### 10.2 自测题（Quiz 2 风格）
+
+1. **Forward pass 手算**：给定 $W^{(1)}=\begin{bmatrix}1&-2\\-1&1\end{bmatrix}$、$b^{(1)}=[1,0]^T$、$x=[1,-1]^T$、sigmoid activation，求 $a^{(1)}$。  
+   **答案**：$z=[4,-2]^T$，$a\approx[0.982,0.119]^T$。
+
+2. **4+2+1 设计**：为什么第一层 4 个 neuron 的 $W$ 分别是 $[-1,0],[0,-1],[1,0],[0,1]$？为什么第二层 bias 取 $-1.5$、第三层取 $-0.5$？  
+   **答案**：前两个切左下矩形的上/右边界，后两个切右上矩形的下/左边界；AND 的 bias 需 $-2<b\le-1$，OR 的 bias 需 $-1<b\le0$，取 $-1.5$、$-0.5$ 方便。
+
+3. **XOR 最小解**：画出 2 层 3-neuron 结构，给出所有 $W,b$。  
+   **答案**：hidden #1 $W=[1,1],b=-0.5$；hidden #2 $W=[-1,-1],b=1.5$；output $W=[1,1],b=-1.5$。
+
+4. **为什么单层不行、多层行**？  
+   **答案**：单层（无论多少 neuron）的输出仍是输入的线性函数，决策边界是 hyperplane；插入非线性 activation 后，多层复合可以表示非线性/非凸区域。
+
+5. **Universal approximation**：1/2/3 层分别能表示什么区域？定理对 activation 有什么要求？  
+   **答案**：1 层 half-plane；2 层单个 convex region；3 层任意区域。Function approximation 的 2 层定理要求 hidden activation nonconstant, bounded, continuous，输出层 linear 且无 bias，hidden neuron 足够多。
+
+6. **Backprop 推导**：写出 2 层网络（MSE + sigmoid）的 $\delta^{(2)}$、$\delta^{(1)}$、$\partial L/\partial W^{(2)}$、$\partial L/\partial W^{(1)}$。  
+   **答案**：见 §9.5；$\delta^{(2)}=(\hat{y}-y)\odot\sigma'(z^{(2)})$，$\delta^{(1)}=(W^{(2)})^T\delta^{(2)}\odot\sigma'(z^{(1)})$，$\partial L/\partial W^{(2)}=\delta^{(2)}(a^{(1)})^T$，$\partial L/\partial W^{(1)}=\delta^{(1)}x^T$。
+
+7. **Batch vs SGD vs mini-batch**：各自用什么梯度？epoch 和 iteration 有什么区别？  
+   **答案**：batch 用全数据平均；SGD 用单样本；mini-batch 用 $B$ 个样本平均。epoch 是遍历整个训练集一次；iteration 是一次参数更新；每个 epoch 有 $\lceil m/B\rceil$ 次 iteration。
+
+8. **Parameters vs hyperparameters**：$W,b$、层数、learning rate、batch size 分别属于哪类？  
+   **答案**：$W,b$ 是 parameters；层数、learning rate、batch size 是 hyperparameters。
+
+### 下一周预告
+
+**Week 10 — Training Deep Networks（正式进入训练）**。本周结束时老师明确说 **"we can continue the next episode. We continue next time."**，结合 Week 1 进度表（Week 10–11 都是 **Training Deep Networks**，Week 11 交 **Homework 2**）：
+
+- **Backpropagation 的正式推导**：老师会从本周的 forward propagation 接着讲，用链式法则算每层梯度；
+- **Gradient descent / SGD / mini-batch**：weight update、learning rate、epoch/batch 的实际用法；
+- **Loss function**：MSE、cross-entropy 与输出层 activation 的搭配；
+- **训练技巧**：初始化、learning rate schedule、optimizer（SGD momentum / Adam）、过拟合与正则化；
+- 之后进入 **CNN / deep architectures**（Week 12 左右），以及 **Quiz 2（Week 12，覆盖 Week 8–11）**。
+
+> ⭐ **Quiz 2 范围是 Week 8–11**，本周内容必考：4+2+1 设计与 forward pass 手算、XOR 最小解、single-layer 局限、universal approximation（1/2/3 层区域、定理条件与局限）、parameters vs hyperparameters、training/inference 的区别。§9 的 backprop 推导是 Week 10 的内容，但既然 Quiz 2 覆盖 Week 8–11，建议提前掌握。

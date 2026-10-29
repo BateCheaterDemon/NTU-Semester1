@@ -2131,3 +2131,1654 @@ $$\boldsymbol{\Lambda}=\begin{bmatrix}1.4155&0\\0&2.9127\end{bmatrix},\qquad \bo
 ---
 
 > **下一周（Week 9）预告**：老师明确说 **"next week we are going to study the linear support vector machines"**——Week 9 = **Linear SVM（线性支持向量机）**，与本周的 LDA 同属 **linear classifier**，但**优化准则不同**：LDA 用 **Fisher criterion（类间散度/类内散度之比）**，SVM 用 **maximum margin（最大间隔）**。二者共享本周讲的线性分类器几何性质（$\boldsymbol{w}$ 垂直于超平面、$g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 为距离）。转写中老师还提到，若时间允许，Week 9 可能**同时开始一部分 Decision Tree**；后续次序为：decision tree classifier → evaluation of classifiers → feature selection + regression → clustering（最后一周）。
+
+---
+
+## Week 9 — Linear Support Vector Machines（线性支持向量机）
+
+> **权威来源说明**：本周转写 `week9/week9.txt`（约 14,600 词，单行无标点）ASR 噪声很大；以下内容以官方课件 `week9/ML-Slides5.pdf`（Mao Kezhi，52 页，标题 "5. Support Vector Machines"）为**权威来源**逐页读图还原（课件公式均为图片，`pdftotext` 提取不到）；**Lagrange multiplier / KKT 的数学推导**以同周讲义 `week9/LagrangeMultiplierMethod(1).pdf`（45 页，2012-03-20，"Lagrange Multipliers and the Karush-Kuhn-Tucker conditions"）为准。转写中典型 ASR 错拼与修正对照：
+>
+> | 转写错拼 | 正确术语 |
+> |---|---|
+> | capes / sub s / S M / S machine / support water machine / support em machine / sepal machine / super vector machine / sub wd machine | **SVM / support vector machine（支持向量机）** |
+> | supple vector / s vector / sub vector / save vector / subwate / suv / sat / stata / swat | **support vector（支持向量）** |
+> | harps plane / harbor plane / harp plan / hyp plan / hyb plane / hyper plate | **hyperplane（超平面）** |
+> | de sin boundary / descent boundary / dissent boundary / deci boundary / decal boundary / deter boundary | **decision boundary（决策边界）** |
+> | dismal / discal / dital / decimal / di / deral / gimal / discal function / official vector | **discriminant function（判别函数）** |
+> | dnoted | **denoted（记为）** |
+> | postal side / pot class / pot side | **positive side / positive class（正侧/正类）** |
+> | netive / netwo / net class | **negative（负侧/负类）** |
+> | modal / model / made / modern separation | **margin of separation（间隔）** |
+> | double transpose x | **$\boldsymbol{w}^T\boldsymbol{x}$** |
+> | range multiplier / leg range / grange / lira / lagran / pa / RFA / alpha | **Lagrange multiplier（拉格朗日乘子）/ $\alpha$** |
+> | select variable / sel variable / slack / cs / CI / cas / slab variable / quas I | **slack variable（松弛变量）$\xi$** |
+> | parm / promo / contumization / ization / organization | **primal（原始问题）/ constrained optimization / optimization** |
+> | du problem / deal problem | **dual problem（对偶问题）** |
+> | quity / QQQ / QP | **quadratic programming（二次规划，QP）** |
+> | cat condition / t VV | **KKT condition（KKT 条件）** |
+> | nine / 90 / at zero | **non / non-zero（非零）** |
+> | casan function | **Gaussian function** |
+> | Dilan / deplan Dn / diplnu / tipln / conversion machine | **deep learning / deep neural network / convolutional neural network** |
+> | new network / neo network / MP new network | **neural network / MLP neural network** |
+> | random for race / random face / random for as | **random forest（随机森林）** |
+> | class tree / classif tree / classic trait / class finery / chal system | **classification tree（分类树）** |
+> | planable / plain AI | **interpretable / explainable AI（可解释 AI）** |
+> | missed data / Ms data | **mixed data（混合类型数据）** |
+> | included distance / ecle distance | **Euclidean distance（欧氏距离）** |
+> | fit C SM | **fitcsvm（Matlab 函数）** |
+> | one area / area | **one error（一个训练错误）** |
+> | tyson sample / teton data | **test sample / test data** |
+> | batter / bust / bis / bias term | **bias $b$** |
+> | num / normal | **norm $\lVert\cdot\rVert$** |
+> | B / be / at / st / ne / net | **But / but / that / first / next / next（句首连词，转写噪声）** |
+>
+> **本周主题**：上周 LDA/FDA 用 **Fisher criterion** 设计 linear classifier；本周学习第二种 linear classifier——**Support Vector Machine（SVM，支持向量机）**。SVM 的准则不是类间/类内散度比，而是 **maximum margin（最大间隔）**：在所有能把两类正确分开的 hyperplane 中，选**离最近样本最远**的那一个。主线：**margin 的几何 → hard-margin primal problem → Lagrange multipliers / KKT conditions → dual problem → support vector expansion → soft margin（slack variable + $C$ 参数）→ kernel SVM（概念）**。
+>
+> ⭐ 老师反复强调：SVM 与 LDA **都是 linear classifier，decision boundary 都是 hyperplane**，但**"什么是好 classifier"的定义不同**，于是导出完全不同的 optimization problem——LDA 是**无约束的比值最大化**（最终化为 generalized eigenvalue problem），SVM 是**带不等式约束的凸二次规划（convex QP）**。
+>
+> ⚠️ 本周**没有**开始 decision tree（Week 8 笔记的预告曾说"可能开始一部分"，实际全部时间用于 SVM）；decision tree 从 Week 10 开始。
+
+### 1. 从 LDA 到 SVM：两种 linear classifier 的不同准则（PDF p.1-5）
+
+#### 1.1 ⭐ 复习与对照
+
+| 项目 | **LDA / FDA（Week 8）** | **Linear SVM（Week 9）** |
+|---|---|---|
+| 准则 | **Fisher criterion**：最大化 $\dfrac{\text{between-class scatter}}{\text{within-class scatter}}$ | **maximum margin**：最大化最近样本到 hyperplane 的距离 |
+| 用到的数据信息 | 类均值 $\boldsymbol{m}_i$、within-class scatter matrix $\boldsymbol{S}_W$ | 只有**离边界最近的样本**（support vectors） |
+| 优化问题类型 | 无约束比值最大化 → generalized eigenvalue problem | **带不等式约束的 convex QP** |
+| 求解 | 闭式 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$，或解特征值问题 | 解 **dual QP** 得 $\alpha$，再算 $\boldsymbol{w},b$ |
+| decision boundary | hyperplane $\boldsymbol{w}^T\boldsymbol{x}+w_0=0$ | hyperplane $\boldsymbol{w}^T\boldsymbol{x}+b=0$ |
+| 共同点 | **都是 linear classifier**；都用 $g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 度量到边界的距离 | 同左 |
+
+⭐ 老师的原话大意：**"It is all linear classifier, but we have different criteria."** 同一个线性分类器框架，换一个"好"的定义，就得到完全不同的优化问题——这是本周最核心的方法论。
+
+#### 1.2 为什么"分对"还不够：confidence 来自距离
+
+SVM **要求 class label 取 $+1$ / $-1$**（不是 Week 8 的 $\omega_1/\omega_2$，也不是 $1/2$）。老师原话："These are requirements in SVM. The class label must be one or minus one."
+
+给定一个已经把两类分开的 hyperplane，训练样本都落在正确一侧，但**置信度不同**：
+
+| 测试点 | 位置 | 预测 | confidence |
+|---|---|---|---|
+| **A** | 离 hyperplane 很远 | $+1$ | **高**——即使边界小幅移动也不会改变预测 |
+| **B** | 中等距离 | $+1$ | 中等 |
+| **C** | 非常靠近 hyperplane（marginal） | $+1$ | **低**——边界稍微一动就可能变成 $-1$ |
+
+⭐ 这正是 Week 8 的结论：**$r=g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 才是到 hyperplane 的带符号距离，其大小就是 confidence**。Week 8 用它**解释**分类结果；本周 SVM 把它**当成设计目标**。
+
+**SVM 的两个要求**（PDF p.4）：
+
+1. classify **correctly**（全部分对）；
+2. classify **confidently**——样本要**远离** decision boundary。
+
+PDF p.5 的两个候选 hyperplane：(a) 离样本很近；(b) 离样本较远。**(b) preferred**，因为 samples are farther from the separating hyperplane。
+
+#### 1.3 SVM 的定义
+
+> The goal of a support vector machine (SVM) is to find the particular hyperplane for which the **margin of separation is maximized**. Under this condition, the decision surface is referred to as the **optimal hyperplane**.（PDF p.8）
+
+⭐ 一句话：**SVM = 最大间隔线性分类器**。
+
+### 2. ⭐⭐ Margin 的几何：从 hyperplane 到 support vector（PDF p.6-14）
+
+#### 2.1 Hyperplane 与决策规则
+
+$$\boldsymbol{w}^T\boldsymbol{x}+b=0$$
+
+- $\boldsymbol{x}$：feature vector（特征向量）
+- $\boldsymbol{w}$：adjustable weight vector（可调权向量）
+- $b$：**bias（偏置）**——就是 Week 8 的 $w_0$，只是换了字母
+
+| class label | 条件 |
+|---|---|
+| $d=+1$ | $\boldsymbol{w}^T\boldsymbol{x}+b>0$（positive side） |
+| $d=-1$ | $\boldsymbol{w}^T\boldsymbol{x}+b<0$（negative side） |
+| 边界 | $\boldsymbol{w}^T\boldsymbol{x}+b=0$ |
+
+⭐ $\boldsymbol{w}$ 仍垂直于 hyperplane（Week 8 §3.1 的推导完全适用）：$\boldsymbol{w}$ 定**方向**，$b$ 定**位置**。
+
+#### 2.2 点到 hyperplane 的距离（复习 + 完整推导）
+
+设 $\boldsymbol{x}_p$ 是 $\boldsymbol{x}$ 在 hyperplane 上的**正交投影（normal projection）**，$r$ 是 $\boldsymbol{x}$ 到 hyperplane 的带符号距离，则
+
+$$\boldsymbol{x}=\boldsymbol{x}_p+r\frac{\boldsymbol{w}}{\lVert\boldsymbol{w}\rVert}$$
+
+代入 $g(\boldsymbol{x})=\boldsymbol{w}^T\boldsymbol{x}+b$：
+
+$$g(\boldsymbol{x})=\boldsymbol{w}^T\Big(\boldsymbol{x}_p+r\frac{\boldsymbol{w}}{\lVert\boldsymbol{w}\rVert}\Big)+b=\boldsymbol{w}^T\boldsymbol{x}_p+b+r\frac{\boldsymbol{w}^T\boldsymbol{w}}{\lVert\boldsymbol{w}\rVert}=g(\boldsymbol{x}_p)+r\lVert\boldsymbol{w}\rVert$$
+
+因为 $\boldsymbol{x}_p$ 在 hyperplane 上，$g(\boldsymbol{x}_p)=0$，所以
+
+$$\boxed{\;r=\frac{g(\boldsymbol{x})}{\lVert\boldsymbol{w}\rVert}\;}$$
+
+⭐ 三个要点（与 Week 8 完全相同）：
+
+1. $g(\boldsymbol{x})$ 本身**不是距离**，$g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$ 才是到 hyperplane 的距离；
+2. $r$ 的**符号**表示在正侧还是负侧；
+3. $r$ 的大小是 **confidence（置信度）**：离边界越远越有信心。
+
+⚠️ 不能直接用 $g(\boldsymbol{x})$ 比较不同超平面的置信度——$\boldsymbol{w}$ 可以整体缩放，$g$ 随之变化，但几何距离不变。**$\boldsymbol{w}$ 的尺度不重要，方向才重要**。
+
+#### 2.3 Margin of separation（间隔）的定义
+
+> The separation between the hyperplane and the closest data point is called the **margin of separation**.（PDF p.7）
+
+- 正类最近点、负类最近点各在 hyperplane 两侧；
+- 过这两个最近点可作两个**平行于** decision hyperplane 的平面；
+- 这两个平面之间的距离就是 **margin of separation**（简称 **margin**）。
+
+⭐ 直观理解：margin 是分类器"敢不敢下判断"的**安全缓冲区**。margin 越大，边界附近的样本越少，对未见数据的容错越好。
+
+#### 2.4 ⭐⭐ Scaling 技巧：把最近点的函数值规范为 $\pm1$
+
+分类只取决于 $g(\boldsymbol{x})$ 的**符号**，所以把 $(\boldsymbol{w},b)$ 同时乘一个正数 $\kappa$：
+
+$$(\boldsymbol{w},b)\;\longrightarrow\;(\kappa\boldsymbol{w},\kappa b),\qquad \kappa>0$$
+
+hyperplane 完全不变（$g$ 的零点不变），但所有函数值被放大 $\kappa$ 倍。
+
+若数据**线性可分（linearly separable）**，则存在 $(\boldsymbol{w},b)$ 使所有样本满足 $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]>0$。取
+
+$$\kappa=\frac{1}{\min_i d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]}>0$$
+
+就能把最近点的函数值规范为 1：
+
+$$\boxed{\;d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1,\qquad i=1,2,\dots,N\;}$$
+
+⭐ 这一步只是**固定 $(\boldsymbol{w},b)$ 的尺度（gauge）**，不是对分类器的额外限制。Week 8 说过"$\boldsymbol{w}$ 的 magnitude 不重要，direction 才重要"；这里正是利用这一点，把"最近点距离"统一写成 $1/\lVert\boldsymbol{w}\rVert$。
+
+⚠️ 前提：数据**线性可分**，否则 $\min_i d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]$ 可能 $\le0$，无法规范到 1。不可分情形要用 §7 的 **soft margin**。
+
+#### 2.5 ⭐ Support vectors（支持向量）
+
+> The particular data points for which the above is satisfied with **equality sign** are called **support vectors**.（PDF p.11）
+
+即满足
+
+$$d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]=1$$
+
+的样本：
+
+- 正类 SV 落在 $\boldsymbol{w}^T\boldsymbol{x}+b=+1$ 上；
+- 负类 SV 落在 $\boldsymbol{w}^T\boldsymbol{x}+b=-1$ 上。
+
+**性质**（PDF p.11-12）：
+
+| 性质 | 说明 |
+|---|---|
+| 离 decision surface **最近** | 它们是 margin 的"支撑点" |
+| **最难分类** | 稍微移动边界就可能被判错 |
+| **决定 hyperplane** | 后面会看到只有 $\alpha(i)>0$ 的样本参与 $\boldsymbol{w}$ 的计算 |
+| 数量 | 线性可分时至少 2 个（每类至少 1 个），也可能更多 |
+
+⭐ "support vector" 这个名字的来源：它们"支撑（support）"起了整个 margin 和 hyperplane。
+
+#### 2.6 ⭐⭐ Margin $\rho=\dfrac{2}{\lVert\boldsymbol{w}\rVert}$
+
+对 support vector $\boldsymbol{x}^{(s)}$，由 $r=g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$：
+
+$$r=\frac{g(\boldsymbol{x}^{(s)})}{\lVert\boldsymbol{w}\rVert}=
+\begin{cases}
++\dfrac{1}{\lVert\boldsymbol{w}\rVert}, & d^{(s)}=+1\\[6pt]
+-\dfrac{1}{\lVert\boldsymbol{w}\rVert}, & d^{(s)}=-1
+\end{cases}$$
+
+（符号表示在正侧/负侧；**距离**取绝对值，两类都是 $1/\lVert\boldsymbol{w}\rVert$。）因此两类之间的 margin 为
+
+$$\boxed{\;\rho=\frac{1}{\lVert\boldsymbol{w}\rVert}+\frac{1}{\lVert\boldsymbol{w}\rVert}=\frac{2}{\lVert\boldsymbol{w}\rVert}\;}$$
+
+⭐⭐ **核心等价关系**：
+
+$$\text{maximize margin }\rho=\frac{2}{\lVert\boldsymbol{w}\rVert}
+\;\Longleftrightarrow\;
+\text{minimize }\lVert\boldsymbol{w}\rVert
+\;\Longleftrightarrow\;
+\text{minimize }\frac{1}{2}\boldsymbol{w}^T\boldsymbol{w}$$
+
+⭐ 这就是 SVM 全部优化问题的来源：**最大间隔 = 最小权向量范数**。
+
+### 3. ⭐⭐ Hard-margin primal problem（PDF p.15）
+
+#### 3.1 问题的正式陈述
+
+给定训练样本 $\{(\boldsymbol{x}(i),d(i))\}_{i=1}^N$，求最优的 $\boldsymbol{w}$ 和 $b$，使它们满足约束
+
+$$d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1,\qquad i=1,2,\dots,N$$
+
+并且最小化代价函数
+
+$$\boxed{\;\min_{\boldsymbol{w},b}\;J(\boldsymbol{w})=\frac{1}{2}\boldsymbol{w}^T\boldsymbol{w}\quad\text{s.t.}\quad d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1,\; i=1,\dots,N\;}$$
+
+术语：**hard margin（硬间隔）**——要求**所有**训练样本都满足约束，一个违反都不允许；因此**只适用于线性可分数据**。
+
+#### 3.2 为什么用 $\frac{1}{2}\boldsymbol{w}^T\boldsymbol{w}$
+
+| 原因 | 说明 |
+|---|---|
+| 等价性 | $\lVert\boldsymbol{w}\rVert$、$\lVert\boldsymbol{w}\rVert^2$、$\frac12\lVert\boldsymbol{w}\rVert^2$ 的极小点相同（都是 $\boldsymbol{w}=\boldsymbol{0}$ 方向最小） |
+| 求导方便 | $\dfrac{\partial}{\partial\boldsymbol{w}}\big(\frac12\boldsymbol{w}^T\boldsymbol{w}\big)=\boldsymbol{w}$，$\frac12$ 与求导产生的 2 相消 |
+| 严格凸 | Hessian $=\boldsymbol{I}\succ0$，目标严格凸，解唯一（对 $\boldsymbol{w}$ 而言） |
+
+老师原话大意："times half, half is just for convenience. Later we will cancel this half."
+
+#### 3.3 问题性质：convex QP
+
+| 性质 | 说明 |
+|---|---|
+| $J(\boldsymbol{w})$ 是 $\boldsymbol{w}$ 的**凸函数** | Hessian $\boldsymbol{I}$ 正定 |
+| 约束对 $\boldsymbol{w},b$ **线性** | $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\ge0$ |
+| 整体 | **convex quadratic programming（凸二次规划）** |
+| 最优性 | 局部最优 = 全局最优；KKT 条件**必要且充分** |
+
+⭐ 这解释了为什么 SVM 可以用 Lagrange/KKT 严格求解，而 LDA 是一个无约束比值问题（化为特征值问题）。两者数学结构完全不同。
+
+### 4. ⭐⭐ Lagrange multipliers 与 KKT 条件（Lagrange 讲义 + PDF p.16-19）
+
+> 这一节把 `LagrangeMultiplierMethod(1).pdf` 的数学工具接到 SVM 上。**考试若只记结论，至少要知道：L 怎么构造、KKT 的三个核心条件、以及为什么 $\alpha(i)$ 只在 support vector 上非零。**
+
+#### 4.1 无约束优化（讲义 p.3-5）
+
+$x^*$ 是 $f$ 的局部极小点，当且仅当
+
+$$\nabla f(x^*)=0\qquad\text{且}\qquad \nabla^2f(x^*)\text{ 半正定（positive semi-definite）}$$
+
+即梯度为零、Hessian 在所有方向上非负。
+
+#### 4.2 Equality constraints：Lagrange multiplier 的几何来源（讲义 p.6-20）
+
+问题：
+
+$$\min_x f(x)\quad\text{s.t.}\quad h(x)=0$$
+
+**几何推导**：
+
+1. 可行域是曲面/曲线 $h(x)=0$；
+2. 沿可行域移动 $\delta x$ 必须满足 $\delta x\perp\nabla h(x)$（$\nabla h$ 是约束曲面的法向量）；
+3. 要使 $f$ 下降，需要 $\delta x\cdot(-\nabla f(x))>0$；
+4. 在最优点，**找不到**既留在可行域又能让 $f$ 下降的方向 ⇒ $-\nabla f$ 与 $\nabla h$ **平行**：
+
+$$\nabla f(x^*)=\mu\nabla h(x^*)$$
+
+**Lagrangian**：
+
+$$L(x,\mu)=f(x)+\mu h(x)$$
+
+**最优性条件**：
+
+| # | 条件 | 含义 |
+|---|---|---|
+| 1 | $\nabla_x L(x^*,\mu^*)=0$ | 编码 $\nabla f$ 与 $\nabla h$ 平行 |
+| 2 | $\nabla_\mu L(x^*,\mu^*)=0$ | 编码约束 $h(x^*)=0$ |
+| 3 | $y^T\nabla^2_{xx}L(x^*,\mu^*)y\ge0$，$\forall y$ 满足 $\nabla h(x^*)^Ty=0$ | 在可行切线方向上的二阶条件 |
+
+⭐ 等式约束的 $\mu$ **可正可负**——因为 $h(x)=0$ 与 $-h(x)=0$ 是同一个约束，$\mu$ 的符号没有约束。
+
+#### 4.3 Inequality constraints：KKT 条件（讲义 p.21-35）
+
+问题：
+
+$$\min_x f(x)\quad\text{s.t.}\quad g(x)\le0$$
+
+**两种情形**：
+
+| 情形 | 几何 | 条件 |
+|---|---|---|
+| **Case 1：inactive（约束不起作用）** | 无约束极小点落在可行域**内部** | $g(x^*)<0$，$\nabla f(x^*)=0$，$\lambda^*=0$ |
+| **Case 2：active（约束起作用）** | 无约束极小点落在可行域**外部**，最优解在边界 $g=0$ 上 | $g(x^*)=0$，$-\nabla f(x^*)=\lambda^*\nabla g(x^*)$，$\lambda^*>0$ |
+
+⭐ **Case 2 的符号直觉**：可行域是 $g\le0$ 一侧。在最优点，$-\nabla f$ 必须指向**可行域外**（否则还能往可行域内走使 $f$ 更小），而 $\nabla g$ 也指向 $g$ 增大的方向（即可行域外），所以两者同向，$\lambda>0$。
+
+**Lagrangian**：
+
+$$L(x,\lambda)=f(x)+\lambda g(x)$$
+
+**KKT conditions（Karush-Kuhn-Tucker conditions）**：
+
+$$\boxed{
+\begin{aligned}
+&1.\;\nabla_x L(x^*,\lambda^*)=0 &&\text{(stationarity)}\\
+&2.\;\lambda^*\ge0 &&\text{(dual feasibility)}\\
+&3.\;\lambda^*g(x^*)=0 &&\text{(complementary slackness)}\\
+&4.\;g(x^*)\le0 &&\text{(primal feasibility)}\\
+&5.\;\text{二阶条件（Hessian 在可行切空间半正定）}
+\end{aligned}}$$
+
+⭐⭐ **Complementary slackness（互补松弛）的解读**：
+
+- $\lambda^*=0$ ⟺ 约束 **inactive**（$g(x^*)<0$）；
+- $\lambda^*>0$ ⟹ 约束 **active**（$g(x^*)=0$）。
+
+一句话："**乘子非零，则约束必紧；约束不紧，则乘子必零**。"
+
+#### 4.4 多个约束的 KKT（讲义 p.36-45）
+
+$$\min_x f(x)\quad\text{s.t.}\quad h_i(x)=0\;(i=1,\dots,l),\quad g_j(x)\le0\;(j=1,\dots,m)$$
+
+$$L(x,\mu,\lambda)=f(x)+\sum_{i=1}^l\mu_i h_i(x)+\sum_{j=1}^m\lambda_j g_j(x)$$
+
+KKT：
+
+$$\nabla_xL=0,\qquad \lambda_j\ge0,\qquad \lambda_jg_j(x)=0,\qquad g_j(x)\le0,\qquad h_i(x)=0$$
+
+⭐ 每个不等式约束配一个**非负**乘子 $\lambda_j$；每个等式约束配一个**符号自由**的乘子 $\mu_i$。
+
+#### 4.5 ⭐⭐ 把 KKT 用到 SVM：构造 Lagrangian
+
+SVM 的约束是"大于等于"：
+
+$$d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$$
+
+要套用讲义中 $g_j(x)\le0$ 的标准形式，先移项：
+
+$$g_i(\boldsymbol{w},b)=1-d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\le0$$
+
+按 $L=f+\sum\alpha_ig_i$：
+
+$$L(\boldsymbol{w},b,\alpha)=\frac12\boldsymbol{w}^T\boldsymbol{w}+\sum_{i=1}^N\alpha(i)\big\{1-d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\big\}$$
+
+整理成课件的形式：
+
+$$\boxed{\;L(\boldsymbol{w},b,\alpha)=\frac12\boldsymbol{w}^T\boldsymbol{w}-\sum_{i=1}^N\alpha(i)\big\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\big\},\qquad\alpha(i)\ge0\;}$$
+
+⭐⭐ **符号的来源（老师特别强调）**：标准 KKT 理论里约束写成 $g_i\le0$，Lagrangian 中乘子项是 **加号**；SVM 的约束是 $\ge1$，移项后变成 $1-d_i(\cdot)\le0$，所以展开后自然出现**减号**。不要死记公式——记住"约束移项成 $\le0$，乘子项相加"即可。
+
+- $\alpha(i)\ge0$：**Lagrange multipliers（拉格朗日乘子）**，每个训练样本一个；
+- 共有 $N$ 个不等式约束 ⇒ $N$ 个 $\alpha(i)$。
+
+#### 4.6 SVM 的 KKT 条件（PDF p.18）
+
+$$\frac{\partial L(\boldsymbol{w},b,\alpha)}{\partial\boldsymbol{w}}=0,\qquad
+\frac{\partial L(\boldsymbol{w},b,\alpha)}{\partial b}=0$$
+
+$$\boxed{\;\alpha(i)\big\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\big\}=0\;}$$
+
+$$\alpha(i)\ge0,\qquad d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\ge0$$
+
+课件原文：
+
+> Following Karush-Kuhn-Tucker (KKT) optimization theory, at the optimal solution, we have $\alpha(i)\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\}=0$, $\alpha(i)\ge0$ — **which means that $\alpha(i)$ will be nonzero only for points satisfying the equality in the constraint.**
+
+#### 4.7 ⭐⭐ Condition 1：support vector expansion
+
+$$\frac{\partial L}{\partial\boldsymbol{w}}=\boldsymbol{w}-\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{x}(i)=0$$
+
+$$\boxed{\;\boldsymbol{w}=\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{x}(i)\;}$$
+
+⭐⭐ **这是 SVM 最核心的结论之一**：
+
+- 最优 $\boldsymbol{w}$ 是**训练样本的加权和**，权重为 $\alpha(i)d(i)$；
+- 不是所有样本都参与——只有 $\alpha(i)>0$ 的样本（support vectors）参与；
+- 与 LDA 的闭式解 $\boldsymbol{w}=\boldsymbol{S}_W^{-1}(\boldsymbol{m}_1-\boldsymbol{m}_2)$ 形式完全不同：LDA 用**类均值 + 协方差**，SVM 用**少数边界样本的加权和**。
+
+老师原话大意："The W actually is a linear combination of all the feature vectors... a weighted sum. ... This result is very different from the one we obtained in the Fisher linear discriminant analysis."
+
+#### 4.8 ⭐ Condition 2：$\alpha$ 的平衡约束
+
+$$\frac{\partial L}{\partial b}=-\sum_{i=1}^N\alpha(i)d(i)=0$$
+
+$$\boxed{\;\sum_{i=1}^N\alpha(i)d(i)=0\;}$$
+
+**解读**：因为 $d(i)\in\{+1,-1\}$，
+
+$$\sum_{d(i)=+1}\alpha(i)=\sum_{d(i)=-1}\alpha(i)$$
+
+即**正类 support vectors 的 $\alpha$ 之和 = 负类 support vectors 的 $\alpha$ 之和**。这是求解 dual 时必须满足的一个等式约束。
+
+> 老师用图中的例子说明：若正类有 2 个 SV（$\alpha_1,\alpha_2$）、负类有 1 个 SV（$\alpha_3$），则必须 $\alpha_1+\alpha_2=\alpha_3$。
+
+#### 4.9 ⭐⭐ Complementary slackness：谁才是 support vector
+
+$$\alpha(i)\big\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\big\}=0$$
+
+| 样本位置 | 约束值 | $\alpha(i)$ | 是否 SV |
+|---|---|---|---|
+| 在 margin **外**、分类正确（严格 $>1$） | $d_i(\cdot)-1>0$ | **$\alpha(i)=0$** | ❌ 不是 |
+| **恰好在 margin 上** | $d_i(\cdot)-1=0$ | **$\alpha(i)>0$** | ✅ 是 |
+| 在 margin **内**或**判错** | hard margin 不可行 | $\alpha(i)>0$（soft margin） | ✅ 是（但不在 margin 上） |
+
+⭐⭐ 结论：**绝大多数 $\alpha(i)=0$；只有 support vectors 的 $\alpha(i)>0$。** 这就是 "support vector machine" 名字的第二个来源——最优 hyperplane 只由 support vectors 决定。
+
+#### 4.10 SVM 的 KKT 条件总表
+
+| # | KKT 条件 | SVM 中的形式 | 含义 |
+|---|---|---|---|
+| 1 | stationarity w.r.t. $\boldsymbol{w}$ | $\boldsymbol{w}=\sum_i\alpha(i)d(i)\boldsymbol{x}(i)$ | $\boldsymbol{w}$ 是样本的加权和 |
+| 2 | stationarity w.r.t. $b$ | $\sum_i\alpha(i)d(i)=0$ | 两类 SV 的权重平衡 |
+| 3 | dual feasibility | $\alpha(i)\ge0$ | 乘子非负 |
+| 4 | complementary slackness | $\alpha(i)\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\}=0$ | $\alpha>0$ 只在 margin 上 |
+| 5 | primal feasibility | $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$ | 全部分类正确 |
+
+### 5. ⭐⭐ Dual problem：消去 $\boldsymbol{w},b$，只留 $\alpha$（PDF p.20-24）
+
+#### 5.1 展开 Lagrangian
+
+把 $L$ 中的求和拆开：
+
+$$L(\boldsymbol{w},b,\alpha)=\frac12\boldsymbol{w}^T\boldsymbol{w}-\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{w}^T\boldsymbol{x}(i)-b\sum_{i=1}^N\alpha(i)d(i)+\sum_{i=1}^N\alpha(i)$$
+
+- **第三项**：由 Condition 2，$\sum_i\alpha(i)d(i)=0$，所以 $b\sum_i\alpha(i)d(i)=0$，直接消失；
+- **第二项**：需要用 Condition 1 把 $\boldsymbol{w}$ 替换掉；
+- **第一项**：同样用 Condition 1 替换。
+
+#### 5.2 处理第二项
+
+由 Condition 1，$\boldsymbol{w}=\sum_{j=1}^N\alpha(j)d(j)\boldsymbol{x}(j)$，所以
+
+$$\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{w}^T\boldsymbol{x}(i)
+=\sum_{i=1}^N\alpha(i)d(i)\Big(\sum_{j=1}^N\alpha(j)d(j)\boldsymbol{x}(j)\Big)^T\boldsymbol{x}(i)$$
+
+$$=\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\,\boldsymbol{x}^T(j)\boldsymbol{x}(i)$$
+
+（$\boldsymbol{x}^T(j)\boldsymbol{x}(i)$ 是标量，等于 $\boldsymbol{x}^T(i)\boldsymbol{x}(j)$，下面统一写成 $\boldsymbol{x}^T(i)\boldsymbol{x}(j)$。）
+
+#### 5.3 处理第一项
+
+$$\boldsymbol{w}^T\boldsymbol{w}
+=\Big(\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{x}(i)\Big)^T\Big(\sum_{j=1}^N\alpha(j)d(j)\boldsymbol{x}(j)\Big)
+=\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\,\boldsymbol{x}^T(i)\boldsymbol{x}(j)$$
+
+#### 5.4 代入，得到只含 $\alpha$ 的目标
+
+$$L(\boldsymbol{w},b,\alpha)=\sum_{i=1}^N\alpha(i)-\frac12\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\boldsymbol{x}^T(i)\boldsymbol{x}(j)$$
+
+$$\boxed{\;Q(\alpha)=\sum_{i=1}^N\alpha(i)-\frac12\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\boldsymbol{x}^T(i)\boldsymbol{x}(j)\;}$$
+
+⭐⭐ **关键观察**：
+
+1. $\boldsymbol{w}$ 和 $b$ **完全消失**，目标只是 $\alpha$ 的函数；
+2. 原问题有 $\boldsymbol{w},b,\alpha$ **三类**未知量，对偶问题只有 $\alpha$ **一类**——问题被简化；
+3. 目标中只出现**内积** $\boldsymbol{x}^T(i)\boldsymbol{x}(j)$——这是后面 **kernel trick** 的伏笔。
+
+#### 5.5 Dual problem 的正式陈述
+
+$$\boxed{\;\min_\alpha\;Q(\alpha)=\sum_{i=1}^N\alpha(i)-\frac12\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\boldsymbol{x}^T(i)\boldsymbol{x}(j)\;}$$
+
+$$\text{s.t.}\qquad \sum_{i=1}^N\alpha(i)d(i)=0,\qquad \alpha(i)\ge0,\quad i=1,\dots,N$$
+
+⚠️ **记号提示（课件与标准教材的符号差异）**：课件把对偶写成 $\min_\alpha Q(\alpha)$，且 $Q$ 的表达式如上。严格按 Lagrange duality，$Q(\alpha)$ 是**凹函数**（二次项系数矩阵半正定、前面带负号），对偶问题应写成 $\max_\alpha Q(\alpha)$（等价于 $\min_\alpha -Q(\alpha)$）。**课件原式如此**；考试若按课件作答就写 $\min Q(\alpha)$，但理解上要知道我们是在**最大化 margin 的对偶目标**。⚠️ 不要把 $\min$ 字面理解成"最小化 $Q$ 本身"：$Q$ 是凹函数，若沿 $\alpha\to t\alpha\ (t\to\infty)$ 的方向看，$Q(t\alpha)=t\sum\alpha-\frac{t^2}{2}\lVert\boldsymbol{w}(\alpha)\rVert^2\to-\infty$，即"最小化 $Q$"根本没有下界，得到的 $\alpha$ 与对偶最优解完全不同。这里应把课件的 $\min_\alpha Q(\alpha)$ 当作**该课程沿用的记号**（实质是最大化对偶目标，等价于 $\min_\alpha -Q(\alpha)$）。
+
+#### 5.6 为什么 dual 重要：QP 与 SMO
+
+| 要点 | 说明 |
+|---|---|
+| 问题类型 | **quadratic programming（QP，二次规划）**：二次目标 + 线性约束 |
+| 变量个数 | $N$ 个 $\alpha(i)$ |
+| 约束个数 | 1 个等式 $\sum\alpha d=0$ + $N$ 个不等式 $\alpha\ge0$ |
+| 规模 | $N$ 可能是几百、几千、几万甚至上百万 ⇒ 大规模 QP |
+| 通用 QP solver | 理论可用，但 $N$ 大时非常耗时 |
+| **SMO** | **Sequential Minimal Optimization（序列最小优化）**：把大 QP 分解成许多**只含 2 个 $\alpha$** 的小 QP，快速逼近原解；SVM 因此变得实用 |
+
+老师原话大意："This method decomposes this large scale QP problem into many small scale QP problems. In each small QP problem, they just have two alpha values. These provide a very fast approximation of the original large scale QP problem."
+
+⭐ 历史注记（老师）：在 deep learning 流行之前，SVM 是最流行的 classifier；如今 deep learning 主要用于**非结构化数据**（image、natural language、video、speech），而**结构化数据**上 SVM 仍然非常强大。
+
+#### 5.7 求出 $\alpha$ 后恢复 $\boldsymbol{w}^*$
+
+$$\boxed{\;\boldsymbol{w}^*=\sum_{i=1}^N\alpha(i)d(i)\boldsymbol{x}(i)=\sum_{\alpha(i)>0}\alpha(i)d(i)\boldsymbol{x}(i)\;}$$
+
+⭐ 第二个等号：$\alpha(i)=0$ 的样本对求和没有贡献，可以**直接删掉**。所以 $\boldsymbol{w}^*$ 只由 support vectors 决定。
+
+#### 5.8 恢复 $b^*$
+
+对任意 support vector（$\alpha(i)>0$），它满足等式约束：
+
+$$d(i)[\boldsymbol{w}^{*T}\boldsymbol{x}(i)+b^*]=1$$
+
+两边除以 $d(i)$（注意 $1/d(i)=d(i)$，因为 $d(i)=\pm1$）：
+
+$$b^*=\frac{1}{d(i)}-\boldsymbol{w}^{*T}\boldsymbol{x}(i)=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$$
+
+**实践中取平均**（PDF p.24）：
+
+$$\boxed{\;b^*=\frac{1}{N_s}\sum_{\alpha(i)>0}\big[d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)\big]\;}$$
+
+其中 $N_s$ 是 support vectors 的总数。
+
+⚠️ 为什么要平均？理论上任取一个 SV 都应得到同一个 $b^*$；但数值计算有误差，不同 SV 算出的 $b$ 会略有不同，取平均更稳。
+
+#### 5.9 决策函数
+
+$$\boxed{\;g(\boldsymbol{x})=\boldsymbol{w}^{*T}\boldsymbol{x}+b^*\;}$$
+
+| $g(\boldsymbol{x})$ | 判为 |
+|---|---|
+| $>0$ | class $+1$ |
+| $<0$ | class $-1$ |
+| $=0$ | on decision boundary |
+
+⭐ $\boldsymbol{w}$ 决定 hyperplane 的 **orientation（方向）**，$b$ 决定 **location（位置）**——与 Week 8 完全一致，只是字母从 $w_0$ 换成了 $b$。
+
+#### 5.10 ⭐ 为什么叫 "support vector machine"
+
+1. 大多数 $\alpha(i)=0$；
+2. 只有 $\alpha(i)>0$ 的样本（support vectors）参与 $\boldsymbol{w}^*$ 的计算；
+3. $b^*$ 也只由 support vectors 计算；
+4. 因此**最优 hyperplane 完全由 support vectors 决定**，其他样本删掉也不影响结果。
+
+老师原话大意："The optimal hyperplane is determined by the support vectors only. ... This is the reason why this classifier is called support vector machines."
+
+#### 5.11 ⭐⭐ Primal vs Dual 对照表
+
+| 项目 | **Primal problem（原始问题）** | **Dual problem（对偶问题）** |
+|---|---|---|
+| 未知量 | $\boldsymbol{w},b,\alpha$（三类） | **只有 $\alpha$（一类）** |
+| 目标 | $\frac12\boldsymbol{w}^T\boldsymbol{w}$（最小化） | $Q(\alpha)$（课件写 $\min$，标准写法 $\max$） |
+| 约束 | $N$ 个不等式 $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$ | 1 个等式 $\sum\alpha(i)d(i)=0$ + $N$ 个不等式 $\alpha(i)\ge0$ |
+| 几何意义 | 在特征空间里最大化 margin | 在样本权重空间里求 $\alpha$ |
+| 求解 | QP | QP（用 SMO 等） |
+| 能否用 kernel | 需要显式 $\boldsymbol{w}$，不方便 | **只含内积，天然适合 kernel trick** |
+| 恢复 | — | $\boldsymbol{w}^*=\sum\alpha d\boldsymbol{x}$，$b^*$ 由 SV 求平均 |
+
+#### 5.12 Hard-margin 完整算法
+
+| 步骤 | 操作 |
+|---|---|
+| **1** | 解 dual QP：$\min_\alpha Q(\alpha)$ s.t. $\sum_i\alpha(i)d(i)=0$，$\alpha(i)\ge0$ |
+| **2** | 计算 $\boldsymbol{w}^*=\sum_{\alpha(i)>0}\alpha(i)d(i)\boldsymbol{x}(i)$ |
+| **3** | 找出 support vectors（$\alpha(i)>0$），用 $b^*=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$ 求平均 |
+| **4** | 对任意样本 $\boldsymbol{x}$，算 $g(\boldsymbol{x})=\boldsymbol{w}^{*T}\boldsymbol{x}+b^*$，按符号分类 |
+
+### 6. 两个 linearly separable 例子（PDF p.25-30）
+
+#### 6.1 Example 1：只有 2 个 support vectors（PDF p.25-26）
+
+- 两类各 100 个样本，二维，明显线性可分；
+- 求得一条 separating hyperplane；
+- **只有 2 个 support vectors**（图中用圆圈标出，每类 1 个）。
+
+⭐ 这说明：
+
+- 决定 hyperplane 的**不是全部 200 个样本**，而是**最靠近边界的 2 个**；
+- 2 是线性可分二类问题的**最少** support vector 数（每类至少 1 个）；
+- 若把其他样本删掉，只要这 2 个还在，hyperplane 不变。
+
+#### 6.2 Example 2：1 个训练错误 vs 0 个训练错误（PDF p.27-30）
+
+同一组数据，两条候选 hyperplane：
+
+| 候选 | 训练错误 | margin | 样本到边界的距离 | 评价 |
+|---|---|---|---|---|
+| **紫色线**（PDF p.29） | **1 个** | **较大** | 多数样本离边界较远 | ✅ **preferred** |
+| **红色线**（PDF p.30） | **0 个** | **较小** | 许多样本紧贴边界 | ❌ 对未来数据风险高 |
+
+⭐ 老师的问题："Which one is preferred? Why?"
+
+**答案**：选**紫色线**（1 个训练错误、较大 margin）。理由：
+
+- 虽然它在训练集上错了 1 个，但 margin 大，**泛化（generalization）更好**；
+- 红色线为了 100% 训练正确，把边界压得很紧，许多样本就在边界附近；未来测试样本只要稍有扰动，就可能被分错；
+- **训练错误 ≠ 测试错误**；我们真正关心的是**未来数据的 misclassification risk**。
+
+⭐⭐ 这个讨论是 **soft margin** 的动机：
+
+> 与其强行要求所有样本满足 hard-margin 约束（可能导致 margin 很小、过拟合），不如**允许少量违反约束**，换取更大的 margin——这就是 soft margin。
+
+### 7. ⭐⭐ Soft margin：non-separable samples（PDF p.31-40）
+
+#### 7.1 理想条件被违反的两种方式
+
+Hard margin 要求：
+
+$$d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$$
+
+但真实数据往往**线性不可分**，总有一些点违反它。违反有两种（PDF p.32-33）：
+
+| 情形 | 位置 | 是否仍分类正确 |
+|---|---|---|
+| **(a)** | 落在 **region of separation 内**（margin 内），但在 hyperplane 的**正确一侧** | ✅ 仍正确，只是 confidence 低 |
+| **(b)** | 落在 hyperplane 的**错误一侧（wrong side）** | ❌ 被分错 |
+
+⭐ 关键区分：**"在 margin 内"不等于"分错"**。margin 内、正确一侧的点，符号仍与 label 一致，只是离边界太近；只有跑到**错误一侧**才是 misclassification。
+
+#### 7.2 ⭐ Slack variable（松弛变量）
+
+引入**非负标量** $\xi(i)\ge0$，把约束放宽为
+
+$$\boxed{\;d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1-\xi(i),\qquad \xi(i)\ge0\;}$$
+
+$\xi(i)$ 称为 **slack variable（松弛变量）**，衡量样本 $i$ 偏离"理想可分条件"的程度。
+
+| $\xi(i)$ | 位置 | 分类 |
+|---|---|---|
+| $\xi(i)=0$ | 在 margin 上或 margin 外 | ✅ 正确，理想 |
+| $0<\xi(i)\le1$ | 在 margin 内，但正确一侧 | ✅ 正确，但 confidence 低 |
+| $\xi(i)>1$ | 在 hyperplane 错误一侧 | ❌ 分错 |
+
+⭐ 几何直觉：$\xi(i)$ 就是"把该样本推回 margin 正确一侧所需要的额外距离"（以 margin 的单位计）。
+
+#### 7.3 ⭐⭐ Soft-margin primal problem
+
+$$\boxed{\;\min_{\boldsymbol{w},b,\xi}\;J(\boldsymbol{w},b,\xi)=\frac12\boldsymbol{w}^T\boldsymbol{w}+C\sum_{i=1}^N\xi(i)\;}$$
+
+$$\text{s.t.}\qquad d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1-\xi(i),\qquad \xi(i)\ge0,\quad i=1,\dots,N$$
+
+- $C$：**hyperparameter（超参数）**，由用户给定，或用 **validation data（验证集）** 确定；
+- $C$ 是**两项之间的权重**。
+
+⭐⭐ **两项的物理意义**：
+
+| 项 | 作用 | 希望 |
+|---|---|---|
+| $\frac12\boldsymbol{w}^T\boldsymbol{w}$ | 控制 margin | 越小 ⇒ margin 越大 |
+| $C\sum_i\xi(i)$ | 控制违反约束的程度（训练错误/越界） | 越小 ⇒ 训练错误越少 |
+
+**$C$ 的 trade-off**：
+
+| $C$ | 对 violations 的惩罚 | margin | 训练错误 | 风险 |
+|---|---|---|---|---|
+| **大**（如 $C=100$） | 很重 | 窄 | 少 | 容易 overfitting，对噪声敏感 |
+| **小**（如 $C=0.01$） | 很轻 | 宽 | 可能多 | 更平滑，可能 underfitting |
+| **默认** | — | — | — | Matlab `fitcsvm` 默认 $C=1$ |
+
+老师原话大意："C is a hyperparameter. If you use SVM to solve your problem, if you call the function in the toolbox, you need to set the value of this C. ... Normally the default value is one."
+
+#### 7.4 Soft-margin 的 Lagrangian
+
+现在有**两类约束**：
+
+1. $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1+\xi(i)\ge0$（等价于 $1-\xi(i)-d_i(\cdot)\le0$）；
+2. $\xi(i)\ge0$（等价于 $-\xi(i)\le0$）。
+
+因此需要**两组乘子**：$\alpha(i)\ge0$ 对应分类约束，$\beta(i)\ge0$ 对应 $\xi(i)\ge0$：
+
+$$L(\boldsymbol{w},b,\xi,\alpha,\beta)=\frac12\boldsymbol{w}^T\boldsymbol{w}+C\sum_{i=1}^N\xi(i)-\sum_{i=1}^N\beta(i)\xi(i)-\sum_{i=1}^N\alpha(i)\big\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1+\xi(i)\big\}$$
+
+⭐ 注意符号：两个约束都先写成 $\le0$，乘子项都取**加号**；展开后 $-\beta\xi$ 和 $-\alpha\{d(\cdot)-1+\xi\}$ 出现。$\alpha(i)\ge0$，$\beta(i)\ge0$。
+
+#### 7.5 Soft-margin 的 KKT 条件（PDF p.36）
+
+$$\alpha(i)\big\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1+\xi(i)\big\}=0$$
+
+$$\beta(i)\xi(i)=0$$
+
+$$\alpha(i)\ge0,\qquad\beta(i)\ge0$$
+
+⭐ 第二式是 $\xi$ 的 complementary slackness：**要么 $\beta=0$，要么 $\xi=0$**。
+
+#### 7.6 ⭐⭐ 对 $\xi(i)$ 求导 → box constraint
+
+$$\frac{\partial L}{\partial\xi(i)}=C-\beta(i)-\alpha(i)=0$$
+
+$$\boxed{\;\beta(i)=C-\alpha(i)\;}$$
+
+因为 $\beta(i)\ge0$，所以
+
+$$\boxed{\;0\le\alpha(i)\le C\;}$$
+
+⭐⭐ **这是 $C$ 进入 dual 的方式**：原问题中的惩罚系数 $C$，在对偶问题中变成 $\alpha$ 的**上界（upper bound / box constraint）**。
+
+#### 7.7 ⭐⭐ Soft-margin dual problem
+
+$$\boxed{\;\min_\alpha\;Q(\alpha)=\sum_{i=1}^N\alpha(i)-\frac12\sum_{i=1}^N\sum_{j=1}^N\alpha(i)\alpha(j)d(i)d(j)\boldsymbol{x}^T(i)\boldsymbol{x}(j)\;}$$
+
+$$\text{s.t.}\qquad \sum_{i=1}^N\alpha(i)d(i)=0,\qquad 0\le\alpha(i)\le C$$
+
+⭐⭐ **与 hard-margin dual 的唯一区别**：
+
+$$\alpha(i)\ge0\quad\longrightarrow\quad0\le\alpha(i)\le C$$
+
+目标函数**完全一样**。所以：
+
+- 解的形式一样：仍是 QP；
+- $\boldsymbol{w}^*=\sum_{\alpha(i)>0}\alpha(i)d(i)\boldsymbol{x}(i)$ 也一样；
+- 区别只在 $\alpha$ 的可行域，以及 $b^*$ 的取法（见 §7.8）。
+
+#### 7.8 ⭐⭐ Soft-margin 下如何求 $b^*$（考试重点）
+
+对 $\alpha(i)>0$ 的 support vectors，分两种情形（PDF p.39）：
+
+| 情形 | 条件 | 结论 | 位置 |
+|---|---|---|---|
+| **(i)** | $\xi(i)>0$ | $C-\alpha(i)=0\Rightarrow\alpha(i)=C$ | 在 margin 内或错误一侧 |
+| **(ii)** | $C-\alpha(i)>0$ | $\xi(i)=0$ | **恰好在 margin 上** |
+
+⭐⭐ 因此：
+
+| $\alpha(i)$ | $\xi(i)$ | 位置 | 能否用来求 $b$ |
+|---|---|---|---|
+| $0$ | — | margin 外 | ❌ 不是 SV |
+| $0<\alpha(i)<C$ | $0$ | **在 margin 上** | ✅ **可以** |
+| $\alpha(i)=C$ | $>0$ | margin 内或错误一侧 | ❌ 不可以 |
+
+只有 $0<\alpha(i)<C$ 的 SV 满足
+
+$$d(i)[\boldsymbol{w}^{*T}\boldsymbol{x}(i)+b^*]=1$$
+
+所以
+
+$$\boxed{\;b^*=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i),\qquad 0<\alpha(i)<C\;}$$
+
+实践中对**所有** $0<\alpha(i)<C$ 的 SV 求平均：
+
+$$\boxed{\;b^*=\frac{1}{N_s}\sum_{0<\alpha(i)<C}\big[d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)\big]\;}$$
+
+其中 $N_s$ 是满足 $0<\alpha(i)<C$ 的 support vector 数。
+
+⭐⭐ **老师明确的考试提示**（转写）：
+
+> "In the past years, I remember exam question like this: I give you the values of support vectors, the alpha values, I also give you the C value. Then ask you to calculate the value of b. ... Maybe we can have a similar question this year."
+
+**解题步骤**：
+
+1. 先看每个 SV 的 $\alpha(i)$；
+2. 只保留 $0<\alpha(i)<C$ 的 SV（它们**在 margin 上**）；
+3. 对每个这样的 SV 算 $b_i=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$；
+4. 取平均。
+
+⚠️ **不能**用 $\alpha(i)=C$ 的 SV 求 $b$——它们不在 margin 上，$d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ne1$。
+
+#### 7.9 ⭐⭐ Hard margin vs Soft margin 对照表
+
+| 项目 | **Hard margin** | **Soft margin** |
+|---|---|---|
+| 数据要求 | **线性可分** | 可以线性不可分 |
+| 约束 | $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$ | $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1-\xi(i)$，$\xi(i)\ge0$ |
+| 目标 | $\frac12\boldsymbol{w}^T\boldsymbol{w}$ | $\frac12\boldsymbol{w}^T\boldsymbol{w}+C\sum_i\xi(i)$ |
+| 新变量 | 无 | **slack variable $\xi(i)$** |
+| 新超参数 | 无 | **$C$** |
+| Dual 约束 | $\alpha(i)\ge0$ | $0\le\alpha(i)\le C$ |
+| Support vector 类型 | 全部在 margin 上 | $\alpha<C$ 在 margin 上；$\alpha=C$ 在 margin 内/错误一侧 |
+| $b$ 的计算 | 任取一个 SV | **只能用 $0<\alpha<C$ 的 SV** |
+| 泛化 | 对噪声/outlier 敏感 | 更稳健（允许少量违反） |
+| 典型场景 | 理想、可分数据 | **真实数据（几乎总是）** |
+
+#### 7.10 Soft-margin 完整算法
+
+| 步骤 | 操作 |
+|---|---|
+| **1** | 选 $C$（validation 或默认 $C=1$） |
+| **2** | 解 dual QP：$\min_\alpha Q(\alpha)$ s.t. $\sum_i\alpha(i)d(i)=0$，$0\le\alpha(i)\le C$ |
+| **3** | $\boldsymbol{w}^*=\sum_{\alpha(i)>0}\alpha(i)d(i)\boldsymbol{x}(i)$ |
+| **4** | 找出 $0<\alpha(i)<C$ 的 SV，$b^*=\frac{1}{N_s}\sum[d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)]$ |
+| **5** | $g(\boldsymbol{x})=\boldsymbol{w}^{*T}\boldsymbol{x}+b^*$，按符号分类 |
+
+### 8. Matlab 实例：200 个样本的 linear SVM（PDF p.41-49）
+
+#### 8.1 代码
+
+```matlab
+data1 = randn(100,2);
+data2 = randn(100,2) + ones(100,1)*[2 2];
+data  = [data1; data2];
+label = [ones(100,1); -ones(100,1)];
+svmmodel = fitcsvm(data, label, 'KernelFunction', 'linear');
+svmmodel
+```
+
+#### 8.2 输出解读（PDF p.42-43）
+
+| 字段 | 值 | 含义 |
+|---|---|---|
+| `NumObservations` | **200** | 200 个训练样本（每类 100 个） |
+| `Alpha` | `[36×1 double]` | **36 个 support vectors**（$\alpha>0$） |
+| `Bias` | **3.2861** | $b^*$ |
+| `KernelFunction` | `linear` | 线性 kernel ⇒ linear SVM |
+| `Solver` | `SMO` | 用 Sequential Minimal Optimization 求解 |
+| `IsSupportVector` | `[200×1 logical]` | 1 = SV，0 = 非 SV |
+| `BoxConstraints` | `[200×1 double]` | 每个 $\alpha$ 的上界（$C$） |
+
+⭐ 转写中老师口误说"220 samples"，PDF 明确是 **200**；后文又说"300"，同样是口误。以 PDF 的 `NumObservations: 200` 为准。
+
+#### 8.3 $\alpha$ 的分布（PDF p.44）
+
+- $C=1$；
+- **绝大多数 $\alpha(i)=1=C$**（33 个左右）；
+- **只有 3 个 $\alpha(i)$ 落在 $0<\alpha(i)<C$**：读图约为 **0.48、0.72、0.20**；
+- 这 3 个就是**在 margin 上的 support vectors**，只有它们能用来求 $b$。
+
+⭐⭐ 这与 §7.8 完全对应：
+
+- $\alpha=C$：在 margin 内或错误一侧（violating points）；
+- $0<\alpha<C$：恰好在 margin 上；
+- $\alpha=0$：在 margin 外，不是 SV。
+
+#### 8.4 `IsSupportVector`（PDF p.45-46）
+
+- 输出长度 = 200（每个样本一个 0/1 标记）；
+- **1**：该样本是 support vector（$\alpha>0$）；
+- **0**：不是 support vector（$\alpha=0$）；
+- 共 **36 个 1**，与 `Alpha: [36×1 double]` 一致。
+
+⭐ `IsSupportVector` 只是"是否 $\alpha>0$"的标记，**不等于"在 margin 上"**。要判断"在 margin 上"，还要看 $\alpha<C$（本例中只有 3 个）。
+
+#### 8.5 结果图（PDF p.47-49）
+
+- 用 `find(svmmodel.IsSupportVector==1)` 取出 SV；
+- 图中红圈 = support vectors；
+- 红线 = decision hyperplane；
+- 可见 SV 大多分布在两类交界处，但**并非全部贴在 margin 上**——这正是 soft margin 的特点。
+
+⭐ 与线性可分例子（§6.1，只有 2 个 SV）对比：**不可分数据的 SV 数量多得多**（本例 36/200 ≈ 18%）。这是因为 margin 内、甚至错误一侧的样本都满足 $\alpha>0$。
+
+### 9. Kernel SVM（概念，PDF p.50-52 + 转写）
+
+#### 9.1 线性边界不够用时
+
+PDF p.50 的数据：红色类在中心，黑色类在外围（类似同心圆）。**任何一条直线都无法分开**，但一条**曲线**（圆）可以。
+
+#### 9.2 ⭐ 两步走的思想
+
+**Kernel SVM = 非线性映射 + 线性 SVM**：
+
+1. **非线性映射（nonlinear map）**：把原空间 $\boldsymbol{x}\in\mathbb{R}^d$ 映射到新空间
+
+$$\boldsymbol{z}=\phi(\boldsymbol{x})\in\mathbb{R}^D$$
+
+（$D$ 可以比 $d$ 高，甚至无穷维）；
+
+2. **在新空间中训练 linear SVM**：在新空间 $\boldsymbol{z}$ 里，数据**线性可分**，于是可以用前面所有的 linear SVM 理论。
+
+⭐ 结果：**原空间中的 decision boundary 是曲线/曲面；新空间中的 boundary 仍是 hyperplane**。老师原话大意："First step, we map the sample from the original feature space X into a new space... Then in this new space, normally the samples are linearly separable. Then we can design a linear support vector machine."
+
+#### 9.3 ⭐ Kernel trick（核技巧）
+
+观察 dual 目标和决策函数：它们**只用到内积** $\boldsymbol{x}^T(i)\boldsymbol{x}(j)$。在新空间中，内积变成
+
+$$\phi(\boldsymbol{x}(i))^T\phi(\boldsymbol{x}(j))$$
+
+定义 **kernel function（核函数）**：
+
+$$\boxed{\;K(\boldsymbol{x}(i),\boldsymbol{x}(j))=\phi(\boldsymbol{x}(i))^T\phi(\boldsymbol{x}(j))\;}$$
+
+于是**不需要显式计算 $\phi(\boldsymbol{x})$**，只要算 $K$：
+
+$$Q(\alpha)=\sum_i\alpha(i)-\frac12\sum_i\sum_j\alpha(i)\alpha(j)d(i)d(j)K(\boldsymbol{x}(i),\boldsymbol{x}(j))$$
+
+$$g(\boldsymbol{x})=\sum_{\alpha(i)>0}\alpha(i)d(i)K(\boldsymbol{x}(i),\boldsymbol{x})+b^*$$
+
+⭐ 这就是 **kernel trick**：把高维（甚至无穷维）内积的计算，换成原空间里一个简单的核函数。
+
+#### 9.4 常见 kernel（补充，课件只提概念）
+
+| Kernel | 形式 | 说明 |
+|---|---|---|
+| **Linear** | $K(\boldsymbol{x}_i,\boldsymbol{x}_j)=\boldsymbol{x}_i^T\boldsymbol{x}_j$ | 就是普通 linear SVM |
+| **Polynomial** | $K(\boldsymbol{x}_i,\boldsymbol{x}_j)=(\boldsymbol{x}_i^T\boldsymbol{x}_j+1)^p$ | $p$ 为多项式阶数 |
+| **Gaussian RBF** | $K(\boldsymbol{x}_i,\boldsymbol{x}_j)=\exp\!\Big(-\dfrac{\lVert\boldsymbol{x}_i-\boldsymbol{x}_j\rVert^2}{2\sigma^2}\Big)$ | 最常用；对应无穷维特征空间 |
+
+⚠️ 上表公式是标准形式（课件未写公式，只提到 "whether it's a Gaussian function or a polynomial function"），用于理解；**EE6407 不要求推导**。
+
+#### 9.5 例子与直觉（PDF p.50-51）
+
+- 同心圆数据：kernel SVM 得到一条**圆形 decision boundary**；
+- 圈内的红点判为 class 1，圈外的黑点判为 class 2；
+- 边界由多个 support vectors 决定（图中圈出的点）。
+
+⭐ 老师举的**血压（blood pressure）**例子：血压在正常范围内是 normal，太高或太低都 abnormal ⇒ 正常区域是一个"区间/环带"，边界自然是**非线性**的。这类问题在现实中很常见。
+
+#### 9.6 ⚠️ 课程范围
+
+PDF p.52 明确写：
+
+> Kernel support vector machines is introduced in **EE7207 Neural Networks and Deep Learning**.
+
+⭐ 所以在 **EE6407** 中：
+
+- 只需掌握 **概念**：非线性映射 + 新空间中的 linear SVM + kernel function；
+- **不需要**推导 kernel SVM 的 dual、不需要背 Mercer 条件；
+- 考试若涉及，大概率是**概念题**（为什么需要 kernel、kernel trick 的作用）。
+
+### 10. 三类 classifier 的回顾与 classification tree 的动机（转写末尾）
+
+#### 10.1 ⭐ 本课程已学的 classifier 家族
+
+| 类型 | 代表 | 核心思想 | decision boundary |
+|---|---|---|---|
+| **Probability-based** | Bayes decision rule（Week 7） | 估计 class-conditional density → posterior → 按 posterior 决策 | Gaussian 时为**曲线**（non-linear） |
+| **Linear classifier** | LDA / FDA（Week 8） | **Fisher criterion**：between-class scatter / within-class scatter | hyperplane |
+| **Linear classifier** | **SVM（Week 9）** | **maximum margin** | hyperplane |
+| **Rule-based** | Classification tree（Week 10） | 树状 if-then 规则 | 轴平行的矩形区域 |
+
+⭐ 老师强调：这三类方法**不是随意选的**，每一类都代表一个"很好的 idea"——概率模型、最大间隔、规则学习。
+
+#### 10.2 ⭐ Distance 的作用与局限
+
+前三种方法都用到 **distance**：
+
+- Bayes：用距离构造 class-conditional density（Gaussian）；
+- LDA：用类均值距离 + 类内散度；
+- SVM：用样本到 hyperplane 的距离定义 margin。
+
+**局限**（老师原话大意）：
+
+> "Euclidean distance is a good measure only if the features are continuous features. But in reality, for a problem, we can have different types of features."
+
+现实问题的特征往往是**混合类型（mixed types）**：
+
+| 特征 | 类型 | Euclidean distance 是否合适 |
+|---|---|---|
+| 身高、体重、血压 | continuous | ✅ 合适 |
+| 性别（male/female） | nominal / categorical | ❌ 不合适 |
+| 国籍（China/Singapore/...） | nominal / categorical | ❌ 不合适 |
+
+⭐ 把 nominal feature 硬编码成数字再用 Euclidean distance，距离**没有物理意义**。此外，Bayes/LDA 还依赖 **Gaussian assumption**，这也是一种限制。
+
+#### 10.3 ⭐ Classification tree 的优势（老师列的动机）
+
+**Classification tree（分类树 / decision tree）**：树状结构的规则表示。
+
+```
+if gender = male:
+    if nationality = China:  → class A
+    else:                    → class B
+else:
+    if age > 30:             → class C
+    else:                    → class D
+```
+
+| 优势 | 说明 |
+|---|---|
+| **规则可读** | 树 = 一组 if-then 规则，人类容易理解 |
+| **可解释（interpretable / explainable）** | 白盒模型，不像 neural network 是黑盒 |
+| **处理 mixed data types** | 连续 + 类别特征都能处理 |
+| **可处理 missing data** | 树的分裂规则对缺失值较鲁棒 |
+| **可融合人类知识** | 规则既可从数据学习，也可由专家提供 |
+| **可扩展为 random forest** | 多棵树集成，适合 big data |
+
+⭐ 老师原话大意："Because it is rule-based, we can easily integrate the knowledge into the learning process. ... The rules are easily understandable. ... This model is interpretable."
+
+#### 10.4 老师的"研究方法"点评
+
+老师用 LDA vs SVM 说明**定义驱动优化**：
+
+| 方法 | "好 classifier" 的定义 | 导出的优化问题 |
+|---|---|---|
+| LDA | 类间差异大、类内差异小 | 无约束比值最大化 → generalized eigenvalue problem |
+| SVM | 最近样本离边界越远越好 | 带不等式约束的凸 QP → Lagrange/KKT → dual |
+
+⭐ 原话大意："You must have some deep understanding about classification, then you can have your own definition about good classifiers. Then you can formulate into an optimization problem."
+
+这段话是整门课的方法论总结：**先定义"好"，再把它写成优化问题，最后用数学工具求解**。
+
+### 11. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **SVM 的准则** | **maximum margin**（最大间隔），不是 Fisher criterion |
+| **class label** | $d(i)\in\{+1,-1\}$（SVM 的硬性约定） |
+| **hyperplane** | $\boldsymbol{w}^T\boldsymbol{x}+b=0$；$\boldsymbol{w}$ 定方向，$b$ 定位置 |
+| **点到边界距离** | $r=\dfrac{g(\boldsymbol{x})}{\lVert\boldsymbol{w}\rVert}$；符号 = 正/负侧，大小 = confidence |
+| **margin** | $\rho=\dfrac{2}{\lVert\boldsymbol{w}\rVert}$ |
+| **max margin 等价** | $\max\rho\iff\min\lVert\boldsymbol{w}\rVert\iff\min\frac12\boldsymbol{w}^T\boldsymbol{w}$ |
+| **support vector 定义** | 满足等式 $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]=1$ 的样本；离边界最近、最难分 |
+| **hard-margin primal** | $\min\frac12\boldsymbol{w}^T\boldsymbol{w}$ s.t. $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$ |
+| **Lagrangian** | $L=\frac12\boldsymbol{w}^T\boldsymbol{w}-\sum_i\alpha(i)\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\}$，$\alpha(i)\ge0$ |
+| **KKT 核心** | $\alpha(i)\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\}=0$；$\alpha>0$ 只在 margin 上 |
+| **condition 1** | $\boldsymbol{w}=\sum_i\alpha(i)d(i)\boldsymbol{x}(i)$（**support vector expansion**） |
+| **condition 2** | $\sum_i\alpha(i)d(i)=0$（两类 SV 权重平衡） |
+| **dual** | $\min_\alpha Q(\alpha)=\sum_i\alpha(i)-\frac12\sum_i\sum_j\alpha(i)\alpha(j)d(i)d(j)\boldsymbol{x}^T(i)\boldsymbol{x}(j)$ |
+| **dual 约束** | $\sum_i\alpha(i)d(i)=0$，$\alpha(i)\ge0$（soft margin 为 $0\le\alpha\le C$） |
+| **QP** | quadratic programming；用 QP solver / **SMO**（每次优化 2 个 $\alpha$） |
+| **为什么 dual 重要** | 只有 $\alpha$ 一类参数；只含内积 → **kernel trick**；SMO 可扩展 |
+| **恢复 $\boldsymbol{w}^*$** | $\boldsymbol{w}^*=\sum_{\alpha(i)>0}\alpha(i)d(i)\boldsymbol{x}(i)$ |
+| **恢复 $b^*$** | $b^*=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$，对所有 SV 取平均 |
+| **soft margin 约束** | $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1-\xi(i)$，$\xi(i)\ge0$ |
+| **$\xi$ 的三种情形** | $\xi=0$ 理想；$0<\xi\le1$ margin 内正确侧；$\xi>1$ 错误侧（分错） |
+| **soft-margin primal** | $\min\frac12\boldsymbol{w}^T\boldsymbol{w}+C\sum_i\xi(i)$ |
+| **$C$ 的意义** | hyperparameter；大 $C$ → 重罚 violations → 窄 margin；小 $C$ → 宽 margin |
+| **soft-margin dual** | 目标同 hard margin，约束改为 $0\le\alpha(i)\le C$ |
+| **⭐ $b$ 的计算** | **只能用 $0<\alpha(i)<C$ 的 SV**（在 margin 上）；$\alpha=C$ 的 SV 不能用 |
+| **hard vs soft** | 见 §7.9 对照表 |
+| **kernel SVM** | 非线性映射 $\phi$ + 新空间 linear SVM；$K(\boldsymbol{x}_i,\boldsymbol{x}_j)=\phi(\boldsymbol{x}_i)^T\phi(\boldsymbol{x}_j)$ |
+| **kernel 的范围** | 细节在 EE7207；EE6407 只考概念 |
+| **LDA vs SVM** | 都是 linear classifier；LDA 用 Fisher criterion（闭式/特征值），SVM 用 maximum margin（QP/dual） |
+| **Matlab** | `fitcsvm(..., 'KernelFunction', 'linear')`；`Alpha`、`Bias`、`IsSupportVector`、`Solver: SMO` |
+| **⭐ 考试题型** | 给定 SV 的 $\alpha$ 值和 $C$，求 $b$：先筛 $0<\alpha<C$，再 $b=d(i)-\boldsymbol{w}^T\boldsymbol{x}(i)$ 取平均 |
+
+### 12. 本周要点小结
+
+- **SVM 的定位**：与 LDA 同属 **linear classifier**，decision boundary 都是 hyperplane；区别在**准则**——LDA 用 **Fisher criterion**（类间/类内散度比），SVM 用 **maximum margin**（最近样本到边界最远）。
+- **Margin 的几何**：点到 hyperplane 的距离 $r=g(\boldsymbol{x})/\lVert\boldsymbol{w}\rVert$；通过 scaling 把最近点的函数值规范为 $\pm1$，得到约束 $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1$；support vectors 是取等号的点；margin $\rho=2/\lVert\boldsymbol{w}\rVert$。
+- **核心等价**：最大化 margin ⇔ 最小化 $\lVert\boldsymbol{w}\rVert$ ⇔ 最小化 $\frac12\boldsymbol{w}^T\boldsymbol{w}$。这就是 hard-margin primal problem，且是 **convex QP**。
+- **Lagrange/KKT 主线**：构造 $L=\frac12\boldsymbol{w}^T\boldsymbol{w}-\sum\alpha(i)\{d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]-1\}$；Condition 1 给出 **support vector expansion** $\boldsymbol{w}=\sum\alpha(i)d(i)\boldsymbol{x}(i)$；Condition 2 给出 $\sum\alpha(i)d(i)=0$；complementary slackness 给出 $\alpha(i)>0$ 只在 support vectors 上。
+- **Dual problem**：把 $\boldsymbol{w},b$ 消去，得到只含 $\alpha$ 的 $Q(\alpha)$；约束为 $\sum\alpha(i)d(i)=0$、$\alpha(i)\ge0$；仍是 QP，可用 **SMO** 求解；只含内积，为 kernel 铺路。
+- **恢复参数**：$\boldsymbol{w}^*=\sum_{\alpha>0}\alpha(i)d(i)\boldsymbol{x}(i)$；$b^*=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$，对所有 SV 取平均；决策函数 $g(\boldsymbol{x})=\boldsymbol{w}^{*T}\boldsymbol{x}+b^*$。
+- **Soft margin**：真实数据几乎都不可分；引入 **slack variable** $\xi(i)$，约束变为 $d(i)[\boldsymbol{w}^T\boldsymbol{x}(i)+b]\ge1-\xi(i)$；目标加上 $C\sum\xi(i)$；$C$ 是 trade-off hyperparameter。
+- **Soft-margin dual**：目标与 hard margin 相同，唯一变化是 $\alpha(i)\ge0\to0\le\alpha(i)\le C$；**$C$ 成为 $\alpha$ 的上界**。
+- **⭐ $b$ 的求法（考试重点）**：soft margin 下，只有 $0<\alpha(i)<C$ 的 support vectors **在 margin 上**，才能用于 $b^*=d(i)-\boldsymbol{w}^{*T}\boldsymbol{x}(i)$；$\alpha(i)=C$ 的 SV 在 margin 内或错误一侧，**不能**用。老师明确说往年在 exam 中出过"给定 $\alpha$ 和 $C$ 求 $b$"的题，今年可能类似。
+- **Kernel SVM**：非线性映射 $\phi$ 把数据送到新空间，在新空间中做 linear SVM；**kernel trick** 用 $K(\boldsymbol{x}_i,\boldsymbol{x}_j)=\phi(\boldsymbol{x}_i)^T\phi(\boldsymbol{x}_j)$ 避免显式计算 $\phi$；原空间的边界变为曲线。细节在 **EE7207**，EE6407 只考概念。
+- **三类 classifier 的总结**：probability-based（Bayes）、linear（LDA、SVM）、rule-based（classification tree）；前两者依赖 Euclidean distance，适合连续特征；classification tree 能处理 **mixed data types**、可解释、可融合人类知识，并将发展为 **random forest**。
+- **一句话**：SVM 把"分类"变成"最大化 margin 的凸二次规划"，再用 KKT/对偶把它变成只含 $\alpha$ 的 QP；最后只有少数 support vectors 决定模型——这就是它的全部故事。
+
+---
+
+> **下一周（Week 10）预告**：老师在本周最后明确说 **"We're going to study the details of this classification tree in the next week"**——**Week 10 = Classification Tree（分类树 / decision tree）**，并在此基础上引入 **Random Forest（随机森林）**。⚠️ 本周实际**没有**开始 decision tree（Week 8 笔记的预告曾写"可能开始一部分"，实际全部时间用于 SVM）。Week 10 的顺序是：先讲 classification tree 的构造（如何从数据生成树、规则、分裂准则），再讲 random forest（多棵树集成，适合 big data）。更后面的次序（按 Week 8 记录）：evaluation of classifiers → feature selection + regression → clustering（最后一周）。考试层面：本周 SVM 是重点，尤其 **soft-margin 下用 $0<\alpha<C$ 的 support vectors 计算 $b$**——老师明确说往年在 exam 中出过"给定 $\alpha$ 和 $C$ 求 $b$"的题，今年可能类似。
+
+---
+
+## Week 10 — Classification Tree（分类树）与 Random Forest（随机森林）
+
+> **本周材料**：`week10/week10.txt`（录播转写，ASR 噪声很大）、`week10/ML-Slides6.pdf`（官方课件 *6. Classification Trees*，67 页）、`week10/Data_HeartDisease.xlsx`（课堂 heart disease 数据，303 样本 × 13 特征）。
+>
+> **权威来源说明**：本笔记先由 `week10.txt` 整理，再以 `ML-Slides6.pdf` 核对修正。典型 ASR 错拼：
+>
+> | 转写中常见 | 正确术语 |
+> |---|---|
+> | class tree / classic tree / c tree / class try | **classification tree** |
+> | intropy / intraplate / interp impurity | **entropy (impurity)** |
+> | gene / genie / gini | **Gini** |
+> | varus / virus impurity | **variance impurity** |
+> | misclasication / misclassation | **misclassification** |
+> | impurit mesa / imputing mesa | **impurity measure** |
+> | splade / splate / sub 点 | **split（分裂）** |
+> | bound tree / boundary tree | **binary tree** |
+> | rule node / root nose | **root node** |
+> | lit node / leaf nose | **leaf node** |
+> | branching ratio | **branching factor（分支因子）** |
+> | pot / strap / both reve | **bootstrap / Bootstrap Aggregating** |
+> | random for / random fest | **random forest** |
+> | deer boundary | **decision boundary** |
+> | cut | **CART** |
+> | AD three | **ID3** |
+> | H / age | **age** |
+> | ABS / AVS / LVS | **fbs（fasting blood sugar）** |
+> | ANG | **exang（exercise induced angina）** |
+> | CP | **cp（chest pain type）** |
+
+### 1. 本周定位：从 distance-based classifier 到 rule-based classifier
+
+Week 7–9 的三类 classifier 都建立在 **distance（距离）** 这个概念上：
+
+| 方法 | 用的"距离/准则" | 依赖 |
+|---|---|---|
+| Bayesian decision rule（Week 7） | class-conditional density（Gaussian） | Gaussian assumption |
+| LDA / FDA（Week 8） | 类均值距离 + 类内散度（Fisher criterion） | Euclidean distance |
+| SVM（Week 9） | 样本到 hyperplane 的距离（margin） | Euclidean distance / inner product |
+
+⭐ **问题**：Euclidean distance 只对 **continuous / numerical feature** 有意义。现实数据常常是 **mixed types**：
+
+| 特征 | 类型 | Euclidean distance 是否合适 |
+|---|---|---|
+| 身高、体重、血压、age | continuous | ✅ 合适 |
+| sex（male/female） | nominal / categorical | ❌ 不合适 |
+| transportation mode（train/car/air/sea） | nominal | ❌ 不合适 |
+| colour（red/yellow/blue/green） | nominal | ❌ 不合适 |
+
+如果硬把 nominal feature 编码成 1, 2, 3, 4，再算距离，**距离的大小没有物理意义**（"train 到 car 的距离"并不比"train 到 sea"更小）。因此 Week 7–9 的 distance-based classifier 在 mixed data 上不一定最优。
+
+⭐ **解法**：用 **nonmetric method（非度量方法）**——**classification tree（分类树）**。它是 **rule-based** 的，不依赖距离，能直接处理 categorical / nominal feature，也能处理 continuous feature 和 missing data。
+
+### 2. 什么是 classification tree
+
+**Classification tree（分类树）**：一种树状 flowchart，用**一系列问题**对样本分类。
+
+```
+                 ┌─────────────┐
+                 │  root node  │   ← 第一个问题（如 color = green?）
+                 └──────┬──────┘
+             yes ┌──────┴──────┐ no
+                 ▼             ▼
+          ┌───────────┐   ┌───────────┐
+          │ internal  │   │ internal  │   ← 继续问（如 size = big?）
+          └─────┬─────┘   └─────┬─────┘
+            yes │ no        yes │ no
+                ▼             ▼
+          ┌──────────┐  ┌──────────┐
+          │leaf node │  │leaf node │   ← 每个 leaf 有一个 class label
+          └──────────┘  └──────────┘
+```
+
+- **root node（根节点）**：第一个问题，覆盖全部训练数据。
+- **internal node / descendant node（内部节点 / 后代节点）**：对子集继续提问。
+- **branch（分支）**：问题的答案，把数据送到子节点。
+- **leaf node（叶节点）**：不再提问，直接给出 class label。
+- 每个节点只问**一个 feature 的一个取值/条件**；问题形式是 yes/no、true/false，或 "value ∈ set of values"。
+- **binary tree（二叉树）**：每个节点只有两个分支（branching factor = 2）。这是最常见的形式，**CART** 就是 binary tree；一般情况也可以 multi-split（多分支）。
+
+⭐ **树 = 一组 if-then rules 的图形表示**。样本从 root 走到 leaf，等价于依次回答一串问题；leaf 的 label 就是预测结果。
+
+### 3. 建树必须回答的五个问题（slide 7）
+
+| # | 问题 | 对应内容 |
+|---|---|---|
+| 1 | 每个节点问几个问题（几次 split）？ | **branching factor / branching ratio** |
+| 2 | 用哪个 feature、哪个 value 提问？ | **query selection（split selection）** |
+| 3 | 什么时候把节点声明为 leaf？ | **stopping criteria** |
+| 4 | 树太大时怎么变小？ | **pruning（剪枝）** |
+| 5 | leaf 不纯时怎么给 label？ | **leaf label assignment** |
+
+⭐ 建树分两个阶段：**先 grow（长树），再 prune（剪枝）**。Grow 阶段回答 1–3、5；prune 阶段回答 4。
+
+### 4. 每个节点分裂几次：branching factor
+
+- 节点分裂出的分支数叫 **branching factor（分支因子）**，可以随节点不同而变化。
+- 例：feature `cp` 有 4 个取值 {1, 2, 3, 4}：
+  - **binary split**：`cp > 2?`（yes/no），或 `cp = 1?`（yes/no）——每次只分成两支。
+  - **multi-split**：`cp = 1` / `cp = 2` / `cp = 3` / `cp = 4`（4 支），或 `cp = 1` / `cp = 2` / `cp > 2`（3 支）。
+- **binary tree**：所有节点都用 binary split；**CART** 属于这一类。
+- 分支数一般由设计者设定，可以在树的不同位置不同。
+
+### 5. ⭐ Node impurity（节点不纯度）
+
+建树的核心原则是 **simplicity（简单性）**：希望得到**节点少、紧凑（compact）**的树。
+
+> 老师原话大意："We prefer a decision that leads to a simple, compact tree with few nodes. A smaller model is less likely to overfit the training data and tends to generalize better."
+
+为了让子节点尽量"纯"，形式上更方便的是衡量 **impurity（不纯度）**：
+
+- 若节点里所有样本都属于同一 class → **impurity = 0**（最纯）。
+- 若各类样本**均匀分布** → impurity 最大。
+- ⭐ **maximum purity ⇔ minimum impurity**。
+
+课件给出四种常用 impurity measure。设节点 $N$ 中属于 class $\omega_j$ 的样本比例为 $P(\omega_j)$：
+
+#### 5.1 Entropy impurity（熵不纯度，最常用）
+
+$$i_E(N) = -\sum_j P(\omega_j)\log_2 P(\omega_j)$$
+
+例：节点中 Class 1 有 10 个、Class 2 有 90 个（共 100）：
+
+$$P(\omega_1)=0.1,\quad P(\omega_2)=0.9$$
+
+$$i_E = -0.1\log_2 0.1 - 0.9\log_2 0.9 = 0.469$$
+
+若是 50:50：
+
+$$i_E = -0.5\log_2 0.5 - 0.5\log_2 0.5 = 1$$
+
+⭐ 二分类时 entropy impurity 的范围是 **0–1**：0 = 全同类，1 = 50:50（最难判断）。
+
+#### 5.2 Variance impurity（方差不纯度）
+
+最简单的形式（二分类）：
+
+$$i_{Var}(N) = P(\omega_1)P(\omega_2)$$
+
+例：$P(\omega_1)=0.1,\ P(\omega_2)=0.9$：
+
+$$i_{Var} = 0.1\times 0.9 = 0.09$$
+
+#### 5.3 Gini impurity（Gini 不纯度）
+
+Variance impurity 的多类推广就是 **Gini impurity**：
+
+$$i_{Gini}(N) = \sum_{j\ne k} P(\omega_j)P(\omega_k) = \frac{1}{2}\left[1-\sum_j P^2(\omega_j)\right]$$
+
+例：$P(\omega_1)=0.1,\ P(\omega_2)=0.9$：
+
+$$i_{Gini} = \frac{1}{2}\left[1-0.1^2-0.9^2\right] = 0.09$$
+
+⭐ 课件里的 $\frac{1}{2}$ 只是**缩放因子（scaling factor）**；很多教材不写这个 $\frac{1}{2}$。对所有节点、所有候选 split 都乘同一个常数，**不影响 split 的排序和最终树结构**。
+
+#### 5.4 Misclassification impurity（误分类不纯度）
+
+$$i_{MC}(N) = 1-\max_j P(\omega_j)$$
+
+含义：若把节点内所有样本都判为**样本最多的 class**，最小的错误率是多少。
+
+例：$P(\omega_1)=0.1,\ P(\omega_2)=0.9$：
+
+$$i_{MC} = 1-0.9 = 0.1$$
+
+#### 5.5 四种 measure 的选择
+
+| Measure | 公式 | 10/90 例子的值 | 特点 |
+|---|---|---|---|
+| **Entropy** | $-\sum_j P_j\log_2 P_j$ | **0.469** | 最常用；计算简单、有信息论基础 |
+| **Variance** | $P(\omega_1)P(\omega_2)$ | **0.09** | 仅二分类最自然 |
+| **Gini** | $\frac12[1-\sum_j P_j^2]$ | **0.09** | variance 的多类推广；CART 常用 |
+| **Misclassification** | $1-\max_j P_j$ | **0.1** | 直接对应错误率，但对 split 不够敏感 |
+
+⭐ 老师强调：
+- **不同 measure 算出的数值不能直接比较**（0.469 vs 0.09 vs 0.1 只是定义不同）。
+- 但**用哪一种 measure 对最终结果影响通常不大**；关键是**整棵树从头到尾只用同一种 measure**。
+- Entropy 最常用（computational simplicity + information theory）。
+
+### 6. ⭐ 如何选 split：maximum impurity drop
+
+对节点 $N$ 的某个候选问题，数据按比例 $P_L$、$P_R$ 分到左、右子节点 $N_L$、$N_R$。定义 **impurity drop（不纯度下降）**：
+
+$$\Delta i(N) = i(N) - P_L i(N_L) - P_R i(N_R)$$
+
+- $i(N)$：分裂前父节点的 impurity。
+- $P_L i(N_L) + P_R i(N_R)$：分裂后两个子节点的**加权平均 impurity**。
+- ⭐ **maximize $\Delta i(N)$ ⇔ minimize $P_L i(N_L)+P_R i(N_R)$**（因为 $i(N)$ 固定）。
+
+**Multi-split（多分支）**的推广：
+
+$$\Delta i(N) = i(N) - \sum_{k=1}^{B} P_k i(N_k),\qquad \sum_{k=1}^{B} P_k = 1$$
+
+其中 $B$ 是分支数，$P_k$ 是分到第 $k$ 支的数据比例。
+
+⭐ **问题**：这个 measure **偏爱大的 $B$**（分支越多，子节点越纯，$\Delta i$ 越大），即使这些多分支并不代表数据中真实的结构。为修正，定义 **gain ratio（增益率）**：
+
+$$\Delta i'(N) = \frac{\Delta i(N)}{-\sum_{k=1}^{B} P_k \log_2 P_k}$$
+
+分母是 split 本身的 entropy（split information）。
+
+- **binary split**：直接选 $\Delta i(N)$ 最大的。
+- **multi-split**：选 $\Delta i'(N)$（gain ratio）最大的。
+
+### 7. ⭐ 实例 1：Heart disease 数据集（手算全过程）
+
+课件用真实数据 **Data_HeartDisease.xlsx** 演示如何选 root node 和后续节点。
+
+#### 7.1 数据
+
+- **303 samples**，2 classes：
+
+| Class | 含义 | 样本数 |
+|---|---|---|
+| Class 1 | with heart attack | **139** |
+| Class 2 | without heart attack | **164** |
+
+- 每个样本 13 个 attributes：
+
+| # | 特征 | # | 特征 |
+|---|---|---|---|
+| 1 | age | 8 | thalach |
+| 2 | sex | 9 | exang |
+| 3 | cp（chest pain type） | 10 | oldpeak |
+| 4 | trestbps | 11 | slope |
+| 5 | chol | 12 | ca |
+| 6 | fbs（fasting blood sugar） | 13 | thal |
+| 7 | restecg | | |
+
+⭐ 这是 **mixed data**：age、trestbps、chol、thalach、oldpeak 是 continuous；sex、cp、fbs、exang 等是 categorical。正适合 classification tree。
+
+#### 7.2 候选 1：`sex`
+
+问 `Sex = 0?`（0/1 是二值 feature，问 0 或问 1 等价）：
+
+| 分支 | Class 1 | Class 2 | 样本数 |
+|---|---|---|---|
+| yes（Sex=0） | 25 | 72 | **97** |
+| no（Sex=1） | 114 | 92 | **206** |
+
+左节点 Gini：
+
+$$i_{left}=\frac12\left[1-\left(\frac{25}{97}\right)^2-\left(\frac{72}{97}\right)^2\right]=0.1913$$
+
+右节点 Gini：
+
+$$i_{right}=\frac12\left[1-\left(\frac{114}{206}\right)^2-\left(\frac{92}{206}\right)^2\right]=0.2471$$
+
+加权合并（权重 = 数据比例）：
+
+$$i_{sex}=P_L i_{left}+P_R i_{right}=\frac{97}{303}\times0.1913+\frac{206}{303}\times0.2471=0.2276$$
+
+> 注：按上式精确复算约为 **0.2293**；课件标注 **0.2276**（应为课件数值笔误/舍入），不影响"选 `sex`"的方法与结论。
+
+
+
+#### 7.3 候选 2：`fbs`
+
+问 `fbs = 0?`：
+
+| 分支 | Class 1 | Class 2 | 样本数 |
+|---|---|---|---|
+| yes（fbs=0） | 117 | 141 | **258** |
+| no（fbs=1） | 22 | 23 | **45** |
+
+$$i_{left}=\frac12\left[1-\left(\frac{117}{258}\right)^2-\left(\frac{141}{258}\right)^2\right]=0.2478$$
+
+$$i_{right}=\frac12\left[1-\left(\frac{22}{45}\right)^2-\left(\frac{23}{45}\right)^2\right]=0.2499$$
+
+$$i_{fbs}=\frac{258}{303}\times0.2478+\frac{45}{303}\times0.2499=0.2481$$
+
+⭐ `fbs` 几乎没有把两类分开（0.2481 很接近"不分裂"），是一个**弱特征**。
+
+#### 7.4 候选 3：`age`（continuous feature 怎么处理）
+
+Continuous feature 不能直接枚举所有实数值，课件的做法：
+
+1. **排序**：把该 feature 的所有取值从小到大排列，如 29, 34, 35, 37, …。
+2. **取相邻两值的中点**作为候选 split point：31.5, 34.5, 36, …。
+3. **逐个尝试**每个中点，计算对应的 impurity；选 impurity 最小的中点。
+
+以 `age > 31.5?` 为例：
+
+| 分支 | Class 1 | Class 2 | 样本数 |
+|---|---|---|---|
+| yes（age > 31.5） | 139 | 163 | **302** |
+| no（age ≤ 31.5） | 0 | 1 | **1** |
+
+$$i_{left}=\frac12\left[1-\left(\frac{139}{302}\right)^2-\left(\frac{163}{302}\right)^2\right]=0.2484,\qquad i_{right}=0$$
+
+$$i_{31.5}=\frac{302}{303}\times0.2484+\frac{1}{303}\times0=0.2476$$
+
+逐个试完后，`age` 的最低 Gini 是 **0.228**，对应 split point **54.5**。
+
+#### 7.5 选出 root node
+
+对 13 个 feature 逐个尝试（continuous 找最佳中点，categorical 逐个取值），比较各自的最低 impurity。课件假设 **`sex` 的 Gini 最低**，于是：
+
+```
+            Sex = 0?
+          yes /    \ no
+     97 samples   206 samples
+```
+
+⭐ 对每个子节点重复同样的过程（在该子集上重新尝试所有**尚未用过的** feature 和取值），树就一层层长出来。
+
+#### 7.6 左分支（97 个样本）继续分裂
+
+在 `Sex=0` 的 97 个样本上：
+
+**候选 `fbs`**：
+
+| 分支 | Class 1 | Class 2 | 样本数 |
+|---|---|---|---|
+| fbs=0 | 19 | 66 | **85** |
+| fbs=1 | 6 | 6 | **12** |
+
+$$i_{left}=0.1736,\quad i_{right}=0.25$$
+
+$$i_{fbs}=\frac{85}{97}\times0.1736+\frac{12}{97}\times0.25=0.1831$$
+
+**候选 `exang`**：
+
+| 分支 | Class 1 | Class 2 | 样本数 |
+|---|---|---|---|
+| exang=0 | 11 | 64 | **75** |
+| exang=1 | 14 | 8 | **22** |
+
+$$i_{left}=0.1252,\quad i_{right}=0.2314$$
+
+$$i_{exang}=\frac{75}{97}\times0.1252+\frac{22}{97}\times0.2314=0.1493$$
+
+⭐ 0.1493 < 0.1831，所以 `exang` 比 `fbs` 更好；课件假设 `exang` 是所有剩余特征中最低的，于是把它作为左分支的后代节点：
+
+```
+            Sex = 0?
+          yes /    \ no
+      exang = 0?   ...
+      yes /   \ no
+   11/64     14/8
+```
+
+#### 7.7 计算流程总结
+
+对任意节点：
+
+1. 对每个候选 feature：
+   - categorical：每个取值（或取值子集）作为候选 split；
+   - continuous：排序 → 相邻中点 → 逐个试。
+2. 对每个候选 split 算 $P_L i(N_L)+P_R i(N_R)$（越小越好），或 $\Delta i$（越大越好）。
+3. 选**加权子节点 impurity 最小**的 feature + value。
+4. 在该节点上分裂，对每个子节点**递归**重复 1–3，直到满足 stopping criterion。
+
+### 8. 什么时候停止分裂（stopping criteria）
+
+⭐ 如果一直长到每个 leaf 都 impurity = 0，训练数据通常已经 **overfit**：
+
+- 极端情况：每个 leaf 只含 1 个训练样本，整棵树等价于一张 **lookup table**，泛化很差。
+- 反过来，停得太早，训练误差还很高，性能也不好。
+
+常用停止方法：
+
+| 方法 | 做法 | 特点 |
+|---|---|---|
+| **Cross-validation** | 用 training data 长树，在 validation data 上继续分裂直到 validation error 最小 | 需要验证集 |
+| **Impurity reduction threshold** | 若最佳候选 split 带来的 impurity 下降小于预设阈值，就停止 | 直接用全部训练数据；leaf 可在不同深度 |
+| **Minimum samples per node** | 节点样本数少于阈值（如 10，或训练集的固定百分比）就停止 | 最直观；阈值控制树的大小 |
+| **Trade-off criterion** | 最小化 $J=\alpha\times size+\sum_{N\in leaf}i(N)$ | 在树复杂度与训练性能之间平衡 |
+
+其中 $size$ 可以是节点数或分支数，$\alpha$ 是正常数。
+
+⭐ 老师强调：这是**所有模型都适用的一般规则**——如果增加模型复杂度带来的性能提升已经**trivial（微不足道）**，就应该停止（神经网络加 neuron、训练迭代也是同样的道理）。
+
+### 9. Pruning（剪枝）
+
+树长好后可能 overfit，第二阶段是 **pruning（剪枝）**：把树"剪小"。
+
+做法：
+
+1. 考虑每一对**相邻 leaf nodes（neighbouring leaf nodes）**——即共享同一个父节点（antecedent node）、位于同一层的两个 leaf。
+2. 如果把这两个 leaf 合并、让父节点变成 leaf，**impurity 的上升可以接受（很小）**，就删除这两个 leaf，把父节点声明为 leaf。
+3. 父节点变成 leaf 后，它又可能与它的"兄弟"构成新的可合并 pair，**继续向上剪**。
+4. 直到再合并会导致 impurity **大幅上升**（性能明显下降）为止。
+
+⭐ **pruning 是 splitting 的逆操作（inverse of splitting）**；合并两个 leaf = 把一次 split 撤销。
+
+### 10. Leaf node 的 label 怎么定
+
+- 若 leaf 的 impurity = 0（所有样本同一 class）→ 直接标为该 class。
+- 更常见：leaf 有正 impurity → **majority principle**：标为**样本数最多的 class**。
+
+例：leaf 中有 10 个样本：Class 1 六个、Class 2 两个、Class 3 一个、Class 4 一个 → 标为 **Class 1**。
+
+### 11. ⭐ 实例 2：二维 continuous 数据 + MATLAB 实现
+
+课件再用一个二维两类数据（约 200 样本，每类约 100）演示完整建树，并与 MATLAB `fitctree` 的结果对照。
+
+#### 11.1 选 root node
+
+两个 feature $x_1, x_2$ 都是 continuous。分别排序、取中点、逐个试：
+
+| Feature | 最优 split point | 最低 Gini impurity |
+|---|---|---|
+| $x_1$ | 1.147 | 0.1367 |
+| $x_2$ | **1.3271** | **0.0524** |
+
+> 注：按下面树中的 94/6 与 6/94 复算，加权 Gini 约为 **0.0564**；课件标 **0.0524**（数值小差异），以"$x_2$ 优于 $x_1$、选 $x_2$"的结论为准。
+
+$x_2$ 的 impurity 更小 → 选 $x_2$ 作为 root node，split point = 1.3271：
+
+```
+              x2 < 1.3271?
+            yes /        \ no
+       Class1=94          Class1=6
+       Class2=6           Class2=94
+```
+
+#### 11.2 继续长树
+
+左分支（94/6）继续找 $x_1$ 的最佳 split：当 **$x_1<1.7803$** 时，impurity 降到 **0.02**：
+
+```
+              x2 < 1.3271?
+            yes /        \ no
+       x1 < 1.7803?      6/94
+       yes /    \ no
+    91/0        3/6
+```
+
+- 左边 91/0 已经是纯节点（impurity = 0）→ leaf，label = Class 1。
+- 右边 3/6 还不纯，继续分裂或按 stopping criterion 停止。
+
+#### 11.3 MATLAB `fitctree` 的结果
+
+用 MATLAB 的 `fitctree` 得到：
+
+```
+x2 < 1.32709?
+├── yes → x1 < 1.78032?
+│         ├── yes → class 1
+│         └── no  → class -1
+└── no  → x1 < -0.218026?
+          ├── yes → class 1
+          └── no  → x1 < 0.513382?
+                    ├── yes → class -1
+                    └── no  → x2 < 2.0452?
+                              ├── yes → x2 < 1.98733?
+                              │         ├── yes → class -1
+                              │         └── no  → class 1
+                              └── no  → class -1
+```
+
+对应的 **rule list**（slide 51）：
+
+```
+1  if x2 < 1.32709 then node 2 elseif x2 >= 1.32709 then node 3
+2  if x1 < 1.78032 then node 4 elseif x1 >= 1.78032 then node 5
+3  if x1 < -0.218026 then node 6 elseif x1 >= -0.218026 then node 7
+4  class = 1
+5  class = -1
+6  class = 1
+7  if x1 < 0.513382 then node 8 elseif x1 >= 0.513382 then node 9
+8  class = -1
+9  if x2 < 2.0452 then node 10 elseif x2 >= 2.0452 then node 11
+10 if x2 < 1.98733 then node 12 elseif x2 >= 1.98733 then node 13
+11 class = -1
+12 class = -1
+13 class = 1
+```
+
+⭐ **树和 rule list 是同一回事**：树只是规则的图形表示，规则的顺序读起来不如树直观。
+
+#### 11.4 Decision boundary 与训练误差
+
+- 树的 **decision boundary** 由若干条**与坐标轴平行（axis-parallel）**的线段组成——因为每个 split 都是"某个 feature < 某个值"。
+- 所以 classification tree 是 **non-linear classifier**（边界是折线/阶梯，而不是一条直线）。
+- 完全长成的树在这个例子中有 **6 个 training errors**。
+
+#### 11.5 用 leaf 最小样本数控制树的大小
+
+| 约束 | 树的复杂度 | Training errors |
+|---|---|---|
+| 不限制（完全长成） | 最复杂 | **6** |
+| 每个 leaf 至少 **10** 个样本 | 简单（只有 2 次 split） | **10** |
+| 每个 leaf 至少 **5** 个样本 | 中等 | **6** |
+
+⭐ 结论：**minimum samples per leaf** 这个阈值直接控制树的复杂度：
+- 阈值太大 → 树太简单，欠拟合，training error 上升；
+- 阈值太小 → 树太复杂，过拟合风险上升；
+- 要在 **复杂度 vs 精度** 之间取平衡（老师认为本例 5 比较合适：既不太简单也不太复杂）。
+
+### 12. 常见的 classification tree 算法
+
+| 算法 | 全称 | 特点 |
+|---|---|---|
+| **CART** | Classification and Regression Tree | 每个节点 **binary split**；课件讲的核心技术就是 CART 的核心思想 |
+| **ID3** | Iterative Dichotomiser 3 | 只处理 **nominal（无序）** 输入；continuous feature 先 **bin** 成区间，当作 unordered nominal attribute |
+| **C4.5** | — | ID3 的后继与改进：real-valued feature 按 **CART 的方式**（排序 + 中点 + 阈值）处理；nominal data 用 **multi-split（B>2）**，并用 **gain ratio** |
+| **Random forest** | — | 多棵决策树的 ensemble（见下节） |
+
+### 13. ⭐ Random forest（随机森林）
+
+#### 13.1 基本思想
+
+- **Random forest = 很多棵 decision tree 组成的 ensemble**，每棵树在不同的训练数据子集上训练。
+- 每个 tree 对测试样本给出一个 class prediction；**得票最多的 class** 成为最终预测（**majority voting**）。
+
+```
+             test sample
+        ┌────────┼────────┐
+        ▼        ▼        ▼
+     Tree-1   Tree-2   Tree-n
+      apple    apple   banana
+        └────────┼────────┘
+            majority voting
+                 ▼
+              apple
+```
+
+#### 13.2 Bagging = Bootstrap Aggregating
+
+Random forest 基于 **Bagging**：
+
+- **Bootstrap（自助采样）**：从原数据集中**有放回地（with replacement）**随机抽取样本，得到多个较小的随机子集；同一个样本可能在一个子集中出现多次，也可能一次都不出现。
+- **Aggregating（聚合）**：把多棵树的预测结果合并（分类用 majority voting，回归可用 averaging）。
+- 因此 Bagging = **Bootstrap + Aggregating**。
+
+⭐ 例：班里有 50 个学生，随机抽 10 个；每抽到一个就**放回**，所以同一个学生可能被重复抽到。这就是 **sampling with replacement**；若不放回，则是 **sampling without replacement**（每个样本唯一）。Random forest 用的是**有放回**。
+
+#### 13.3 建 random forest 的步骤（slide 63）
+
+设训练集有 $N$ 个样本、$d$ 个 feature：
+
+1. 用 **bootstrapping** 生成 $n$ 个数据子集：$\text{subset}_1,\dots,\text{subset}_n$，其中 $n<N$。
+2. 对每个子集，从原始 $d$ 个 feature 中**随机选 $m$ 个 feature**（$m<d$），只用这 $m$ 个 feature 建一棵 classification tree。
+3. 对全部 $n$ 个子集重复步骤 2，得到 $n$ 棵树。
+
+⭐ **"random" 体现在两处**：
+1. **随机数据子集**（bootstrap）；
+2. **随机 feature 子集**（每棵树只看 $m$ 个 feature）。
+
+#### 13.4 用 random forest 分类（slide 65）
+
+给定一个未知 label 的测试样本：
+
+1. 让它经过**每一棵** tree，得到 $n$ 个预测 class。
+2. 统计每个 class 的**票数**。
+3. 输出**票数最高**的 class 作为最终预测。
+
+⭐ 聚合方式不限于 majority voting；若某些树明显更好，也可以给不同树**加权投票（weighted voting）**。
+
+#### 13.5 Random forest 的特点（slide 66）
+
+| 特点 | 含义 |
+|---|---|
+| **Diversity（多样性）** | 每棵树用的数据子集和 feature 子集都不同，每棵树都是独特的 |
+| **Immune to the curse of dimensionality** | 每棵树只考虑部分 feature，feature space 被缩小，缓解高维灾难 |
+| **Parallelization（可并行）** | 各棵树独立训练，可并行计算 |
+| **Train-test split** | 不必额外划分 train/test：每棵树总有"没见过的数据"可作测试（类似 out-of-bag） |
+| **Stability（稳定性）** | 结果是多数投票/平均，单个树的波动被抵消，更稳定 |
+
+#### 13.6 Random forest vs 单棵 classification tree（slide 67）
+
+| Aspect | Random forest | Classification tree |
+|---|---|---|
+| **Nature** | Ensemble of multiple trees | A single tree |
+| **Variance** | Lower variance, reduced overfitting | Higher variance, prone to overfitting |
+| **Accuracy** | Generally higher due to ensemble | Prone to overfitting, may vary |
+| **Robustness** | More robust to outliers and noise | Sensitive to outliers and noise |
+| **Training time** | Slower（要建多棵树） | Faster（只建一棵树） |
+| **Interpretability** | Less interpretable due to ensemble | More interpretable as a single tree |
+| **Usage** | Complex tasks, high-dimensional data | Simple tasks, easy interpretation |
+
+⭐ 老师总结：
+- **问题简单** → 用单棵 classification tree（可解释、快）。
+- **问题复杂、feature 多、数据高维 / big data** → 用 random forest（更准、更稳、抗噪声，但训练慢、可解释性下降）。
+- Random forest 现在是非常 popular 的技术。
+
+### 14. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **为什么用 classification tree** | distance-based classifier 处理 nominal / mixed data 时 Euclidean distance 无意义；tree 是 nonmetric、rule-based |
+| **树的结构** | root node → internal node → branch → leaf node；每个 leaf 有 class label |
+| **binary vs multi-split** | branching factor = 分支数；CART 用 binary split |
+| **Impurity 的定义** | 全同类为 0；各类均匀时最大；max purity ⇔ min impurity |
+| **Entropy** | $i_E=-\sum_j P_j\log_2 P_j$；10/90 → 0.469；50/50 → 1 |
+| **Variance** | $i_{Var}=P(\omega_1)P(\omega_2)$；10/90 → 0.09 |
+| **Gini** | $i_{Gini}=\sum_{j\ne k}P_jP_k=\frac12[1-\sum_jP_j^2]$；10/90 → 0.09；$\frac12$ 不影响结果 |
+| **Misclassification** | $i_{MC}=1-\max_jP_j$；10/90 → 0.1 |
+| **不同 measure 能否比较** | ❌ 数值不可比；✅ 选一种全程使用；结果通常差别不大 |
+| **Impurity drop** | $\Delta i(N)=i(N)-P_Li(N_L)-P_Ri(N_R)$；max drop ⇔ min weighted child impurity |
+| **Multi-split** | $\Delta i(N)=i(N)-\sum_{k=1}^B P_ki(N_k)$，$\sum P_k=1$ |
+| **Gain ratio** | $\Delta i'=\Delta i/(-\sum_k P_k\log_2 P_k)$；multi-split 用它避免偏爱大 $B$ |
+| **Continuous feature** | 排序 → 相邻值中点 → 逐个试 → 选 impurity 最小的 split point |
+| **Heart disease 例子** | 303 样本；sex Gini=0.2276、fbs=0.2481、age 最低 0.228@54.5；假设 sex 最低 → root |
+| **Stopping** | cross-validation、impurity 下降阈值、leaf 最小样本数、trade-off $J=\alpha\cdot size+\sum i(N)$ |
+| **Pruning** | 合并相邻 leaf pair；impurity 上升可接受就剪；是 splitting 的逆操作 |
+| **Leaf label** | 不纯时用 majority（样本最多的 class） |
+| **Decision boundary** | axis-parallel 折线；classification tree 是 non-linear classifier |
+| **CART** | binary split；课件核心思想 |
+| **ID3** | 只处理 nominal；continuous 先 bin |
+| **C4.5** | real-valued 像 CART；nominal 用 multi-split + gain ratio |
+| **Bagging** | Bootstrap（有放回采样）+ Aggregating（多数投票/平均） |
+| **Random forest 的两处 random** | 随机数据子集（bootstrap）+ 随机 feature 子集（$m<d$） |
+| **RF 建树步骤** | $N$ 样本/$d$ feature → $n$ 个 bootstrap 子集 → 每子集随机选 $m$ 个 feature 建树 → 共 $n$ 棵 |
+| **RF 预测** | 每棵树投票 → 票数最多者为最终 class（也可加权投票） |
+| **RF 优点** | diversity、抗 curse of dimensionality、可并行、无需额外 train-test split、稳定 |
+| **RF vs single tree** | RF 方差低/更准/更鲁棒/训练慢/可解释性差；single tree 反之 |
+| **⭐ 考试信号** | 课件大量手算 Gini / impurity drop / continuous split point，期末很可能出**可手算的建树题**（给数据表，问选哪个 feature/split、算 impurity） |
+
+### 15. 本周要点小结
+
+- **定位**：Week 7–9 的 Bayes/LDA/SVM 都是 **distance-based**（依赖 Euclidean distance / Gaussian），遇到 **nominal / mixed data** 时距离没有意义；**classification tree** 是 **nonmetric、rule-based** 的替代方案，可解释、能处理 mixed / missing data、可融合人类知识。
+- **树的结构**：root node 问第一个问题；内部节点继续问；leaf node 给 class label。每个问题只涉及一个 feature 的一个取值/条件；常见的是 **binary tree**（CART）。
+- **建树五问**：每个节点分裂几次（branching factor）、用哪个 feature/value、何时停止、如何 prune、leaf 怎么标 label。
+- **Impurity**：entropy、variance、Gini、misclassification 四种；全同类为 0，均匀分布最大；不同 measure 数值不可比，但选哪一种对结果影响不大，**全程用同一种**。
+- **Split selection**：选 **impurity drop 最大**（等价于子节点加权 impurity 最小）的 feature + value；multi-split 用 **gain ratio** 修正"偏爱多分支"的偏差。
+- **Continuous feature**：排序 → 相邻值中点作为候选 → 逐个算 impurity → 选最小。
+- **Heart disease 实例**：303 样本、13 feature；`sex` 的 Gini 0.2276 最低 → root；左分支 97 个样本中 `exang`（0.1493）优于 `fbs`（0.1831）。**计算流程可手算，是典型考题形式**。
+- **Stopping**：cross-validation、impurity 下降阈值、leaf 最小样本数、trade-off criterion；核心是**复杂度 vs 性能**的平衡，避免 overfit / underfit。
+- **Pruning**：合并相邻 leaf pair，若 impurity 上升可接受就剪；是 splitting 的逆操作；先 grow 再 prune 是两阶段流程。
+- **Leaf label**：不纯时按 **majority（样本最多的 class）**。
+- **Decision boundary**：由 axis-parallel 线段组成，因此 classification tree 是 **non-linear classifier**；leaf 最小样本数阈值控制树的复杂度与 training errors 的平衡。
+- **CART / ID3 / C4.5**：CART 用 binary split；ID3 只处理 nominal（continuous 先 bin）；C4.5 对 real-valued 像 CART，对 nominal 用 multi-split + gain ratio。
+- **Random forest**：多棵 decision tree 的 **ensemble**；基于 **Bagging = Bootstrap（有放回采样）+ Aggregating（多数投票/平均）**；两处 random（数据子集 + feature 子集）；优点 diversity、抗高维、可并行、无需额外 train-test split、稳定；代价是训练慢、可解释性下降。
+- **一句话**：classification tree 用"问题序列"把 feature space 切成 axis-parallel 的矩形区域，用 **impurity drop** 选问题、用 **stopping + pruning** 控制复杂度；random forest 用 **bootstrap + 随机 feature 子集**造很多棵树，再用 **majority voting** 把它们的判断合起来——用可解释性换准确性和鲁棒性。
+
+---
+
+> **下一周（Week 11）预告**：老师在本周最后明确说：
+>
+> - **"Next week we will talk about the evaluation of the classified performance."**——**classifier performance evaluation**（怎么评价一个 classifier 好不好）；
+> - **"Also we'll talk about the feature selection. We'll introduce the concept of the curse of dimensionality, the peaking phenomena."**——**feature selection + curse of dimensionality（维数灾难）+ peaking phenomenon（峰值现象）**。
+>
+> 按 Week 9 的预告，之后再讲 **regression**，最后一周讲 **clustering**。本周的 classification tree / random forest 是期末 ML 部分的重要考点（Final 4 题中约 3 题来自 ML 部分），尤其 **Gini / entropy / impurity drop / continuous split point 的手算**要练熟。

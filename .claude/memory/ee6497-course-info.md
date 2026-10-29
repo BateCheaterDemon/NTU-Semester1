@@ -18,8 +18,10 @@ EE6497 Pattern Recognition and Deep Learning（NTU，AY26-27 Semester1）。
 
 **Wang Lipo 部分（Week 8–13）要点（Week 8 亲述）**：
 - 课程分三块：NN/DL 导论 → 训练（shallow + deep）→ CNN；**其他网络结构放在 supplementary folder 作选读**（课上不覆盖）。
-- **Python 编程不考**（"not in the final exam or in the quiz"），但作业**会包含编程**（HW2 预计是编程题）；**用 ChatGPT/AI 写程序他不禁止**。
-- 讲座 19:30–21:30 档（3×50 min），中途休息 10 分钟；**Week 8 忘记开 Wooclap**（下次补），出勤仍按 Wooclap 记。
+- **Python 编程不考**（"not in the final exam or in the quiz"），但作业**会包含编程**；**用 ChatGPT/AI 写程序他不禁止**。
+- ⭐ **HW2 内容（Week 9 亲述）**："We're going to give you a homework that you're going to **train on your network to approximate a function**"——即用神经网络逼近一个函数，并借此说明"不需要很多 neuron"。预计 Week 11 前后发布。
+- 考试形式补充（Week 9）：final exam 允许**笔 + 计算器手算**（"You just use your pen… maybe a calculator"），会有需要逐步计算 forward/backward 的题。
+- 讲座 19:30–21:30 档（3×50 min），中途休息 10 分钟；**Week 8 忘记开 Wooclap**，**Week 9 已恢复正常**（课后 Wooclap 答题："if you get it wrong, you also get attendance… record the participation, not the score"——只记参与、不记分数）。
 - Week 8 内容 = Part 2.1 Introduction to NN & DL（神经元模型、线性可分性、XOR 需多层 → universal approximation）。
 
 **HW1 反馈（来自 Quiz 1 review session）**：批改时把 "EM algorithm" 当作 Baum-Welch 的写法**没有扣分**，但 Tay 明确提醒 **Quiz/Final 里必须具体写 Baum-Welch，只写 EM 会扣分**。
