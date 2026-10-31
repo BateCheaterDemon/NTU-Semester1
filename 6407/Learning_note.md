@@ -3782,3 +3782,407 @@ Random forest 基于 **Bagging**：
 > - **"Also we'll talk about the feature selection. We'll introduce the concept of the curse of dimensionality, the peaking phenomena."**——**feature selection + curse of dimensionality（维数灾难）+ peaking phenomenon（峰值现象）**。
 >
 > 按 Week 9 的预告，之后再讲 **regression**，最后一周讲 **clustering**。本周的 classification tree / random forest 是期末 ML 部分的重要考点（Final 4 题中约 3 题来自 ML 部分），尤其 **Gini / entropy / impurity drop / continuous split point 的手算**要练熟。
+
+---
+
+## Week 11 — Performance Evaluation for Classifiers（分类器性能评估）＋ Linear Regression（线性回归）
+
+> **本周材料**：`week11/week11.txt`（录播转写）、`week11/ML-Slides7.pdf`（官方课件 *7. Performance Evaluation for Classifiers*，25 页）。⚠️ 课件只覆盖 **performance evaluation**；后半段 **linear regression / ridge / lasso** 在转写中有详细讲解，但**未包含在这份 PDF 里**（可能用另一份 slides），本笔记按老师口述整理并标注。
+>
+> **权威来源说明**：本周转写 ASR 噪声很大，典型错拼：
+>
+> | 转写 | 正确 |
+> |---|---|
+> | hold out / hold on | **holdout** |
+> | foot / food / fod | **fold**（K-fold） |
+> | care food / cafo / k foot | **k-fold** |
+> | l one / L one out | **leave-one-out (LOOCV)** |
+> | matrix / metris | **metric** |
+> | regional regression / re regression | **ridge regression** |
+> | lasso / laser regression | **lasso regression** |
+> | list squared / least square | **least squares** |
+> | area / era | **error**（residual/误差） |
+> | t value / true value | **true value** |
+> | postal / possible class | **positive class** |
+> | netive / negative | **negative** |
+> | four positive / force positive | **false positive** |
+> | two positive / true positive | **true positive** |
+> | sp / specificity | **specificity** |
+> | precede / precision | **precision** |
+> | recall / record | **recall** |
+
+### 1. 本周定位：从"设计 classifier"到"评价 classifier"
+
+Week 7–10 已经设计了多种 classifier：
+
+| 周 | 方法 | 类型 |
+|---|---|---|
+| Week 7 | Bayesian decision rule / Naïve Bayes | probability-based |
+| Week 8 | LDA / FDA | linear |
+| Week 9 | SVM | linear / kernel |
+| Week 10 | Classification tree / Random forest | rule-based / ensemble |
+
+⭐ 现在的问题：**给定一个 classifier，它的 performance 到底好不好？** 本周分两部分回答：
+
+1. **Evaluation procedures（评估流程）**：数据怎么划分（training / validation / test），如何得到可靠的性能估计；
+2. **Evaluation metrics（评估指标）**：用哪些数字衡量 performance（accuracy、precision、recall、F1、ROC/AUC 等）。
+
+> 老师用"练习题 vs 考试题"作比喻：平时做的练习题 = **training data**；最后没见过的考试题 = **test data**。用练习题调模型、用考试题报告最终成绩。
+
+### 2. Evaluation Procedures（评估流程）
+
+#### 2.1 Holdout method（留出法）
+
+- 从全部 labeled data 中**随机**取一部分作为 **training data**，剩下的**留出（held back）**作为 **test data**。
+- 用 training data 训练模型；用 test data 的 feature 预测 label，再与 ground truth 比较，统计错误。
+- 常见比例：
+  - 二划分：**70%–80% training / 20%–30% test**；
+  - 三划分：**60–70% training / 15–20% validation / 15–20% test**。
+
+| 数据子集 | 用途 | 使用阶段 |
+|---|---|---|
+| **Training data** | 估计模型参数（weights） | 训练阶段 |
+| **Validation data** | 选择 **hyperparameters**（如 tree 的 stopping threshold、SVM 的 $C$、$\lambda$） | 训练阶段（可视为 training 的一部分） |
+| **Test data** | 报告最终 performance | 训练结束后，只用一次 |
+
+⭐ **Validation vs Test 的区别**：
+- Validation 用来**调 hyperparameter**，会"参与"模型选择；
+- Test 只在最后用一次，模拟"从未见过的数据"，报告最终性能。
+- 如果反复用 test data 调参，test data 就"泄漏"成了 validation data，最终性能会偏乐观。
+
+#### 2.2 Class imbalance 与 stratified sampling（分层采样）
+
+- 随机划分可能破坏类别比例。例： biomedical 数据中 cancer 样本很少（如 20%），随机抽样后 training set 里可能只剩 5%–10% cancer。
+- 这叫 **class imbalance（类别不平衡）**；少数类叫 **minority class**。
+- 解决：**stratified random sampling（分层随机采样）**——**对每个 class 分别**按相同比例采样。
+  - 例：要 70% training，则 minority class 抽 70%，majority class 也抽 70%；
+  - 这样 training set 中各类比例与原始数据一致。
+
+#### 2.3 Repeated holdout（重复留出法）
+
+- Holdout 的 performance 是**随机变量**：换一次随机划分，结果可能很好或很差。
+- 做法：重复多次 holdout，每次重新随机划分，最后取**平均值**。
+- 直觉：像测空气质量——不能只看某一天的 PM2.5，要测很多天再取平均；也像做多套模拟题取平均分。
+
+#### 2.4 K-fold cross-validation（K 折交叉验证）
+
+- 把数据分成 $K$ 个**互不重叠**的 fold（$K$ 通常 = 5 或 10）。
+- 每一轮：用其中 **1 个 fold 作 test**，其余 $K-1$ 个 fold 作 training；共训练/评估 $K$ 次。
+- 最后报告 $K$ 次 performance 的**平均值**。
+
+```
+Fold 1  Fold 2  Fold 3  Fold 4  Fold 5
+Test    Train   Train   Train   Train   → 第 1 次
+Train   Test    Train   Train   Train   → 第 2 次
+Train   Train   Test    Train   Train   → 第 3 次
+Train   Train   Train   Test    Train   → 第 4 次
+Train   Train   Train   Train   Test    → 第 5 次
+```
+
+⭐ 与 holdout 的关键区别：
+- Holdout 随机划分，**某些样本可能永远没被选为 test**；
+- K-fold **每个样本恰好被用作 test 一次**，且被用作 training $K-1$ 次。
+- 缺点：同一 fold 内的样本总是一起被 train 或 test，可能引入相关性；**repeated K-fold** 通过重新 shuffle 缓解。
+
+#### 2.5 Leave-one-out cross-validation（LOOCV，留一法）
+
+- K-fold 的极端情况：**$K=N$**（$N$ = 样本数），每个 fold 只有 1 个样本。
+- 每轮用 1 个样本作 test，其余 $N-1$ 个作 training；共 $N$ 轮。
+- ⭐ 计算量 = $N$ 次训练，**非常昂贵**；只适合：
+  - 样本量小；
+  - 单次训练很快（如 LDA 有闭式解）。
+
+#### 2.6 Repeated K-fold cross-validation（重复 K 折）
+
+- 单次 K-fold 的结果仍有方差：换一次划分，mean performance 会变。
+- 做法：把整个 K-fold 过程**重复多次**（如 50 次），每次**重新 shuffle** 数据再分 fold；最后对所有 folds、所有 repeats 取平均。
+- 好处：
+  - 降低 variance，得到更可靠的 performance estimate；
+  - 重新 shuffle 打破"同 fold 样本总在一起"的限制。
+
+### 3. Performance Evaluation Metrics（评估指标）
+
+#### 3.1 Positive / negative class
+
+- 二分类中，把**关心的类**称为 **positive class**，另一类称为 **negative class**。
+- 例：cancer diagnosis 中，cancer = positive（我们关心是否患癌），normal = negative。
+- ⭐ positive/negative 是**语义选择**，不代表"好/坏"。
+
+#### 3.2 Confusion matrix（混淆矩阵）与四个基本量
+
+| | Actual Positive | Actual Negative |
+|---|---|---|
+| **Predicted Positive** | **TP**（True Positive） | **FP**（False Positive） |
+| **Predicted Negative** | **FN**（False Negative） | **TN**（True Negative） |
+
+- **TP**：positive 样本被正确判为 positive。
+- **FP**：negative 样本被错误判为 positive（"误报"）。
+- **TN**：negative 样本被正确判为 negative。
+- **FN**：positive 样本被错误判为 negative（"漏报"）。
+
+课件例子（共 100 个样本）：
+
+| | Actual Positive | Actual Negative |
+|---|---|---|
+| **Predicted Positive** | **85** | **4** |
+| **Predicted Negative** | **2** | **9** |
+
+即 $TP=85,\ FP=4,\ FN=2,\ TN=9$。
+
+#### 3.3 Accuracy / Error rate
+
+$$\text{Accuracy}=\frac{TP+TN}{TP+FP+FN+TN}=\frac{85+9}{100}=94\%$$
+
+$$\text{Error rate}=1-\text{Accuracy}=\frac{FP+FN}{100}=\frac{4+2}{100}=6\%$$
+
+⭐ Accuracy 把两类样本**混在一起**看；在 class imbalance 时可能误导（如 99% negative，全判 negative 也有 99% accuracy，但 positive 全漏）。
+
+#### 3.4 Sensitivity / Specificity
+
+**Sensitivity（敏感度）**：positive 样本中被正确判为 positive 的比例（positive class 的 accuracy）：
+
+$$\text{Sensitivity}=\frac{TP}{TP+FN}=\frac{85}{85+2}\approx97.7\%$$
+
+**Specificity（特异度）**：negative 样本中被正确判为 negative 的比例（negative class 的 accuracy）：
+
+$$\text{Specificity}=\frac{TN}{TN+FP}=\frac{9}{9+4}\approx69.2\%$$
+
+⭐ 记忆：
+- Sensitivity 只看 **Actual Positive 那一列**（TP + FN）；
+- Specificity 只看 **Actual Negative 那一列**（TN + FP）。
+
+#### 3.5 Precision / Recall
+
+**Precision（精确率）**：所有**预测为 positive** 的样本中，真正是 positive 的比例：
+
+$$\text{Precision}=\frac{TP}{TP+FP}=\frac{85}{85+4}\approx95.5\%$$
+
+**Recall（召回率）**：所有**实际为 positive** 的样本中，被正确预测为 positive 的比例：
+
+$$\text{Recall}=\frac{TP}{TP+FN}=\frac{85}{85+2}\approx97.7\%$$
+
+⭐⭐ **Recall ≡ Sensitivity**（两者公式相同，只是叫法不同）。
+⭐ **Precision 的分母是"预测为 positive"（TP+FP）**；**Recall 的分母是"实际为 positive"（TP+FN）**——这是最容易混淆的地方。
+
+#### 3.6 Precision / Recall 的"多选题"例子（老师课堂例题）
+
+题目：从以下 4 个 statement 中选出**所有正确**的：
+
+- (a) EE6407 class has male and female students. ✅
+- (b) EE6407 class comprises students from multiple countries. ✅
+- (c) All students in EE6407 class are PhD students. ❌
+- (d) EE6407 exam is closed-book. ✅
+
+正确答案是 **(a), (b), (d)**（3 个）。把"选中"看作 predicted positive，"正确 statement"看作 actual positive：
+
+| 你的选择 | TP | FP | FN | Precision | Recall | F1 |
+|---|---|---|---|---|---|---|
+| 只选 (a) | 1 | 0 | 2 | $1/1=100\%$ | $1/3=33.3\%$ | $0.5$ |
+| 选 (a)(b)(c)(d) | 3 | 1 | 0 | $3/4=75\%$ | $3/3=100\%$ | $\approx0.857$ |
+| 选 (a)(b)(d) | 3 | 0 | 0 | $3/3=100\%$ | $3/3=100\%$ | $1$ |
+
+⭐ 结论：
+- 只追求 precision → 少选，precision 高但 recall 低；
+- 只追求 recall → 全选，recall 高但 precision 低；
+- **需要同时看 precision 和 recall**，所以引入 F1。
+
+#### 3.7 F-score（F1）
+
+$$F_1=2\cdot\frac{\text{Precision}\cdot\text{Recall}}{\text{Precision}+\text{Recall}}=\frac{2TP}{2TP+FP+FN}$$
+
+- $F_1\in[0,1]$，越高越好。
+- 上表三种情况：$F_1=0.5$、$0.857$、$1$。
+- ⭐ 论文中若只报一个指标，通常报 **F1**（同时兼顾 precision 和 recall）。
+
+#### 3.8 ROC curve 与 AUC
+
+**问题**：Bayes decision rule 默认 threshold = 0.5（posterior > 0.5 判 positive）。但不同应用需要不同 threshold：
+- cancer diagnosis：宁可**多报**，threshold 取 **0.4**，减少漏诊（FN）；
+- 不同 threshold 会改变 TP/FP/TN/FN，从而改变所有指标。
+
+**ROC curve（Receiver Operating Characteristic）**：把 threshold 从 0 到 1 逐个取，计算每个 threshold 下的：
+
+$$\text{TPR}=\frac{TP}{TP+FN}=\text{Sensitivity}=\text{Recall}$$
+
+$$\text{FPR}=\frac{FP}{FP+TN}=1-\text{Specificity}$$
+
+以 **FPR 为横轴、TPR 为纵轴**，每个 threshold 对应一个点，连起来就是 ROC curve。
+
+**AUC（Area Under the Curve）**：ROC 曲线下的面积。
+
+| AUC | 含义 |
+|---|---|
+| **1** | perfect classifier（正负完全分开） |
+| **0.5** | random guessing（无法区分） |
+| **0** | 完全反向（positive 判 negative，negative 判 positive） |
+| **0.5–1** | 正常的好 classifier，越高越好 |
+
+⭐ AUC 衡量 classifier **区分两类的能力**，不依赖某一个 threshold。
+
+### 4. Regression（回归）——本周后半段
+
+#### 4.1 Classification vs Regression
+
+| | Classification | Regression |
+|---|---|---|
+| **Target variable** | categorical（class label） | continuous numerical |
+| **例子** | 预测 grade（A/A-/B+） | 预测 mark（82 分） |
+| **评价指标** | accuracy、precision、recall、F1、AUC | MSE、RMSE、MAE、$R^2$ |
+
+⭐ 两者都是 supervised learning，都需要 labeled data；区别只在 target 是 categorical 还是 continuous。
+
+#### 4.2 Simple / Multiple Linear Regression
+
+**Simple linear regression**（一个 predictor）：
+
+$$y=\theta_0+\theta_1 x+\epsilon$$
+
+- $\theta_0$：bias / intercept；
+- $\theta_1$：slope；
+- $\epsilon$：residual / noise。
+
+**Multiple linear regression**（多个 predictors）：
+
+$$y=\theta_0+\theta_1 x_1+\theta_2 x_2+\cdots+\theta_m x_m+\epsilon$$
+
+- 统计学术语：$x$ = predictor variables / independent variables；$y$ = dependent variable。
+- Machine learning 术语：$x$ = features / attributes；$y$ = target。
+- 把 $x_0=1$ 并入，写成向量形式：
+
+$$y=\boldsymbol{\theta}^T\boldsymbol{x}+\epsilon,\qquad \boldsymbol{x}=[1,x_1,\dots,x_m]^T,\quad \boldsymbol{\theta}=[\theta_0,\theta_1,\dots,\theta_m]^T$$
+
+#### 4.3 Ordinary Least Squares（OLS，普通最小二乘）
+
+给定 $N$ 个训练样本，定义 design matrix $F$（每行一个样本的 $[1,x_1,\dots,x_m]$）和目标向量 $\boldsymbol{y}$：
+
+$$\boldsymbol{y}=F\boldsymbol{\theta}+\boldsymbol{\epsilon}$$
+
+损失函数（sum of squared residuals）：
+
+$$J(\boldsymbol{\theta})=\sum_{i=1}^{N}\left(y_i-\boldsymbol{\theta}^T\boldsymbol{x}_i\right)^2=(\boldsymbol{y}-F\boldsymbol{\theta})^T(\boldsymbol{y}-F\boldsymbol{\theta})$$
+
+对 $\boldsymbol{\theta}$ 求导并令零：
+
+$$\frac{\partial J}{\partial\boldsymbol{\theta}}=-2F^T(\boldsymbol{y}-F\boldsymbol{\theta})=0$$
+
+$$\boxed{\hat{\boldsymbol{\theta}}=(F^TF)^{-1}F^T\boldsymbol{y}}$$
+
+⭐ 这是 **closed-form analytical solution**（normal equation），不需要迭代。
+⭐ 名字解释：
+- **Least squares**：最小化 squared residuals；
+- **Ordinary**：区别于 ridge/lasso 等带正则项的变体。
+
+#### 4.4 噪声对参数估计的影响（老师例子）
+
+真实模型：$\theta_0=0.5,\ \theta_1=2$，噪声 $\epsilon\sim\mathcal{N}(0,\sigma^2)$。
+
+| Noise std $\sigma$ | 估计 $\hat\theta_0$ | 估计 $\hat\theta_1$ | 与真值的差距 |
+|---|---|---|---|
+| 0.5 | 0.443 | 2.0728 | 较大 |
+| 0.1 | 0.494 | 2.0073 | 较小 |
+| 0 | 0.5 | 2 | 无误差 |
+
+⭐ 噪声越小，OLS 估计越接近真实参数。
+
+#### 4.5 Ridge Regression（岭回归，L2 正则）
+
+**动机**：OLS 需要 $(F^TF)^{-1}$，但以下情况会出问题：
+1. **$m\ge N$**（特征数 ≥ 样本数）；
+2. $F^TF$ **接近 singular**（multicollinearity，特征高度相关）。
+
+此时 OLS 估计的 $\theta$ 可能非常大（$10$、$100$ 量级），模型不稳定、过拟合。
+
+**Ridge loss**：
+
+$$J(\boldsymbol{\theta})=\|\boldsymbol{y}-F\boldsymbol{\theta}\|^2+\lambda\|\boldsymbol{\theta}\|^2$$
+
+解：
+
+$$\boxed{\hat{\boldsymbol{\theta}}_{\text{ridge}}=(F^TF+\lambda I)^{-1}F^T\boldsymbol{y}}$$
+
+- $\lambda>0$ 是 **hyperparameter**，通常取 $0.1, 0.01, 0.001$ 等小正数；
+- 给对角线加一个小量，使矩阵可逆，同时**惩罚大权重**（shrinkage）；
+- ⭐ Ridge 是 **regularization（正则化）** 技术，主要作用是**抑制 overfitting**。
+
+#### 4.6 Lasso Regression（L1 正则）
+
+**Lasso loss**：
+
+$$J(\boldsymbol{\theta})=\|\boldsymbol{y}-F\boldsymbol{\theta}\|^2+\lambda\|\boldsymbol{\theta}\|_1=\|\boldsymbol{y}-F\boldsymbol{\theta}\|^2+\lambda\sum_k|\theta_k|$$
+
+- L1 惩罚会让**不重要的 $\theta_k$ 精确变成 0** → **feature selection（特征选择）**；
+- 因此 lasso 可以得到**更 compact 的模型**（特征更少）；
+- 缺点：**没有 closed-form 解**，需要数值优化（如 coordinate descent）；
+- $\lambda$ 太大会把重要特征也删掉 → **underfit**；$\lambda$ 太小则正则不足 → overfit；
+- $\lambda$ 通过 **validation data** 选择。
+
+⭐ Ridge vs Lasso 一句话：
+- **Ridge（L2）**：把系数**缩小**，但通常不恰好为 0；
+- **Lasso（L1）**：把不重要的系数**压到 0**，自带 feature selection。
+
+#### 4.7 Regression 的评估指标
+
+| 指标 | 公式 | 特点 |
+|---|---|---|
+| **MSE** | $\frac1N\sum_i(y_i-\hat y_i)^2$ | 均方误差，惩罚大误差 |
+| **RMSE** | $\sqrt{\text{MSE}}$ | 与 $y$ 同量纲，更直观 |
+| **MAE** | $\frac1N\sum_i|y_i-\hat y_i|$ | 平均绝对误差，对 outlier 不如 MSE 敏感 |
+| **$R^2$** | $1-\dfrac{RSS}{TSS}=1-\dfrac{\sum_i(y_i-\hat y_i)^2}{\sum_i(y_i-\bar y)^2}$ | 拟合优度，越接近 1 越好 |
+| **Adjusted $R^2$** | $1-(1-R^2)\dfrac{N-1}{N-p-1}$ | 对特征数 $p$ 做惩罚，防止"多加特征就变大" |
+
+⭐ $R^2$ 的直觉：
+- $R^2=1$：perfect fit；
+- $R^2=0$：模型不比"直接用均值 $\bar y$ 预测"好；
+- 老师举例：$R^2=0.2$ 时预测点离真实点很远；$R^2=0.97$ 时非常接近。
+- $R^2$ 的"好"标准取决于应用：社会科学（预测人的行为）通常较低（<0.5）；物理系统通常较高（>0.9）。
+
+### 5. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **Holdout** | 70–80% train / 20–30% test；三划分 60–70/15–20/15–20 |
+| **Validation vs Test** | validation 调 hyperparameter；test 最后报告一次 |
+| **Class imbalance** | 用 **stratified random sampling**，每个 class 分别按比例抽 |
+| **Repeated holdout** | 多次随机划分，取平均，降低随机性 |
+| **K-fold CV** | K 个互不重叠 fold；每个 fold 当一次 test；报告 K 次平均；常用 K=5/10 |
+| **LOOCV** | K=N；N 次训练；昂贵；适合小数据/快模型 |
+| **Repeated K-fold** | 重复 K-fold 多次并 reshuffle；降低 variance |
+| **Confusion matrix** | TP/FP/FN/TN；例：85/4/2/9 |
+| **Accuracy** | $(TP+TN)/N=94\%$ |
+| **Error rate** | $(FP+FN)/N=6\%$ |
+| **Sensitivity** | $TP/(TP+FN)=85/87\approx97.7\%$（= Recall） |
+| **Specificity** | $TN/(TN+FP)=9/13\approx69.2\%$ |
+| **Precision** | $TP/(TP+FP)=85/89\approx95.5\%$ |
+| **Recall** | $TP/(TP+FN)=85/87\approx97.7\%$（= Sensitivity） |
+| **F1** | $2PR/(P+R)$；P=R=1 时 F1=1 |
+| **ROC** | 横轴 FPR、纵轴 TPR；每个 threshold 一个点 |
+| **AUC** | 1 完美；0.5 随机；0 完全反向；0.5–1 正常 |
+| **OLS** | $\hat\theta=(F^TF)^{-1}F^Ty$；最小化 squared residuals |
+| **Ridge** | L2；$\hat\theta=(F^TF+\lambda I)^{-1}F^Ty$；处理 $m\ge N$ / singular |
+| **Lasso** | L1；无 closed form；稀疏化 → feature selection |
+| **MSE/RMSE/MAE** | 回归误差指标 |
+| **$R^2$** | $1-RSS/TSS$；adjusted $R^2$ 惩罚特征数 |
+| **⭐ Quiz 2** | 2026-11-10（周二）9:30–10:30；范围到 Week 12（不含 Week 13）；约 1 小时，可提前交 |
+
+### 6. 本周要点小结
+
+- **评估流程**：holdout → repeated holdout → K-fold → LOOCV → repeated K-fold；核心是"用未见过的数据估计泛化性能"，并尽量降低估计的方差。
+- **数据划分**：training 学参数；validation 调 hyperparameter；test 只报告一次。Class imbalance 用 **stratified sampling**。
+- **Confusion matrix 是根**：TP/FP/FN/TN 四个数推出 accuracy、error rate、sensitivity、specificity、precision、recall、F1。
+- **Precision vs Recall**：precision 分母是"预测 positive"，recall 分母是"实际 positive"；recall = sensitivity。F1 是两者的调和平均。
+- **ROC/AUC**：遍历 threshold，画 TPR vs FPR；AUC 衡量"区分两类"的能力，1 最好、0.5 随机。
+- **Regression**：target 连续；simple/multiple linear regression；OLS 有闭式解 $(F^TF)^{-1}F^Ty$。
+- **Ridge（L2）**：加 $\lambda\|\theta\|^2$，解决 $m\ge N$ / singular，抑制 overfitting；有闭式解。
+- **Lasso（L1）**：加 $\lambda\|\theta\|_1$，把不重要系数压到 0，自带 feature selection；无闭式解，需数值优化。
+- **Regression metrics**：MSE、RMSE、MAE、$R^2$、adjusted $R^2$。
+- **一句话**：分类器评估 = "怎么分数据"（procedures）+ "用什么数字"（metrics）；回归评估 = "误差类指标 + $R^2$"，并用 ridge/lasso 控制复杂度。
+
+---
+
+> **下一周（Week 12）预告**：老师明确说：
+>
+> - 先用几页 slides **finish model validation**；
+> - 然后讲 **feature selection + dimensionality reduction**（curse of dimensionality / peaking phenomenon 也会涉及）；
+> - 之后开始 **clustering**（主要是 **k-means**，data grouping）。
+>
+> **Quiz 2**：**2026-11-10（周二）9:30–10:30**，约 1 小时（可提前 15–20 分钟交卷）；**只考到 Week 12 的内容，Week 13 的内容不考**。老师会尽量安排大教室，具体考场看 NTULearn。

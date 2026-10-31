@@ -4165,3 +4165,348 @@ $$
 
 
 
+
+---
+
+## Week 11 — Topic 12：Video (Part II)（视频分析下半：检测/跟踪、动作识别、视频增强、光流、视频分割）
+
+> **本周材料**：`week11/week11.txt`（录播转写）、`Lecture Notes Week 11.pdf`（Cheng Jun，*Video (Part II)*，49 页）。本周是 **Dr. Cheng Jun** 部分的第二讲，接 Week 10 的 Video (Part I)。
+>
+> **权威来源说明**：转写 ASR 噪声较大，典型错拼：
+>
+> | 转写 | 正确 |
+> |---|---|
+> | detection and checking | **detection and tracking** |
+> | racking / ting | **tracking** |
+> | re ID / GDE / GD | **Re-ID / JDE** |
+> | temporary | **temporal** |
+> | general A | **generative AI** |
+> | sitation / semitation | **segmentation** |
+> | optic flow | **optical flow** |
+> | decolion | **deconvolution** |
+> | unit | **U-Net** |
+> | compolution / combolion | **convolution** |
+> | MK | **MICCAI**（medical image conference） |
+> | treaty / TD | **3D** |
+> | post function | **point-spread function (PSF)** |
+> | brightness considered equation | **brightness constancy equation** |
+> | four positive / force positive | **false positive** |
+> | ASF | **AI safety** |
+
+### 1. 本周定位：Video (Part II)
+
+Week 10 的 Video (Part I) 讲了视频的基础表示与视频理解的整体框架；本周进入**具体任务**：
+
+| 任务 | 核心问题 |
+|---|---|
+| **Object Detection & Tracking** | 视频里有什么、每一帧在哪里、跨帧是不是同一个人/物 |
+| **Re-ID** | 跨摄像头/跨时间匹配同一个人/物 |
+| **Action Recognition** | 视频里的人在做什么动作 |
+| **Video Enhancement** | 视频模糊/湍流怎么恢复 |
+| **Optical Flow** | 每个像素在相邻帧之间怎么移动 |
+| **Video Segmentation** | 每个像素属于什么类别，且帧间要一致 |
+
+⭐ 老师的定位：Video (Part II) 是**相对成熟、商业化已久**的方向（object detection/tracking、action recognition 已在工业界广泛使用）；相比 Week 10 的生成式 AI，这个方向**研究热度较低**，但工业需求稳定。
+
+### 2. Video vs Image：最核心的区别是 Temporal Continuity
+
+- **Video**：a sequence of images with **correlations among the images**。
+- **Image object detection**：每一帧独立处理。
+- **Video object detection**：帧与帧之间有 **temporal continuity**；可以利用 temporal information 改善 detection、tracking。
+- 人眼把连续帧"看成"视频；计算机看到的是**一帧一帧的静态图像**。
+
+⭐ 典型流水线：
+
+```
+1. Detect / segment objects in each frame
+2. Associate detections over time (tracking)
+3. Assign consistent ID to each object
+```
+
+### 3. Object Detection & Tracking（目标检测与跟踪）
+
+#### 3.1 基本概念
+
+- **Detection**：在当前帧找出 object，给出 bounding box，并可做 segmentation 得到精确边界。
+- **Tracking**：把不同帧中的 detection **关联**起来，判断是不是同一个 object。
+- 每个 object 分配一个 **ID**；视频中不同颜色/编号的框就是 tracking 的结果。
+
+#### 3.2 视频检测的挑战：Flicker（闪烁）
+
+- 同一张脸在连续帧中**人眼明明看到**，但 detector 在某些帧漏检 → 框时有时无，称为 **flickering artifact**。
+- 这是视频检测特有的问题：单帧检测器没有利用 temporal consistency。
+- 评价一个 detector 在视频上的表现，**帧间一致性**本身就是一个指标。
+
+#### 3.3 Re-ID（Re-identification，重识别）
+
+> **Re-ID**：matching object/people across **disjoint camera views** in a multi-camera system.
+
+- 可以跨不同摄像头，也可以同一摄像头不同时间。
+- 传统做法：**detect → track → compare appearance**。
+- 应用：多摄像头行人追踪、安防、无人店。
+
+#### 3.4 JDE（Joint Detection and Embedding）
+
+- **JDE**：把 detection 和 embedding **同时**做。
+- 检测头通常包含：
+  - **Regression**：预测 bounding box（左上/右下坐标）；
+  - **Classification**：判断 object 类别（人/狗/车…）；
+  - **Embedding**：输出一个固定维度的 feature，代表 object 的 appearance。
+- 有了 embedding，就可以直接比较不同帧/不同摄像头的 object 是不是同一个，**不需要先检测再单独做 Re-ID**。
+- 相比 "detect-then-compare" 的 Re-ID：
+  - JDE 在**遮挡后重新出现**时更容易恢复（因为 embedding 一直保留）；
+  - 速度更快、端到端。
+
+⭐ 老师用 DGI 的视频展示：普通 detection+tracking 在 object 被树挡住后会丢失，无法恢复；JDE 因为有 embedding feature，object 再次出现时可以自动 re-associate。
+
+#### 3.5 动作识别与事件检测的区别
+
+- **Action recognition**：识别**单个动作**（走路、跳跃、挥手）。
+- **Video event detection**：识别**复杂事件**（婚礼、进球、打架）。
+- 复杂事件的时间边界（从哪一帧开始、到哪一帧结束）目前**仍不准确**；通常把长视频切成 clip，再对 clip 分类，只能粗略定位。
+
+### 4. Action Recognition（动作识别）
+
+#### 4.1 基本流程
+
+```
+raw video → sample frames into a clip → feature extraction → classifier
+```
+
+- 与 object recognition 类似，但输入从单张图变成 **clip（多帧）**。
+- 关键新增：**video sampling / frame rate**。
+
+#### 4.2 Frame rate 与实时性
+
+- 视频可以是 60/30/15 fps；做实时系统时，每秒要处理所有帧。
+- 例：10 fps → 每帧只有 **100 ms** 的处理预算；30 fps → 约 33 ms。
+- 老师课堂提问：最低多少 fps 看起来仍像"视频"而不是"几张图"？答案大约 **7–15 fps**；10–15 fps 是很多人觉得"接近实时"的范围。
+- 动作识别对 frame rate 的鲁棒性也是一个挑战：downsample 后分类结果可能变化。
+
+#### 4.3 早期方法：LRCN（Long-term Recurrent Convolutional Network）
+
+- 用 CNN 提每帧 feature，再用 **LSTM/RNN** 建模时间序列。
+- 结构：CNN feature sequence → recurrent layer → classifier。
+- 适合处理变长视频；但训练较慢。
+
+#### 4.4 C3D（3D Convolutional Network）
+
+- 把视频看成 **3D volume**（空间 2D + 时间 1D），用 **3D convolution** 同时提取空间和时间特征。
+- 优点：直接捕获 spatiotemporal features；不需要显式 optical flow。
+- 缺点：参数量大、计算贵；对长时序建模有限。
+- 课件还提到用 **deconvolutional layers** 解释模型决策。
+
+#### 4.5 Two-Stream / Hidden Two-Stream
+
+- **Two-stream**：一路 RGB（spatial appearance），一路 optical flow（motion），最后融合。
+- **Hidden Two-Stream**（Zhu et al., 2017）：用一个单独的网络**实时生成 optical flow**，不再需要预先计算 flow。
+- 直觉：一张图看"我长什么样"，另一路看"我怎么动"。
+
+#### 4.6 医学视频例子：Cine MRI
+
+- 任务：判断心肌微血管阻塞（microvascular obstruction），healthy vs unhealthy。
+- 数据：新加坡国家心脏中心约 600 个病人（小数据）。
+- 方法：C3D 提取时空特征 + motion features + two-stream 融合。
+- ⭐ 老师强调：**Transformer 虽然强，但需要大量数据**；医学数据小，所以用 C3D / two-stream 更实际。
+
+#### 4.7 Transformer 的崛起
+
+- 现在视频理解的主流逐渐转向 **Transformer**（时空 attention）。
+- 但 Transformer 需要更多数据/算力；小数据场景仍可用 CNN/RNN/3D CNN。
+
+### 5. Video Enhancement（视频增强）
+
+#### 5.1 Motion Blur（运动模糊）
+
+- 来源：**object motion**（物体动）或 **camera motion**（相机抖）。
+- 模糊可以用 **point-spread function (PSF)** 描述：
+
+$$g(n_1,n_2)=d(n_1,n_2)*f(n_1,n_2)+w(n_1,n_2)$$
+
+其中 $d$ = PSF，$f$ = 真实图像，$w$ = 噪声，$*$ 是 2D convolution。
+
+- PSF 的性质：
+  - 非负（物理成像过程）；
+  - 实值；
+  - 不吸收/产生能量：$\sum_{n_1,n_2}d(n_1,n_2)=1$。
+- **No blur**：PSF 是 unit pulse（delta function），$g=f+w$。
+
+#### 5.2 Blind Image Deconvolution（盲反卷积）
+
+- 目标：从 $g$ 恢复 $f$。
+- 因为 $g=d*f+w$，逆过程是 **deconvolution**。
+- **Blind**：PSF $d$ 未知（不同人手持相机的抖动不同）。
+- ⭐ 需要**准确的 PSF**；PSF 不准，deconvolution 会引入新的噪声/伪影。
+- 传统方法不展开；深度学习方法：**encoder-decoder**，输入 stacked nearby frames，输出 deblurred video（Deep Video Deblurring, Su et al., CVPR 2017）。
+
+#### 5.3 Turbulence Removal（湍流去除）
+
+- 场景：空气湍流（air turbulence）、水面（water turbulence）。
+- 特点：
+  - **local non-rigid deformation**（局部非刚性形变）；
+  - **space-time-varying blur**（时空变化的模糊）。
+- 处理框架：low-rank decomposition → non-rigid registration → spatial-temporal kernel regression → deblurring → superfast refinement（NLTV & TV）。
+- 代表工作：Xie et al., IEEE T-IP 2016。
+
+⭐ 老师观点：深度学习降低了进入门槛（不需要完全理解 PSF 也能训练 deblur 模型），但**理解成像模型**仍然重要，否则不知道模型为什么work、什么时候会失败。
+
+### 6. Optical Flow（光流）
+
+#### 6.1 定义
+
+> **Optical flow**：the 2D projection of the physical movement of points relative to the observer to the 2D displacement of pixel patches on the image plane.
+
+- 给定帧 $t$ 中的点 $p_1$，在帧 $t+1$ 中找到对应点 $p_2$，位移 $(u,v)$ 就是 flow。
+- 由位移和帧间隔可算**速度**（方向 + 大小）。
+- 应用：image tracking、motion analysis、two-stream action recognition、video stabilization。
+
+#### 6.2 三个假设
+
+| 假设 | 含义 |
+|---|---|
+| **Spatial coherence** | 相邻像素通常属于同一表面，因而有相近的 flow |
+| **Temporal persistence** | 相邻帧之间物体移动有限（不会瞬间跳很远） |
+| **Brightness constancy** | 同一个点在相邻帧中亮度不变：$I(x,y,t)=I(x+\Delta x,y+\Delta y,t+\Delta t)$ |
+
+#### 6.3 Brightness Constancy Equation（推导）
+
+对 $I(x+\Delta x,y+\Delta y,t+\Delta t)$ 在 $(x,y,t)$ 做一阶 Taylor 展开：
+
+$$I(x+\Delta x,y+\Delta y,t+\Delta t)\approx I(x,y,t)+I_x\Delta x+I_y\Delta y+I_t\Delta t$$
+
+由 brightness constancy，两边相等：
+
+$$I_x\Delta x+I_y\Delta y+I_t\Delta t\approx0$$
+
+除以 $\Delta t$，令 $u=\frac{dx}{dt},\ v=\frac{dy}{dt}$：
+
+$$\boxed{I_x u+I_y v+I_t=0}\qquad\text{或}\qquad \nabla I^T\begin{bmatrix}u\\v\end{bmatrix}+I_t=0$$
+
+这就是 **brightness constancy equation**（光流约束方程）。
+
+#### 6.4 Aperture Problem（孔径问题）
+
+- 每个像素只有 **1 个方程**，但有 **2 个未知数** $(u,v)$ → **underdetermined**。
+- 几何解释：只能测出**沿梯度方向**的运动分量（normal flow）；**沿边缘方向**（垂直于梯度）的分量无法确定。
+- 若 $(u,v)$ 满足方程，则 $(u+u',v+v')$ 只要 $\nabla I^T[u'\ v']=0$ 也满足 → 解不唯一。
+- 解决需要额外约束（如 Lucas-Kanade 的局部平滑假设、Horn-Schunck 的全局平滑）——课件只讲到问题本身。
+
+### 7. Video Segmentation（视频分割）
+
+#### 7.1 Semantic Segmentation
+
+- 输入图像，输出**每个像素的 class label**（人/车/路/背景…）。
+- 与 classification 的区别：classification 输出一个 label；segmentation 输出**与原图同尺寸的 label map**。
+- 相关任务：depth estimation、boundary prediction（输入输出都是 image-level）。
+
+#### 7.2 从 Classification 到 Segmentation：FCN
+
+- 分类网络：conv + pool + FC → 1000-dim vector → class。
+- 分割网络：把 **FC 层换成 fully convolutional**，保留 spatial 信息；再 **upsampling** 回原图尺寸。
+- **End-to-end, pixels-to-pixels**：输入像素，输出像素级 label + loss。
+- 代表：R-CNN 做 detection；FCN 做 segmentation。
+
+#### 7.3 U-Net
+
+- 结构：**Contraction（encoder）+ Expansion（decoder）**。
+
+| 阶段 | 作用 | 变化 |
+|---|---|---|
+| **Contraction** | 提取语义、"what" | 空间尺寸减小，channel 数增加；丢失部分 spatial info |
+| **Expansion** | 恢复细节、"where" | 上采样，恢复分辨率 |
+| **Skip connection** | 把 contraction 的高分辨率 feature **concatenate** 到 expansion | 帮助恢复 "where" 信息 |
+
+- ⭐ 类比：contraction 是"压缩理解"，expansion 是"还原细节"；skip connection 把压缩前的细节抄近路送回去。
+
+#### 7.4 Image Segmentation vs Video Segmentation
+
+| | Image segmentation | Video segmentation |
+|---|---|---|
+| **处理方式** | frame-based，每帧独立 | frame-to-frame association |
+| **问题** | **flicker artifact**：相邻帧 label 跳变 | 需要**temporal consistency** |
+| **目标** | 单帧准确 | 帧间平滑、稳定 |
+
+- 视频分割可以直接用 image segmentation 逐帧跑，但会有 flicker；更好的做法是利用帧间关联。
+- 评价：除了 mIoU，还要看 **temporal consistency**（相邻帧相似度/感知特征）。
+- 例子：OSDab（on-device learning）用 base network + tiny auxiliary network 提升时序一致性；在 Snapdragon 上把任务分到 DSP/GPU，推理时间降到 37 ms，达到 real-time。
+- 应用：autonomous driving、smart cameras、XR。
+
+#### 7.5 Face detection：image-based vs video-based
+
+- 老师课堂投票：商用 face detection 是基于 image 还是 video？
+- 答案：**image-based**（逐帧处理）更常见。
+- 原因：video-based 需要等更多帧，延迟高；image-based 虽然精度可能略低，但**更实用、更快、更省资源**。
+
+### 8. 3D 与 Vision-Language-Action（老师的前沿点评）
+
+- 老师认为 **3D** 比 2D 视频更重要：机器人、自动驾驶都在 3D 世界。
+- 当前热点：**Vision-Language-Action (VLA)**、**Vision-Language Navigation**——用自然语言给机器人/汽车下指令，模型把视觉 + 语言转成动作。
+- 趋势：从"segmentation 输出"转向"直接输出动作/导航决策"；Tesla 等公司也在从 rule-based 后处理转向端到端学习。
+- ⚠️ 老师明确说：**接下来两周（Week 12–13）讲 3D**。
+
+### 9. 作业与考试信息（Week 11 课堂宣布）
+
+#### 9.1 Assignment 2 更正
+
+> **"You don't need to provide revised design."**
+
+- Part 1：写自己的设计（own design），不需要参考/修改 AI；
+- Part 2：拿到 AI proposal 后，**比较差异**，按四个 points 讨论；
+- **不需要**给出"revised design"；
+- 重点：**能够判断 AI 哪里对、哪里错**，而不是让 AI 代写。
+
+#### 9.2 Final Exam（Cheng Jun 部分）
+
+- 期末 **4 题，每题约 25 分**：
+  - **3 题**来自 Jiang Xudong（Topic 1–10）；
+  - **1 题**来自 Cheng Jun（Topic 11–14）。
+- ⭐ Cheng Jun 明确说：**他这部分考 concept，不考 calculation**；不要只背公式，要理解原理、方法、limitation。
+- 往年题可能以计算为主，但**本学期他的 Q4 是英文简答/概念题**；不要因为"往年题"而只准备计算。
+- 他提到有学生战略性地放弃 Q4——他明确不鼓励：Q4 占 25 分，且是概念题，容易拿分。
+
+### 10. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **Video vs Image** | video 有 temporal continuity；image 每帧独立 |
+| **Detection + Tracking** | detect → associate over time → assign ID |
+| **Flicker** | 视频检测的帧间不一致；可用 temporal consistency 评价 |
+| **Re-ID** | 跨摄像头/跨时间匹配同一 object |
+| **JDE** | detection + embedding 同时做；embedding 用于 re-associate |
+| **Action recognition** | clip → feature → classifier；与 object recognition 类似但多时间维 |
+| **LRCN** | CNN + LSTM/RNN |
+| **C3D** | 3D convolution 提 spatiotemporal features |
+| **Two-stream / Hidden Two-stream** | RGB + optical flow；Hidden 用网络生成 flow |
+| **Frame rate** | 10–15 fps 接近"实时感"；10 fps → 100 ms/frame |
+| **Blur model** | $g=d*f+w$；PSF 非负、和为 1；无模糊时 PSF=delta |
+| **Blind deconvolution** | PSF 未知；PSF 不准会引入伪影 |
+| **Deep video deblur** | stacked frames → encoder-decoder |
+| **Turbulence** | non-rigid deformation + space-time-varying blur；registration + kernel regression |
+| **Optical flow** | 2D displacement of pixel patches |
+| **三个假设** | spatial coherence、temporal persistence、brightness constancy |
+| **Brightness constancy equation** | $I_xu+I_yv+I_t=0$ |
+| **Aperture problem** | 1 equation, 2 unknowns；只能测 normal flow |
+| **Semantic segmentation** | 每像素 class label |
+| **FCN** | FC → fully convolutional + upsampling；pixels-to-pixels |
+| **U-Net** | contraction + expansion + skip concatenation |
+| **Image vs video segmentation** | frame-based 有 flicker；video 要 temporal consistency |
+| **Face detection** | 商用多用 image-based（速度/资源） |
+| **Final exam** | 4 题 × 25 分；Cheng Jun 1 题，概念为主，不考计算 |
+
+### 11. 本周要点小结
+
+- **Video 的本质**：带时间相关性的图像序列；视频任务的关键是 **temporal continuity**。
+- **Detection & Tracking**：检测每帧 object，再跨帧关联；Re-ID 跨摄像头匹配；JDE 把 detection 与 embedding 合在一起，遮挡后更容易恢复。
+- **Action recognition**：clip → feature → classifier；LRCN（CNN+RNN）、C3D（3D conv）、two-stream（RGB+flow）是早期主流；Transformer 现在更强但需要更多数据。
+- **Video enhancement**：motion blur = PSF convolution + noise；blind deconvolution 需要准确 PSF；深度学习用 encoder-decoder；turbulence 需要 non-rigid registration + kernel regression。
+- **Optical flow**：brightness constancy → $I_xu+I_yv+I_t=0$；1 equation / 2 unknowns → aperture problem，只能测 normal flow。
+- **Video segmentation**：FCN / U-Net 做 pixel-level 预测；视频要额外保证 temporal consistency，避免 flicker。
+- **考试**：Cheng Jun 的 Q4 是概念题（25 分），不考计算；理解原理、方法、limitation 比背公式重要。
+- **一句话**：Video (Part II) 的主线是"**在时间维度上保持一致**"——检测要跨帧一致、动作要跨帧理解、分割要跨帧平滑、光流要跨帧对应；所有方法都在解决"单帧方法在视频上会抖/会丢"的问题。
+
+### 12. 下一周预告
+
+- **Week 12–13：3D**（Topic 13–14）——Three-dimensional Machine Perception / Machine Vision。
+- 老师会讲 3D 的表示、感知、以及 Vision-Language-Action / Navigation 等前沿方向。
+- **Final exam**：4 题 × 25 分；Cheng Jun 的 Q4 概念题；3 题来自 Jiang Xudong。
+- **Assignment 2**：按更正后的要求，不需要 revised design；重点是 own design + AI proposal + 四点比较。

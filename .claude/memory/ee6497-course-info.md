@@ -12,7 +12,8 @@ EE6497 Pattern Recognition and Deep Learning（NTU，AY26-27 Semester1）。
 **考核占比（PG 研究生 EE6497）**：
 - Final Exam 期末 60%（可带一张双面 A4 reference sheet，手写或打印均可，无便利贴；无有效 LOA/MC 缺考记 0）
 - Quiz ×2 各 10%，共 20%（同样可带 A4 reference sheet；Quiz 1 在 Week 7 覆盖 Week 1–4，Quiz 2 在 Week 12 覆盖 Week 8–11；线上题但需到 lecture theater 现场自带 laptop 完成，经 NTULearn）
-- Homework ×2 各 5%，共 10%（不允许迟交，提交单个 PDF；**Homework 1 已于 2026-09-11 23:59 截止并批改**，Homework 2 约 Week 11 —— 截至 Week 8 尚未发布）
+- Homework ×2 各 5%，共 10%（不允许迟交，提交单个 PDF；**Homework 1 已于 2026-09-11 23:59 截止并批改**；**Homework 2 已在 Week 11 前后发布，due date 推迟到 Week 12 末**（老师 Week 10 原话 "end of week 12"，以 NTULearn 为准））
+- ⭐ **Quiz 2（Week 12）具体安排（Week 11 亲述）**：Week 12 课上 **21:00 左右**开始；老师说已发 **practice quiz**，题量/难度与真题相似；范围 **Week 8–11**；可带 A4 reference sheet；线上题但需到 lecture theater 用自带 laptop 经 NTULearn 完成。
 - Class Participation 5%（PG；UG 为 10%）—— **Wooclap** 答题，13 次讲座参加 ≥9 次且 attempt 即满分，答错不扣分；必须经 NTULearn 登录进 Wooclap 才能记录出勤
 - Survey Report 5%（仅 PG，约 Week 13）
 
@@ -23,6 +24,10 @@ EE6497 Pattern Recognition and Deep Learning（NTU，AY26-27 Semester1）。
 - 考试形式补充（Week 9）：final exam 允许**笔 + 计算器手算**（"You just use your pen… maybe a calculator"），会有需要逐步计算 forward/backward 的题。
 - 讲座 19:30–21:30 档（3×50 min），中途休息 10 分钟；**Week 8 忘记开 Wooclap**，**Week 9 已恢复正常**（课后 Wooclap 答题："if you get it wrong, you also get attendance… record the participation, not the score"——只记参与、不记分数）。
 - Week 8 内容 = Part 2.1 Introduction to NN & DL（神经元模型、线性可分性、XOR 需多层 → universal approximation）。
+- **Week 9 = Part 2.1 续**（多层网络设计、forward propagation、universal approximation）；**Week 10–11 = Part 2.2 Training Deep Networks**：
+  - Week 10 前半：MLP forward、softmax、sigmoid/tanh/ReLU/Leaky ReLU、cross-entropy/MSE、gradient descent、backprop、mini-batch/SGD、momentum、Adam、learning rate/scheduling、vanishing gradient；
+  - **Week 11 后半**：generalization（under/overfitting）、L2/L1/elastic net、dropout、early stopping、batch normalization、hyperparameter tuning（grid/random/Bayesian）、K-fold CV、deep vs shallow；然后进入 **CNN 导论**（MLP 不适合图像 / translation；Hubel & Wiesel；Neocognitron/LeNet/AlexNet；convolution 与 cross-correlation；local receptive field、parameter sharing、pooling、ResNet/DenseNet）。
+  - ⚠️ CNN 部分在 `week11.txt` 转写中，**`Part 2.2_Training(1).pdf` 未包含 CNN slides**。
 
 **HW1 反馈（来自 Quiz 1 review session）**：批改时把 "EM algorithm" 当作 Baum-Welch 的写法**没有扣分**，但 Tay 明确提醒 **Quiz/Final 里必须具体写 Baum-Welch，只写 EM 会扣分**。
 

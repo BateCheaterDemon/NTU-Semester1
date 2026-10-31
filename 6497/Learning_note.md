@@ -4117,3 +4117,425 @@ $L'<L$，说明这一步方向正确（下降量很小，因为 $\eta$ 小且输
 - 之后进入 **CNN / deep architectures**（Week 12 左右），以及 **Quiz 2（Week 12，覆盖 Week 8–11）**。
 
 > ⭐ **Quiz 2 范围是 Week 8–11**，本周内容必考：4+2+1 设计与 forward pass 手算、XOR 最小解、single-layer 局限、universal approximation（1/2/3 层区域、定理条件与局限）、parameters vs hyperparameters、training/inference 的区别。§9 的 backprop 推导是 Week 10 的内容，但既然 Quiz 2 覆盖 Week 8–11，建议提前掌握。
+
+---
+
+## Week 11 — Part 2.2（续）：Training Deep Networks 收尾（正则化/优化）＋ CNN 导论
+
+> **本周材料**：`week10-11/week11.txt`（录播转写）、`week10-11/Part 2.2_Training(1).pdf`（Wang Lipo，*Training Deep Networks*，81 页）。⚠️ 课件覆盖 **training** 部分；本周后半段老师已开始讲 **CNN（Convolutional Neural Network）**，这部分**没有对应 PDF**（可能用另一份 slides），本笔记按转写整理并标注。
+>
+> **本周是 Week 10 "Training Deep Networks" 的接续**：Week 10 讲 forward/backprop/GD/优化器；Week 11 从 **generalization** 开始，讲正则化、dropout、early stopping、batch norm、超参数调优，然后进入 **CNN**。
+>
+> **权威来源说明**：典型 ASR 错拼：
+>
+> | 转写 | 正确 |
+> |---|---|
+> | e pch / approach | **epoch** |
+> | arrow / era | **error** |
+> | sta | **theta / parameters** |
+> | parents / patients | **patience** |
+> | patch normalization | **batch normalization** |
+> | internal variance shift | **internal covariate shift** |
+> | hyper pameter | **hyperparameter** |
+> | basion | **Bayesian** |
+> | cross variation | **cross-validation** |
+> | near network / neur newer | **neural network** |
+> | Covent / convolution on | **CNN / convolution** |
+> | Lc / Banjo | **LeCun / Bengio** |
+> | Alex sNt | **AlexNet** |
+> | Hub and Whistle / Cuban whistle | **Hubel & Wiesel** |
+> | Mx pulling | **max pooling** |
+> | rest net | **ResNet** |
+> | dense net | **DenseNet** |
+> | dying lu | **dying ReLU** |
+> | lure | **lecture** |
+
+### 1. Week 10 内容回顾（本周的前半部分基础）
+
+> Week 10 的笔记未单独成节；为便于理解本周，先压缩回顾 PDF 的前半部分。
+
+| 主题 | 要点 |
+|---|---|
+| **MLP forward** | $a^{(l)}=\sigma(W^{(l)}a^{(l-1)}+b^{(l)})$；矩阵形式 $y=f(x)=\sigma(W^L\cdots\sigma(W^1x+b^1)\cdots+b^L)$ |
+| **Softmax** | $y_i=e^{z_i}/\sum_j e^{z_j}$；输出非负且和为 1；多分类输出层用 softmax（二分类可用 sigmoid） |
+| **Activations** | Sigmoid（0–1，会饱和）、Tanh（-1–1，zero-centered，优于 sigmoid）、**ReLU**（$\max(0,x)$，最常用，缓解 vanishing gradient）、Leaky ReLU（解决 dying ReLU）、Linear（回归输出层） |
+| **Loss** | Cross-entropy（分类）、MSE（回归） |
+| **Gradient descent** | $\theta_{new}=\theta_{old}-\alpha\nabla L(\theta_{old})$；可能停在 local minimum / saddle point / plateau |
+| **Backprop** | 链式法则从输出往输入算梯度；一次 forward + 一次 backward 更新一次参数 |
+| **Mini-batch / SGD** | Mini-batch GD（32–256）是实际常用；SGD 单样本噪声大；库里的 "SGD" 通常指 mini-batch GD + momentum |
+| **Momentum / Adam** | Momentum 用历史梯度平滑；Adam 用一阶矩 + 二阶矩自适应学习率；最常用 Adam / SGD+momentum |
+| **Learning rate** | 太小 → 收敛慢；太大 → 震荡/发散；可用 decay / warmup |
+| **Vanishing gradient** | 梯度逐层变小；用 ReLU、batch norm 缓解 |
+
+### 2. Generalization：underfitting vs overfitting
+
+#### 2.1 为什么 generalization 重要
+
+> 训练 NN 的目的**不是**在 training data 上拿满分——如果只是"输入问题、输出答案"，那和 **lookup table** 没区别。真正难的是：**给一个没见过的、但相似的输入，模型也能答对**，这就是 **generalization**。
+
+#### 2.2 Underfitting（欠拟合）
+
+两种可能：
+
+1. **模型太简单**：例如需要 100 个 neuron，你只给了 1–2 个，参数不够，training error 降不下去；
+2. **训练不够**：模型容量够，但 epoch 太少，还没收敛。
+
+特征：**training error 高，validation error 也高**。
+
+#### 2.3 Overfitting（过拟合）
+
+形成条件（老师强调**两个都要**）：
+
+1. **很多 neuron**（容量大）；
+2. **训练很久**（training error 接近 0）。
+
+结果：模型**记住**了 training data（包括 noise），training error 很低，但 validation/test error 高。
+
+| | Training error | Validation error |
+|---|---|---|
+| **Underfitting** | 高 | 高 |
+| **Just right** | 低 | 低 |
+| **Overfitting** | 很低（≈0） | 高 |
+
+⭐ 老师用一个 2D 二分类例子：
+- 3 个 hidden neurons → 边界较平滑，少量错误，可能是"just right"；
+- 6 个 hidden neurons → 边界出现很奇怪的"楔形"凸起，把每个训练点都分对，但**太 sharp、太奇怪**，很可能 overfit。
+
+回归例子（$g(p)=1+\sin(\pi p/4)$）：
+- 1-1-1 / 1-2-1：neuron 太少 → underfit；
+- 1-3-1：对简单区域够用；
+- 1-5-1：对更复杂区域刚好；
+- 1-9-1：neuron 太多 → 曲线剧烈上下波动，穿过每个训练点，**overfit**。
+
+⭐ 没有先验公式能直接告诉你"多少个 neuron 正好"；只能**试**（trial and error），用 validation data 判断。
+
+### 3. Regularization（正则化）
+
+#### 3.1 L2 regularization（weight decay）
+
+在 loss 上加一个惩罚大权重的项：
+
+$$\mathcal{L}_{reg}(\theta)=\mathcal{L}(\theta)+\lambda\sum_k\theta_k^2$$
+
+- $\theta$ 包括所有 weights 和 biases；
+- $\lambda$ 是 **regularization coefficient / hyperparameter**；
+- $\lambda$ 越大 → 惩罚越强 → 权重被压小 → 模型更"regular"、更平滑；
+- $\lambda$ 太大 → regularization term 主导，data loss 被忽略 → **underfit**；
+- $\lambda$ 太小 → 几乎无正则 → **overfit**；
+- 典型值：$0.1,\ 0.01,\ 0.001$（具体问题要试）。
+
+⭐ 直觉：如果某些权重特别大，平方后更大；加进 loss 后，梯度下降会** discourages 大权重**，最终权重更均匀、更小，决策边界更平滑。
+
+#### 3.2 L1 regularization
+
+$$\mathcal{L}_{reg}(\theta)=\mathcal{L}(\theta)+\lambda\sum_k|\theta_k|$$
+
+- 用 L1 norm（绝对值）而不是平方；
+- 在 NN 中**不如 L2 常用**，通常表现更差；
+- L1 在 0 点不可导；L2 处处可导；
+- 可以组合 L1 + L2 → **elastic net**：
+
+$$\mathcal{L}_{reg}=\mathcal{L}+\lambda_1\sum_k|\theta_k|+\lambda_2\sum_k\theta_k^2$$
+
+#### 3.3 PyTorch 实现
+
+```python
+# 0.01 L2 regularization
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1, weight_decay=0.01)
+```
+
+⭐ 正则化通常写在 **optimizer** 的 `weight_decay` 参数里。
+
+### 4. Dropout（随机失活）
+
+#### 4.1 做法
+
+- 训练时，每个 neuron 以固定概率 $p$ **独立**被"丢弃"（连同它的 weights/biases）；
+- 常用 $p=20\%$–$50\%$（具体要调）；
+- 被丢弃的 neuron 不参与 forward/backward；每次 mini-batch 都重新随机丢弃。
+
+```
+原网络： 16 neurons
+dropout 后：约 9 neurons 保留（丢掉约 7 个）
+```
+
+#### 4.2 为什么有效
+
+- 减少参数量 → 网络变简单 → 降低 overfitting；
+- 可以看作 **ensemble learning**：每个 mini-batch 训练一个**不同的子网络**（不同架构），最后相当于很多子网络"投票"/平均。
+- 老师用"committee machine"类比：让很多个模型投票，通常比单个模型更稳。
+
+#### 4.3 ⭐ 测试时必须关闭 dropout
+
+```python
+network = torch.nn.Sequential(
+    torch.nn.Linear(2, 2),
+    torch.nn.Dropout(p=0.5),
+)
+network(torch.tensor([0, 1], dtype=torch.float))  # 训练模式：输出随机
+network.eval()                                      # 评估模式：关闭 dropout
+```
+
+- `model.train()`：启用 dropout / batch norm 的训练行为；
+- `model.eval()`：关闭 dropout，使用全部 neuron；
+- 若评估时忘记 `.eval()`，同一输入会得到不同输出。
+
+### 5. Early Stopping（早停）
+
+- 从 training data 中分出一部分作为 **validation set**（常见 75/25，或 90/10；比例是经验值）；
+- 每个 epoch 后用 validation set 评估（**不参与 backprop**）；
+- 当 validation accuracy/loss **连续 $n$ 个 epoch 没有改善**时停止训练；$n$ 叫 **patience**；
+- 为什么：training error 可以一直降到 0，但 validation error 会在某点**plateau 或开始上升**——再训练就是 overfit；
+- 为什么要 patience：validation 曲线会波动，第一次上升可能是假信号；等几个 epoch 确认。
+
+⭐ Validation data 的定位：训练过程中使用（决定何时停、选超参数），但**不参与梯度更新**；test data 完全留到最后。
+
+### 6. Batch Normalization（批归一化）
+
+#### 6.1 做法
+
+对每一层的 mini-batch 激活做标准化：
+
+$$\hat{x}=\frac{x-\mu}{\sigma}$$
+
+其中 $\mu,\sigma$ 是该 batch 的均值和标准差；输出零均值、单位方差。
+
+#### 6.2 作用
+
+- 类似 input data preprocessing，但**每一层都做**；
+- 减轻对参数初始化的敏感度；
+- 减少 **internal covariate shift**（训练中激活分布随参数更新而变化）；
+- 允许使用**更大的 learning rate**而不发散；
+- 训练更快、更稳定；
+- 在 CNN 中非常常用。
+
+#### 6.3 PyTorch
+
+```python
+network = torch.nn.Sequential(
+    torch.nn.Linear(2, 2),
+    torch.nn.BatchNorm1d(2),
+    torch.nn.Linear(2, 2),
+)
+```
+
+### 7. Hyperparameter Tuning（超参数调优）
+
+#### 7.1 哪些是 hyperparameters
+
+| Hyperparameter | 典型范围/说明 |
+|---|---|
+| Number of layers | 3、5、10、100… |
+| Number of neurons per layer | 每层宽度 |
+| Initial learning rate | 0.1、0.01、0.001… |
+| Learning rate decay schedule | step / exponential / cosine / warmup |
+| Optimizer type | SGD、SGD+momentum、Adam、RMSprop… |
+| Regularization parameters | L2 $\lambda$、dropout rate |
+| Batch size | 32–256 |
+| Activation function | ReLU、Leaky ReLU、tanh… |
+| Loss function | cross-entropy、MSE… |
+
+⭐ **Parameter vs Hyperparameter**：
+- **Parameters**：$W,b$，由训练（backprop）学习；
+- **Hyperparameters**：层数、宽度、学习率、batch size、$\lambda$、dropout rate…，**训练前设定**，不能由梯度下降直接学。
+
+#### 7.2 搜索方法
+
+| 方法 | 做法 | 优缺点 |
+|---|---|---|
+| **Grid search** | 在每个超参数的候选值上做笛卡尔积，逐个试 | 最可靠，但组合爆炸、非常耗时 |
+| **Random search** | 随机采样超参数组合 | 通常更高效，实践中常优先 |
+| **Bayesian optimization** | 用代理模型指导下一步采样 | 活跃研究方向 |
+
+#### 7.3 用 K-fold CV 调超参数
+
+当数据量小（如医学图像只有几十/几百张）时常用：
+
+1. 先划出 **test set**（不碰）；
+2. 把剩余 training data 分成 $K$ 个 fold（如 5）；
+3. 每次用 1 个 fold 作 **validation**，其余 $K-1$ 个作 training；
+4. 重复 $K$ 次，平均 validation performance；
+5. 选最好的 hyperparameters；
+6. 最后在 test set 上评估一次。
+
+⭐ 老师举例：与生物学家/化学家合作时，显微镜非常昂贵，数据只有 50–100 张，这种场景下 K-fold 特别重要。
+
+### 8. Deep vs Shallow Networks
+
+- **Deep network** 通常比 **shallow network** 表现更好（同样数量的 neuron，分层放置往往比全放一层好）；
+- 但深度有上限：超过一定层数后 performance **plateaus**；
+- "deep" 最初指 >4 层；后来 **CNN** 才真正让 deep learning 成功；
+- 例子：4 个 neuron 全放一个 hidden layer vs 2+2 两层；后者通常更好。
+
+### 9. CNN（Convolutional Neural Network）导论
+
+> ⚠️ 以下内容来自 Week 11 转写后半段；对应 slides 未包含在 `Part 2.2_Training(1).pdf` 中。
+
+#### 9.1 为什么 MLP 不适合图像
+
+**Translation（平移）问题**：
+
+- 同一个 object 在图像中向左/向右平移，语义上**还是同一个 object**；
+- 但 MLP 把图像 flatten 成一维向量，平移后向量每个位置都变了 → MLP 看到的是**完全不同的输入**；
+- 所以 MLP **不具备 translation invariance**；同一个 object 在左边响应强、移到右边响应弱。
+
+⭐ 这是 CNN 出现的核心动机之一。
+
+#### 9.2 生物学灵感：Hubel & Wiesel（1950s–60s）
+
+- 用猫做实验，发现视觉皮层中有**对特定方向敏感**的细胞（vertical / horizontal / oblique）；
+- 皮层有 **topographic mapping**：相邻细胞对应视野相邻区域；
+- **Hierarchical organization**：
+  - **Simple cells**：对光的方向敏感；
+  - **Complex cells**：对方向和运动敏感；
+  - **Hypercomplex cells**：对运动 + 端点敏感；
+- 这项工作是视觉神经科学的基础，获诺贝尔奖。
+
+#### 9.3 从 Neocognitron 到 AlexNet
+
+| 阶段 | 工作 | 要点 |
+|---|---|---|
+| 1980s | **Neocognitron**（Fukushima） | 模仿 simple/complex cells 的层级结构；但 filter **handcrafted** |
+| 1989–1998 | **LeCun / Bengio** | 把 **backprop** 用到 CNN；手写数字/邮编识别（LeNet） |
+| 2012 | **AlexNet**（Krizhevsky, Sutskever, Hinton） | 1M images；GPU；deep CNN 的起点 |
+
+⭐ 关键转变：早期 filter 是**手工设计**的；后来用 **backprop + 大量数据**让 filter **自己学**。
+
+#### 9.4 Convolution（卷积）的定义
+
+**1D continuous**：
+
+$$(f*g)(t)=\int_{-\infty}^{\infty}f(\tau)g(t-\tau)\,d\tau$$
+
+- $g$ 是 **kernel / filter**；先**翻转**（$g(-\tau)$），再滑动、相乘、积分。
+
+**Discrete**：
+
+$$(f*g)[n]=\sum_k f[k]g[n-k]$$
+
+**2D**：filter 在 image 上滑动，element-wise 相乘再求和。
+
+⭐ ⭐ **深度学习中的"convolution"其实是 cross-correlation**：
+- 数学定义要 flip kernel；深度学习框架（PyTorch/TensorFlow）**不 flip**；
+- 因为 filter 是**学出来的**：flip 与不 flip 只是学到一套"翻转的"filter，网络表达能力相同；
+- 所以实践中不用纠结，统一叫 convolution。
+
+#### 9.5 Convolution 作为 feature extractor
+
+- 一个 3×3 filter 在图像上滑动，得到一个 **response map**；
+- 当 filter 与图像局部 pattern **相似**时，response 大；
+- 例：edge detection filter（如 $\begin{bmatrix}1&1&1\\1&1&1\\-4&0&0\end{bmatrix}$ 之类）会在边缘处产生大响应，在平坦区域响应为 0；
+- 不同 filter 提取不同 feature（垂直边、水平边、对角边…）。
+
+#### 9.6 关键概念
+
+| 概念 | 含义 |
+|---|---|
+| **Local receptive field** | 每个 neuron 只连接上一层的一个局部区域（如 2×2/3×3），不是全连接 |
+| **Parameter sharing** | 同一个 filter 在整张图上共享权重 → 参数量大大减少 |
+| **Feature map depth** | 该层 filter 的数量 = 输出 feature map 的通道数 |
+| **Stride** | filter 每次滑动的步长 |
+| **Padding** | 边界补零，控制输出尺寸 |
+
+#### 9.7 Pooling（池化）
+
+| 类型 | 做法 |
+|---|---|
+| **Max pooling** | 在窗口内取最大值 |
+| **Average pooling** | 在窗口内取平均值 |
+
+- 窗口大小如 2×2，stride 2；
+- 作用：**降低 spatial size**、减少参数、防止 overfitting；
+- 与 convolution 一样，都会让 feature map 变小；
+- Max vs average 差别通常不大。
+
+#### 9.8 典型 CNN 架构
+
+```
+input image
+  → [conv → ReLU] × 2 → max pool
+  → [conv → ReLU] × 2 → max pool
+  → [conv → ReLU] × 3 → max pool
+  → flatten → fully connected (MLP) → softmax
+```
+
+⭐ 重要观察：
+- **CNN 的"深度"主要来自 convolution 层**；
+- **分类仍然由最后的 fully connected MLP 完成**；
+- convolution 层参数很少（parameter sharing），参数大多集中在最后的 FC 层；
+- convolution 做 **feature extraction**，pooling 做 **simplification**，FC 做 **classification**。
+
+#### 9.9 ResNet 与 DenseNet
+
+- **ResNet**：引入 **identity skip connection**：$x_{l+1}=x_l+\mathcal{F}(x_l)$；
+  - 缓解 **vanishing gradient**；
+  - 可以训练 **1000+ 层**；
+  - 是很多 SOTA 模型的 backbone。
+- **DenseNet**：每层与前面所有层连接（dense connection），进一步复用 feature。
+- 这些 backbone 常作为研究/工程的 baseline。
+
+#### 9.10 CNN 的应用
+
+- Object detection、segmentation；
+- Self-driving；
+- Medical image recognition；
+- Astronomy / scientific imaging；
+- Image captioning（早期结果还很粗糙）；
+- Style transfer。
+
+### 10. ⭐ Quiz 2 与作业信息
+
+- 老师在本周最后明确说：**"next time we're going to do a little quiz... at 9:00, we do a big quiz."**
+- **Week 12 课上（19:30–21:30）**，约 **21:00** 开始 Quiz 2；
+- 老师已发 **practice quiz**：题量、难度与真题相似；
+- 按课程安排（Week 1 公布）：**Quiz 2 覆盖 Week 8–11**，10%，可带 **一张 A4 reference sheet**，线上题但需到 lecture theater 用自带 laptop 经 NTULearn 完成；
+- **Homework 2**：Week 10 转写提到 due date 推迟到 **Week 12 末**；本周未重复，按 NTULearn 为准。
+
+### 11. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **Generalization** | 训练目标不是 memorization，而是 unseen data 表现 |
+| **Underfitting** | 模型太简单 / 训练不够；train & validation error 都高 |
+| **Overfitting** | 很多 neuron + 训练很久；train error≈0，validation error 高 |
+| **Neuron 数量** | 没有公式；trial + validation；越多 capacity 越大 |
+| **L2 regularization** | $\mathcal{L}+\lambda\sum\theta^2$；`weight_decay`；λ 太大会 underfit |
+| **L1 regularization** | $\mathcal{L}+\lambda\sum|\theta|$；NN 中不如 L2 常用；0 点不可导 |
+| **Elastic net** | L1 + L2 |
+| **Dropout** | 训练时按概率 $p$ 丢弃 neuron；20–50%；测试时 `.eval()` 关闭 |
+| **Dropout = ensemble** | 每个 mini-batch 训练不同子网络；投票/平均 |
+| **Early stopping** | 用 validation set；patience $n$；validation 不再改善就停 |
+| **Batch normalization** | 每层 $\hat x=(x-\mu)/\sigma$；减少 internal covariate shift；允许更大 LR |
+| **Hyperparameters** | 层数、宽度、LR、decay、optimizer、λ、dropout、batch size、activation、loss |
+| **Grid vs random search** | grid 可靠但组合爆炸；random 更高效；Bayesian 是研究方向 |
+| **K-fold for tuning** | 小数据常用；train 分 K 折，轮流 validation，平均；最后 test 一次 |
+| **Deep vs shallow** | 深通常更好，但有上限；CNN 让 deep learning 成功 |
+| **MLP 为什么不适合图像** | translation：平移后输入向量完全不同；无 translation invariance |
+| **Hubel & Wiesel** | simple/complex/hypercomplex cells；orientation；topographic map |
+| **Neocognitron/LeNet/AlexNet** | handcrafted → backprop → 1M images/GPU |
+| **Convolution** | 数学上 flip kernel；深度学习不 flip = cross-correlation；filter 学出来，无影响 |
+| **CNN 关键概念** | local receptive field、parameter sharing、feature map depth、stride、padding |
+| **Pooling** | max / average；降尺寸、减参数、防过拟合 |
+| **CNN 架构** | conv+ReLU → pool → … → FC → softmax；conv 提特征，FC 分类 |
+| **ResNet** | identity skip connection；缓解 vanishing gradient；1000+ 层 |
+| **Quiz 2** | Week 12 课上一小时；21:00 开始；覆盖 Week 8–11；A4 reference sheet |
+
+### 12. 本周要点小结
+
+- **Generalization**：训练不是背训练集；要避免 underfit 和 overfit。Overfit 需要"大容量 + 长时间训练"两个条件。
+- **正则化**：L2（weight decay）最常用，L1 可稀疏化但 NN 中较少用；λ 是超参数，太大会 underfit。
+- **Dropout**：随机丢 neuron，等价于训练很多子网络并 ensemble；评估时务必 `.eval()`。
+- **Early stopping**：用 validation set + patience；在 validation 开始变差前停下。
+- **Batch normalization**：每层标准化，稳定训练、允许更大 LR、缓解 vanishing/exploding gradient。
+- **超参数调优**：grid search 可靠但昂贵；random search 更实用；小数据用 K-fold。
+- **CNN 的动机**：MLP 不具备 translation invariance；CNN 用 local receptive field + parameter sharing 解决。
+- **Convolution**：filter 滑动 + 内积；深度学习实际是 cross-correlation；filter 由 backprop 学习。
+- **Pooling / 架构**：conv 提特征，pool 降维，FC 分类；ResNet 用 skip connection 训练很深。
+- **Quiz 2**：Week 12 课上一小时，21:00 开始，覆盖 Week 8–11；练习 quiz 已发，务必先做。
+
+### 13. 下一周预告
+
+- **Week 12**：继续 **CNN**（卷积层细节、pooling、经典架构），并在课上进行 **Quiz 2**（21:00 左右）。
+- **Quiz 2 范围 Week 8–11**：神经网络导论、MLP/forward/backprop、训练技巧（正则化/dropout/batch norm/超参数）、CNN 基础。
+- **Homework 2**：Week 12 末截止（以 NTULearn 为准）；内容是用神经网络逼近函数，注意 underfit / overfit / just-right 的对比。
+- 之后 Week 13 进入 **CNN 的后续内容 / 课程收尾**，并准备 Final Exam（可带一张 A4 reference sheet）。

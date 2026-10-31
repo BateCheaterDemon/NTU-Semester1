@@ -29,7 +29,12 @@ EE6222 Machine Vision（NTU，AY26-27 Semester1，School of EEE）。注意用�
     - **提交**：把报告 PDF 上传 **NTULearn**，**截止 2026-10-25（Week 10 末）**。
     - **文件名规则**：学生证姓名 + 学号，例如 `HOEJIUNTIAN-U2203856C`。
     - 原文见 `6222/assignment1/Assignment.pdf`；工作目录 `/home/qwx/NTU/6222assignment1/`（手写 PCA/LDA 人脸识别 pipeline + report）。
-  - Assignment 2（Cheng Jun 部分）**尚未发布**（Week 8 转写中无任何提及）。
+  - **Assignment 2（Cheng Jun 部分，15%）**：**Week 10 课堂发布**（"available online tonight"）；主题 = **video generation network proposal + 与 AI proposal 比较**。Week 11 更正：**不需要 revised design**；Part 1 写自己的设计，Part 2 按四个 points 比较 AI proposal（差异、AI 弱点等）。**在线提交系统截止约 2026-11-23 23:59**（转写 "November 23 … 59 seconds" 略含糊，以 NTULearn 公告为准）。
+
+**课程进度（Cheng Jun 部分）**：
+- **Week 10 = Video (Part I)**；**Week 11 = Video (Part II)**：object detection & tracking、Re-ID / JDE、action recognition（LRCN / C3D / two-stream / Hidden Two-Stream）、video enhancement（motion blur / PSF / blind deconvolution / turbulence）、optical flow（brightness constancy、aperture problem）、video segmentation（FCN / U-Net / temporal consistency）。
+- ⭐ **Week 11 考试说明**：Final 4 题 × 25 分；Cheng Jun 的 **Q4 是概念题，不考计算**（往年题偏计算，但本学期他的部分考 concept/understanding）；不要战略放弃 Q4。
+- **Week 12–13 = 3D**（Topic 13–14：3D Machine Perception / Machine Vision；VLA、Vision-Language Navigation 等前沿）。
 
 **课程布局**：14 Topics。Topic 1–3 图像处理基础（image fundamentals / LSI & transforms / enhancement），4–5 识别决策（matching→classification、MAP decision），6–8 传统机器学习（统计估计→手工特征→特征选择/降维），9–10 深度学习（MLP→CNN→Transformer），11–14 Video + 3D（Cheng Jun）。
 

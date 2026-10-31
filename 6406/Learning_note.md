@@ -3559,3 +3559,530 @@ plt.show()
 > - 之后 Week 11 进入 **Gradient-Boosted Trees、XGBoost、LightGBM**；Week 12 前半讲 ensemble 与 reinforcement learning 的联系（**不考**），后半 **Quiz 3（CA3，15%，范围 Week 9–11）**。
 >
 > 预习建议：把本周的 **bias–variance 分解**、**bagging variance 公式 $\sigma^2[(1-\rho)/M+\rho]$**、**Gini/Entropy 计算**、**bootstrap/OOB** 先吃透——Week 10 的 RF 和 boosting 会反复用到这些概念。
+
+---
+
+## Week 11 — Lecture 11：Gradient Boosting、GBDT、XGBoost、LightGBM
+
+> **本周材料**：`week11/EE6406_Lecture11_SL.pdf`（Simon Liu，79 页）、`week11/*.txt`（录播转写）。
+>
+> **⚠️ Quiz 3 / CA3 信息（本周 slide 原文，最权威）**：
+> - **时间**：**2026-11-05（周四）20:00**（Week 12，课后）；
+> - **时长**：**50 分钟**；
+> - **形式**：online、in-class、lockdown browser；**True/False + multiple choice + short calculations**；
+> - **范围**：**Week 9–11**（Ensemble Learning：随机森林、boosting、gradient boosting、XGBoost/LightGBM）；
+> - **Python notebook 不考**；
+> - Week 12 第一小时的 **reinforcement learning 内容不考**；
+> - 老师强调：**Final Exam 中他这部分的范围也正好是 Week 9–11**，所以准备这次 quiz 等于同时准备期末。
+>
+> ⚠️ 转写里说 "15 minutes"，与 slide 的 **50 mins** 冲突；**以 slide 为准**。
+
+### 1. 本周定位：从 AdaBoost 到 Gradient Boosting
+
+Week 9–10 的 ensemble 主线：
+
+| 方法 | 机制 | 主要作用 |
+|---|---|---|
+| **Bagging / Random Forest** | bootstrap 采样 + 随机 feature 子集 + 多数投票/平均 | **降 variance**，bias 基本不变 |
+| **Boosting** | 顺序训练 weak learners，每个纠正前一个的错误 | **降 bias**（过多迭代也可能升 variance） |
+| **AdaBoost** | 提高错分样本权重；用 error rate 算 $\alpha_m$ | 指数损失 + 二分类专用 |
+| **Gradient Boosting** | 每个新 learner 拟合 **pseudo-residual**（负梯度） | 任意可微损失；更通用 |
+
+⭐ 本周核心：**Gradient Boosting 把 boosting 看成"函数空间中的梯度下降"**；XGBoost 和 LightGBM 是它的两个最强工程实现。
+
+### 2. 复习：Random Forest、Boosting、AdaBoost
+
+#### 2.1 Random Forest
+
+- Ensemble of decision trees built via **bagging**（bootstrap sampling）；
+- 每棵树用不同 bootstrap sample；每次 split 只考虑**随机 feature 子集** → 降低树间 correlation；
+- 分类用 **majority vote**，回归用 **average**；
+- 主要收益：**variance reduction with minimal change in bias**。
+
+#### 2.2 Boosting（general concept）
+
+- **Sequential ensemble**：每个 weak learner 纠正前一个的错误；
+- 组合成 weighted sum：
+
+$$F(x)=\sum_{m=1}^{M}\alpha_m h_m(x)$$
+
+- 关注 **hard examples**（调样本权重或拟合 residual）；
+- 主要作用：**降 bias**，并常常也降 variance。
+
+#### 2.3 AdaBoost
+
+- 每轮重新加权训练样本；错分样本权重变大；
+- Learner weight：
+
+$$\alpha_m=\frac{1}{2}\ln\left(\frac{1-\epsilon_m}{\epsilon_m}\right)$$
+
+- 样本权重更新（归一化）：
+
+$$w_i\leftarrow w_i\exp\left(-\alpha_m y_i h_m(x_i)\right)$$
+
+- 最终 weighted vote；bias reduction 很好，但对 noisy data 敏感。
+
+### 3. Gradient Boosting：核心思想
+
+#### 3.1 与 AdaBoost 的区别
+
+| | AdaBoost | Gradient Boosting |
+|---|---|---|
+| 如何纠错 | 调**样本权重**，让新 learner 关注错分样本 | **不调样本权重**；让新 learner 拟合 **residual / pseudo-residual** |
+| 损失函数 | 指数损失（二分类） | **任意可微损失** |
+| 适用 | 分类 | 回归 + 分类 |
+
+⭐ 直觉：Gradient Boosting 不改变数据权重，而是改变**目标值**——每个新 learner 学习"当前模型还差多少"。
+
+#### 3.2 Additive model
+
+$$F_M(x)=\sum_{m=1}^{M}\gamma_m h_m(x)$$
+
+- $h_m$：weak learner（通常是 shallow decision tree）；
+- $\gamma_m$：第 $m$ 个 learner 的权重/步长；
+- 每一步：
+
+$$F_m(x)=F_{m-1}(x)+\gamma_m h_m(x)$$
+
+#### 3.3 Pseudo-residual（伪残差）
+
+Gradient Boosting 要求损失函数 $L(y,F(x))$ **可微**。在第 $m$ 轮，定义：
+
+$$r_i^{(m)}=-\frac{\partial L(y_i,F^{(m-1)}(x_i))}{\partial F^{(m-1)}(x_i)}$$
+
+- 负梯度 → loss 下降最快的方向；
+- 用 weak learner $h_m(x)$ 去拟合 $\{(x_i,r_i^{(m)})\}$；
+- ⭐ **pseudo-residual 是"方向"，不是真正的 residual**；对 squared loss，它恰好等于 residual 的常数倍。
+
+#### 3.4 Functional gradient descent（函数空间梯度下降）
+
+- 普通梯度下降：对**参数**求导；
+- Gradient Boosting：对**模型函数 $F$** 求导（functional derivative）；
+- 每次加入的 weak learner 是函数空间中的一个**基方向**；
+- 由于精确 functional gradient 是无限维的，用**样本上的 pseudo-residual** 做数值近似。
+
+#### 3.5 两个具体损失例子
+
+**Squared loss**：
+
+$$L(y,F)=(y-F)^2$$
+
+$$\frac{\partial L}{\partial F}=-2(y-F)\quad\Rightarrow\quad r=-\frac{\partial L}{\partial F}=2(y-F)$$
+
+例：$y=5,\ F=3$ → $r=2(5-3)=4$。
+
+**Logistic loss**（$y\in\{-1,+1\}$）：
+
+$$L(y,F)=\ln(1+e^{-yF})$$
+
+$$\frac{\partial L}{\partial F}=-\frac{y}{1+e^{yF}}\quad\Rightarrow\quad r=\frac{y}{1+e^{yF}}$$
+
+例：$y=+1,\ F=0$ → $r=0.5$；$y=-1,\ F=1$ → $r\approx-0.27$。
+
+### 4. Gradient-Boosted Trees（GBT）
+
+#### 4.1 算法（slide 16–17）
+
+1. **初始化**常数预测：
+
+$$F_0(x)=\arg\min_\gamma\sum_{i=1}^{N}L(y_i,\gamma)$$
+
+2. 对 $m=1,\dots,M$：
+   - 计算 pseudo-residual：$r_i^{(m)}=-\partial L(y_i,F_{m-1}(x_i))/\partial F_{m-1}(x_i)$；
+   - 用 regression tree $h_m(x)$ 拟合 $\{(x_i,r_i^{(m)})\}$；
+   - 求最优步长：
+
+$$\gamma_m=\arg\min_\gamma\sum_{i=1}^{N}L\left(y_i,F_{m-1}(x_i)+\gamma h_m(x_i)\right)$$
+
+   - 更新：$F_m(x)=F_{m-1}(x)+\gamma_m h_m(x)$。
+
+3. 输出 $F_M(x)$。
+
+⭐ 为什么用 **shallow regression tree**（depth 3–5/3–7）：
+- boosting 本身会逐步降 bias，不需要一开始就用很复杂的树；
+- 浅树 high bias、low variance，适合作 weak learner；
+- 深树容易 overfit，尤其在 noisy data。
+
+#### 4.2 Global line search（squared loss）
+
+对 squared loss，最小化：
+
+$$\sum_i\left(y_i-[F_{m-1}(x_i)+\gamma h_m(x_i)]\right)^2$$
+
+求导令零：
+
+$$\gamma_m=\frac{\sum_i h_m(x_i)(y_i-F_{m-1}(x_i))}{\sum_i[h_m(x_i)]^2}$$
+
+例：predictions $F_{m-1}=\{3,4,5\}$，targets $\{5,6,8\}$，$h_m=\{1,1,1\}$：
+
+$$\gamma_m=\frac{(5-3)+(6-4)+(8-5)}{1^2+1^2+1^2}=\frac{7}{3}\approx2.33$$
+
+#### 4.3 Region-specific step size（按叶节点分别取 γ）
+
+- 全局 $\gamma_m$：整棵树一个标量；
+- **region-specific $\gamma_{m,r}$**：每个 leaf $r$ 一个标量；
+- 每个 leaf 在自己的数据子集上做 line search，loss reduction 更大，但计算更贵。
+
+Squared loss 下：
+
+$$\gamma_{m,r}=\frac{\sum_{i\in r}(y_i-F_{m-1}(x_i))}{|r|}$$
+
+例：leaf 内 $F=\{3,4,5\}$，$y=\{5,7,9\}$ → $\gamma=(2+3+4)/3=3$。
+
+#### 4.4 Shrinkage / Learning rate
+
+$$F_m(x)=F_{m-1}(x)+\eta\,\gamma_m h_m(x),\qquad 0<\eta\le1$$
+
+- $\eta$ 小 → 学习慢、收敛平滑、降低 overfitting；
+- 典型值 **0.01–0.1**；
+- $\eta$ 越小，需要越多 trees，但 generalization 通常更好。
+
+#### 4.5 Subsampling
+
+| 类型 | 做法 | 作用 |
+|---|---|---|
+| **Row subsampling**（stochastic boosting） | 每棵树用随机 50–80% 训练样本 | 降 variance、加速 |
+| **Column subsampling** | 每次 split 随机选 50–80% features | 降低树间 correlation、增强鲁棒性 |
+
+#### 4.6 树结构超参数（slide 27）
+
+| 参数 | 作用 | 典型范围 |
+|---|---|---|
+| Number of trees | ensemble 大小 | 100–1000 |
+| Max depth | 树复杂度 | 3–7 |
+| Min samples to split | 分裂所需最少样本 | 2–10 |
+| Min samples per leaf | 防止过小 leaf | 5–20 |
+| Max leaves | 限制 leaf 总数 | 20–100 |
+
+#### 4.7 Bias–variance 视角
+
+- Boosting 顺序拟合 residual → **bias 大幅下降**；
+- 不加正则时，过多迭代会 **增加 variance / overfit noise**；
+- 控制 variance 的手段：
+  - **shrinkage**（learning rate）；
+  - **row subsampling**；
+  - **column subsampling**；
+  - **tree constraints**（depth、min samples、max leaves）。
+
+#### 4.8 AdaBoost vs GBT（slide 30）
+
+| 特征 | AdaBoost | Gradient Boosted Trees |
+|---|---|---|
+| Base learner | Decision stump（depth=1） | Shallow regression tree（depth 3–7） |
+| 纠错方式 | 重加权错分样本 | 拟合 pseudo-residual（梯度下降） |
+| Step size | 由 error rate 得 $\alpha_m$ | Global $\gamma_m$ via line search |
+| Loss | Exponential loss（仅分类） | **任意可微损失**（回归+分类） |
+| 正则化 | 隐式（弱学习器简单） | **显式**：shrinkage、subsampling、tree constraints |
+| Overfit 风险 | noisy data 下较高 | 用 learning rate + subsampling 降低 |
+| 超参数 | iterations、stump complexity | trees、depth、learning rate、subsample rates |
+
+### 5. XGBoost（eXtreme Gradient Boosting）
+
+#### 5.1 核心改进
+
+| 改进 | 内容 |
+|---|---|
+| **Explicit regularization** | 对 leaf 数和 leaf weight 都加惩罚 |
+| **Second-order optimization** | 同时用 gradient（一阶）和 Hessian（二阶） |
+| **Sparse-aware split finding** | 原生处理 missing values |
+| **Cache-efficient / parallel / distributed** | 大规模数据训练更快 |
+
+#### 5.2 Objective function
+
+$$J=\sum_{i=1}^{N}L(y_i,\hat y_i)+\sum_{m=1}^{M}\Omega(f_m)$$
+
+$$\Omega(f_m)=\gamma T+\frac{1}{2}\lambda\sum_{j=1}^{T}w_j^2$$
+
+- $T$：一棵树的 leaf 数；
+- $w_j$：第 $j$ 个 leaf 的输出权重；
+- $\gamma$：每增加一个 leaf 的惩罚（控制树复杂度）；
+- $\lambda$：leaf weight 的 **L2 正则**（防止权重过大）。
+
+#### 5.3 Second-order Taylor expansion
+
+在第 $m$ 轮加入 $f_m$：
+
+$$L(y_i,F_{m-1}+f_m)\approx L(y_i,F_{m-1})+g_i f_m(x_i)+\frac{1}{2}h_i[f_m(x_i)]^2$$
+
+其中：
+
+$$g_i=\left.\frac{\partial L(y_i,\hat y)}{\partial \hat y}\right|_{\hat y=F_{m-1}(x_i)},\qquad h_i=\left.\frac{\partial^2 L(y_i,\hat y)}{\partial \hat y^2}\right|_{\hat y=F_{m-1}(x_i)}$$
+
+近似目标：
+
+$$\sum_i\left[g_i f_m(x_i)+\frac12 h_i f_m(x_i)^2\right]+\gamma T+\frac12\lambda\sum_j w_j^2$$
+
+#### 5.4 Optimal leaf weight
+
+对 leaf $j$（$f_m(x_i)=w_j$ for $i\in I_j$）：
+
+$$J_j(w_j)=\sum_{i\in I_j}\left[g_i w_j+\frac12 h_i w_j^2\right]+\frac12\lambda w_j^2$$
+
+求导令零：
+
+$$\boxed{w_j^*=-\frac{\sum_{i\in I_j}g_i}{\sum_{i\in I_j}h_i+\lambda}}$$
+
+- 分子：该区域梯度的方向和；
+- 分母：curvature（Hessian 和）+ L2 正则。
+
+**Squared loss 例子**（$L=(y-\hat y)^2$，$g_i=-2(y_i-F_{m-1}(x_i))$，$h_i=2$）：
+
+| $i$ | $y_i$ | $F_{m-1}$ | $g_i$ |
+|---|---|---|---|
+| 1 | 5 | 3 | $-4$ |
+| 2 | 7 | 4 | $-6$ |
+| 3 | 9 | 5 | $-8$ |
+
+$\sum g_i=-18$，$\sum h_i=6$。
+
+| $\lambda$ | 分母 $6+\lambda$ | $w_j^*$ | 直觉 |
+|---|---|---|---|
+| 0 | 6 | **3.00** | 无正则，完整 residual correction |
+| 2 | 8 | **2.25** | 中等惩罚，shrink |
+| 10 | 16 | **1.125** | 强惩罚，大幅 shrink |
+
+⭐ $\lambda$ 越大，leaf 输出越接近 0，抑制极端更新 → 降低 overfitting。
+
+#### 5.5 Tree pruning via γ
+
+XGBoost 每增加一个 split 都要付 $\gamma$ 的代价；只有 **gain > γ** 才分裂。
+
+Split gain：
+
+$$\text{Gain}=\frac12\left[\frac{G_L^2}{H_L+\lambda}+\frac{G_R^2}{H_R+\lambda}-\frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right]-\gamma$$
+
+- $G_L=\sum_{i\in L}g_i,\ H_L=\sum_{i\in L}h_i$（右同）；
+- **Gain > 0** 才接受 split；
+- $\gamma$ 越大 → 分裂要求越严格 → 树越简单。
+
+**数值例子**：$G_L=10,\ H_L=8;\ G_R=-4,\ H_R=5;\ \lambda=0$：
+
+$$\text{pre-penalty Gain}=\frac12\left[\frac{10^2}{8}+\frac{(-4)^2}{5}-\frac{6^2}{13}\right]\approx6.5$$
+
+- $\gamma=5$：Gain $=6.5-5=1.5>0$ → 接受；
+- $\gamma=7$：Gain $=6.5-7=-0.5<0$ → 拒绝。
+
+#### 5.6 Missing values
+
+- XGBoost 把 missing 当作**单独类别**，不需要 imputation；
+- 每个候选 split 计算**两次 gain**：missing 全去左、missing 全去右；
+- 选 gain 更大的方向作为 **default direction**；
+- 训练和 inference 使用同一个 default direction。
+
+例：feature X，candidate split $X<10$；missing 去左 gain=4.2，去右 gain=1.8 → default = left。
+
+#### 5.7 工程优化（了解即可）
+
+- **Columnar block storage**：按列压缩存储，提高 cache locality；
+- **Histogram-based split finding**：固定宽度直方图，减少内存扫描；
+- **Cache line optimization**：连续 block 放进 CPU cache；
+- **Out-of-core**：数据超过 RAM 时 spill 到磁盘；
+- **Multi-threaded / column / data parallelism**：并行构建 histogram；
+- **GPU acceleration**：histogram + gain 在 GPU 上算；
+- **AllReduce**：分布式聚合；
+- **Elastic scaling**：动态增删 worker。
+
+#### 5.8 XGBoost 训练算法（slide 52–53）
+
+1. 初始化 $F_0(x)=\arg\min_\gamma\sum_iL(y_i,\gamma)$；
+2. 对 $m=1,\dots,M$：
+   - 计算 $g_i,h_i$；
+   - 可选 row/column subsampling；
+   - **leaf-wise** 建树：对每个候选 split 算 Gain，Gain>0 才分裂；达到 max depth/min child size 停止；
+   - 计算每个 leaf 的 $w_j^*$；
+   - 更新 $F_m(x)=F_{m-1}(x)+\eta f_m(x)$；
+3. 输出 $F_M(x)$。
+
+#### 5.9 超参数（slide 54）
+
+| 参数 | 说明 | 典型范围 |
+|---|---|---|
+| learning rate $\eta$ | step size shrinkage | 0.01–0.2 |
+| number of trees | boosting rounds | 100–1000（early stopping） |
+| max depth | 树深 | 3–7 |
+| subsample | 行采样 | 0.6–0.8 |
+| colsample_bytree | 列采样 | 0.5–0.8 |
+| gamma $\gamma$ | 最小 split gain | 0–5 |
+| lambda $\lambda$ | L2 on leaf weights | 1–10 |
+| min child weight | leaf 最小样本权重和 | 1–10 |
+
+#### 5.10 影响力（slide 55）
+
+- 超过 **70%** 的 winning Kaggle solutions 使用过 XGBoost；
+- 比传统 GBT 快 **5–10×**（large tabular data）；
+- 常降低 test error **10–30%**；
+- 应用：credit scoring、CTR prediction、fraud detection、churn、demand forecasting。
+
+### 6. LightGBM（Light Gradient Boosting Machine，Microsoft 2017）
+
+#### 6.1 三大核心创新
+
+| 创新 | 内容 |
+|---|---|
+| **Leaf-wise (best-first) growth** | 每次选 **split gain 最大** 的 leaf 分裂，而不是按层分裂 |
+| **GOSS**（Gradient-based One-Side Sampling） | 保留大梯度样本，随机采样小梯度样本并放大 |
+| **EFB**（Exclusive Feature Bundling） | 把互斥的稀疏 feature 合并成一个 bundle |
+
+#### 6.2 Leaf-wise growth
+
+- 传统 GBT：**level-wise**，一层一层把所有节点都分裂；
+- LightGBM：每次选**当前 gain 最大**的单个 leaf 分裂 → 更深、更聚焦的树；
+- 优点：每次 split 的 loss reduction 更大 → 达到同样精度需要更少的树；
+- 缺点：小数据上容易 overfit（用 max depth / num leaves 控制）。
+
+**数值例子**（num leaves=4，gain：root 20、left 12、right 4、left→left 8）：
+
+- **Level-wise**：先 split root（20）→ 再同时 split left（12）和 right（4）→ 得到 4 个 leaves；
+- **Leaf-wise**：先 split root（20）→ 再 split left（12）→ 再 split left→left（8）→ 得到 4 个 leaves；
+- 同样的 leaf 数，leaf-wise 把容量集中在**高 gain 区域**。
+
+#### 6.3 GOSS（Gradient-based One-Side Sampling）
+
+- 大梯度样本对 split 更重要；小梯度样本贡献小；
+- 步骤：
+  1. 按 $|g_i|$ 排序；
+  2. 保留 top $a\%$（如 40%）大梯度样本；
+  3. 从剩余小梯度样本中随机采样 $b\%$（如 20%）；
+  4. 小梯度样本的梯度/Hessian 乘以 $\frac{1-a}{b}$ 放大（保持总和近似不变）。
+- 典型 $a=40\%,\ b=20\%$ → 放大因子 $0.6/0.2=3$。
+
+**数值例子**：$|g|=[9,8,7,6,5,4,3,2,1,0.5]$，$a=40\%$（保留前 4 个），$b=20\%$（从剩余 6 个中采 2 个，例如 5 和 3）：
+
+- 保留：$9,8,7,6$；
+- 采样并放大：$5\times3=15,\ 3\times3=9$；
+- 训练用梯度：$[9,8,7,6,15,9]$。
+
+#### 6.4 EFB（Exclusive Feature Bundling）
+
+- 互斥的稀疏 feature（one-hot / indicator）很少同时非零；
+- 把它们合并成一个 bundle，用 **offset** 区分原 feature；
+- 例：$f_1=8,\ f_2=5,\ f_3=3,\ f_4=9$，offsets $0,10,20,30$ → bundle 值 $8,15,23,39$；
+- 效果：feature 数大幅减少（最高约 **80%**），内存/计算下降，信息不丢失。
+
+#### 6.5 原生 categorical 支持
+
+- 不需要 one-hot encoding；
+- 每个 category 当作一个 bin；按 **mean target** 排序，搜索最优二分：
+  - 例：A 均值 10.5、B 12.5、C 4.5 → 排序 B, A, C → 最优 split {A,B} vs {C}（均值 11.5 vs 4.5）。
+- 优点：降维、降内存、训练更快、比 one-hot 更不容易 overfit。
+
+#### 6.6 Missing values
+
+- 与 XGBoost 相同：missing 当单独类别；split 时分别试去左/去右，选 gain 大的方向；不需要手动 imputation。
+
+#### 6.7 LightGBM 训练算法（slide 70–71）
+
+1. 初始化 $F_0(x)=\arg\min_\gamma\sum_iL(y_i,\gamma)$；
+2. 对 $m=1,\dots,M$：
+   - 计算 $g_i,h_i$；
+   - **GOSS**：保留 top $a\%$，采样 $b\%$ 并放大；
+   - **EFB**：合并互斥稀疏 feature；
+   - **leaf-wise** 建树：每次 split gain 最大的 leaf，直到 num leaves 或 no valid split；
+   - 计算 leaf weight $w_j=-\sum g_i/(\sum h_i+\lambda)$；
+   - 更新 $F_m(x)=F_{m-1}(x)+\eta f_m(x)$；
+3. 输出 $F_M(x)$。
+
+#### 6.8 超参数（slide 72）
+
+| 参数 | 作用 | 典型范围 |
+|---|---|---|
+| num leaves | 每棵树最大 leaf 数 | 31–255 |
+| learning rate | step size | 0.01–0.2 |
+| n estimators | 树数量 | 100–1000（early stopping） |
+| max depth | 限制深度 | 3–7 |
+| min data in leaf | leaf 最小样本数 | 10–50 |
+| feature fraction | 列采样 | 0.5–0.8 |
+| bagging fraction | 行采样 | 0.6–0.8 |
+| bagging freq | bagging 频率 | 1–5 |
+| min gain to split | 最小 split gain | 0–5 |
+| lambda | L2 on leaf weights | 0–10 |
+
+#### 6.9 XGBoost vs LightGBM（slide 73）
+
+| 特征 | XGBoost | LightGBM |
+|---|---|---|
+| Tree growth | **Level-wise**（balanced） | **Leaf-wise**（best-first） |
+| Missing values | Sparse-aware default direction | 同 |
+| Categorical | 需要 encoding | **原生支持**（optimal grouping） |
+| Sampling | Row/column subsample | **GOSS + EFB** + subsampling |
+| Split pruning | $\gamma$ threshold | $\gamma$ + **num leaves** |
+| Memory | Moderate | **High**（EFB 降维） |
+| Speed | 并行化后快 | **更快**（leaf-wise + sampling） |
+| GPU | 支持 | 支持 |
+| 典型场景 | 平衡精度/稳定性 | **超大数据、稀疏 feature** |
+
+### 7. 实践与代码示例（credit data）
+
+老师用一个 **credit default** 数据集演示：
+
+- 目标：是否 seriously delinquent in last 2 years；正类约 **6%**，类别不平衡；
+- 数据预处理：
+  - **correlation matrix / Pearson correlation** 检查共线特征（>0.8 视为高度相关）；
+  - 高度相关的 feature 会**竞争 feature importance**，让两个重要特征都显得不重要 → 删掉冗余特征；
+  - 缺失值用 **median imputation**（也可根据业务知识填 0）；
+- 模型比较：AdaBoost vs Gradient Boosting vs XGBoost vs LightGBM；
+- 单指标比较用 **AUC-ROC**（threshold-independent）：
+  - 银行场景：AUC **0.75** 是基准，**0.8** 算好，**0.85** 很好；
+  - 小数据集上 XGBoost / LightGBM 性能接近；大数据（百万/十亿）LightGBM 更快。
+
+⭐ 老师提醒：**correlated features 对 tree-based models 的 feature importance 尤其有害**——两个强特征互相"抢" importance；删掉一个通常不影响性能，甚至更好。
+
+### 8. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **Quiz 3** | 2026-11-05（周四）20:00，**50 min**，online/in-class/lockdown；T/F + MCQ + short calculations；范围 **W9–11**；notebook 不考；W12 RL 不考 |
+| **Bagging vs Boosting** | bagging 并行降 variance；boosting 顺序降 bias |
+| **Random Forest** | bootstrap + random feature subset + vote/average |
+| **AdaBoost α** | $\frac12\ln\frac{1-\epsilon}{\epsilon}$ |
+| **Gradient Boosting 核心** | 拟合 **pseudo-residual = 负梯度**；任意可微 loss |
+| **Pseudo-residual** | $r_i=-\partial L/\partial F$；squared loss → $2(y-F)$ |
+| **Additive model** | $F_m=F_{m-1}+\gamma_m h_m$ |
+| **Line search** | $\gamma_m=\arg\min_\gamma\sum L(y_i,F_{m-1}+\gamma h_m)$ |
+| **Squared loss γ** | $\frac{\sum h(y-F)}{\sum h^2}$；例 7/3≈2.33 |
+| **Region-specific γ** | 每个 leaf 一个 γ；例 9/3=3 |
+| **Shrinkage** | $F_m=F_{m-1}+\eta\gamma h$；η 0.01–0.1；小 η 需更多树 |
+| **Subsampling** | row / column；降 variance、降 correlation |
+| **GBT 树深** | 3–7（常用 3–5）；shallow weak learners |
+| **AdaBoost vs GBT** | stump vs shallow tree；重加权 vs residual；exponential vs any differentiable loss |
+| **XGBoost objective** | $J=\sum L+\sum[\gamma T+\frac12\lambda\sum w^2]$ |
+| **XGBoost g/h** | $g_i=\partial L/\partial\hat y$；$h_i=\partial^2L/\partial\hat y^2$ |
+| **Optimal leaf weight** | $w_j^*=-\sum g_i/(\sum h_i+\lambda)$ |
+| **λ 效果** | λ↑ → $w^*$↓；例 -18/(6+λ)：3 / 2.25 / 1.125 |
+| **γ 效果** | Gain > γ 才分裂；γ↑ → 树更简单 |
+| **Gain 公式** | $\frac12[\frac{G_L^2}{H_L+\lambda}+\frac{G_R^2}{H_R+\lambda}-\frac{(G_L+G_R)^2}{H_L+H_R+\lambda}]-\gamma$ |
+| **Gain 例** | GL=10,HL=8,GR=-4,HR=5 → 6.5；γ=5 接受，γ=7 拒绝 |
+| **Missing values** | XGBoost/LightGBM 学 default direction；不需 imputation |
+| **XGBoost 工程** | column block、histogram、cache、parallel、GPU、AllReduce |
+| **LightGBM 三大创新** | leaf-wise、GOSS、EFB |
+| **Leaf-wise** | 每次 split gain 最大的 leaf；小数据易 overfit |
+| **GOSS** | 保留 top 40% 大梯度；采样 20% 小梯度 ×3 |
+| **EFB** | 互斥稀疏 feature 合并；offset；降维最高 80% |
+| **LightGBM categorical** | 原生；按 mean target 排序找最优 split |
+| **XGBoost vs LightGBM** | level-wise vs leaf-wise；encoding vs native categorical；speed/memory |
+| **AUC** | threshold-independent；0.75 基准、0.8 好、0.85 很好 |
+
+### 9. 本周要点小结
+
+- **Gradient Boosting**：把 boosting 看成**函数空间的梯度下降**；每个新 learner 拟合 pseudo-residual（负梯度），再加权加入 ensemble。
+- **Pseudo-residual**：对 squared loss 就是 $2(y-F)$；对 logistic loss 是 $y/(1+e^{yF})$；只要 loss 可微就能用。
+- **GBT**：用 shallow regression tree（depth 3–5/3–7）；通过 line search 找 $\gamma$；可用 region-specific $\gamma$ 更精细。
+- **正则化**：shrinkage（learning rate）、row/column subsampling、tree constraints（depth/min samples/max leaves）。
+- **Bias–variance**：boosting 快速降 bias；不加控制会升 variance；所有正则化手段都是为了控制 variance。
+- **XGBoost**：二阶 Taylor + 显式正则（$\gamma$ leaf 数惩罚、$\lambda$ leaf weight L2）；最优 leaf weight $w^*=-\sum g/(\sum h+\lambda)$；Gain > γ 才分裂；原生处理 missing；工程上高度优化。
+- **LightGBM**：leaf-wise growth + GOSS + EFB + 原生 categorical；超大数据/稀疏特征更快；小数据易 overfit。
+- **实践**：credit data 例子；检查 correlation（>0.8 删冗余）、median imputation、AUC 比较；小数据上 XGBoost/LightGBM 接近，大数据 LightGBM 更快。
+- **一句话**：Gradient Boosting 用"拟合负梯度"把任意可微 loss 变成加法模型；XGBoost 用二阶信息和显式正则把它做到又准又稳；LightGBM 用 leaf-wise + GOSS + EFB 把它做到又快又省内存。
+
+### 10. 下一周预告
+
+- **Week 12**：
+  - 第一小时：**Introduction to Reinforcement Learning**（老师明确说**不考**）；
+  - 之后：**Quiz 3 / CA3**（2026-11-05 周四 20:00，50 min，W9–11，online in-class lockdown，T/F + MCQ + short calculations；notebook 不考）。
+- **Final Exam**：Simon Liu 部分的范围**正好也是 Week 9–11**；准备 Quiz 3 等于同时准备期末的这部分。
+- **复习建议**：
+  1. 能手算 **pseudo-residual**（squared/logistic）；
+  2. 能手算 **XGBoost leaf weight** $w^*=-\sum g/(\sum h+\lambda)$ 和 **Gain**；
+  3. 记住 **XGBoost vs LightGBM** 的对比表；
+  4. 记住 **GOSS / EFB / leaf-wise** 的直觉和数字（40%/20%/×3、80% 降维）；
+  5. 记住 **Quiz 3 时间/形式/范围**，不要记成 15 分钟。

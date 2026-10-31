@@ -16,6 +16,8 @@ EE6406 Analytic and Ensemble Machine Learning（NTU，AY2026-27 S1，School of E
 - Final Exam **60%**：4 题，2.5 题来自 Part 1（Week 1–8）、1.5 题来自 Part 2（Week 9–13）。
 - ⭐ **CA2（15%）范围 = Lecture 5–7**（regression / classification learning + penalized learning），concept 为主 + 少量 basic calculation（参照 lecture slides examples，不做书末难题）；原定 **Week 8**（recess 后）课上举行。**CA3（15%）在 Week 12**，Week 9 起 Simon Liu 接手 Ensemble Learning。
 - ⭐ **CA3 范围（Simon Liu Week 9 亲述，2026-10）**："quiz three will based on material from **Week nine, ten, 11**"——即 **Ensemble Learning 的 bagging/random forest + boosting**。**Week 12 第一小时讲 ensemble 与 reinforcement learning 的关系，明确"that 1 hour will not be tested"**（不考）。Week 13 为纯 industry sharing。
+- ⭐ **CA3 具体安排（Week 11 slide 原文，2026-10-29）**：**2026-11-05（周四）20:00**，**50 分钟**（转写误作 15 min，以 slide 为准），online + in-class + lockdown browser；**True/False + multiple choice + short calculations**；范围 **Week 9–11**；**Python notebook 不考**。老师强调 **Final Exam 中他这部分的范围也正好是 Week 9–11**，所以 Quiz 3 的复习直接复用。
+- **Week 11 内容 = Gradient Boosting / GBDT / XGBoost / LightGBM**：pseudo-residual（负梯度）、functional gradient descent、line search、shrinkage/subsampling、XGBoost 二阶 Taylor + 正则（leaf weight $w^*=-\sum g/(\sum h+\lambda)$、$\gamma$ pruning、Gain 公式、missing default direction）、LightGBM（leaf-wise、GOSS、EFB、原生 categorical）。
 - CA（仅 quiz）**40%**：CA1 10% **Week 5**、CA2 15% **Week 8**（recess 后）、CA3 15% **Week 12**。
 - 三次 quiz 均 **online 但 in-class（必须到课）**、**closed-book**、需 **lockdown browser**（PC+Windows 最稳，Mac/Unix 可能有问题，iPad 可用但不稳）；计划 Week 4 开头 10–15 分钟 try-run 测设备。**无日常考勤**——平时不点名，仅在三次 quiz 日须到场。
 - **Lecture 1 不进 quiz/exam；Lecture 2 起会进。**
