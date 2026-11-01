@@ -1,0 +1,311 @@
+EE6497 Q2 Practice：图片题目整理与逐项解析
+
+资料来源：用户提供的 13 张 Blackboard 截图，按 Question 1–13 排序。以下英文题干和选项按图片转录；“Selected”只记录截图中的勾选，不代表官方答案。中文解析是针对这些题目的补充解释，并非讲义原文或官方答案。截图未显示评分结果。
+
+答案速览：1 C；2 B；3 D；4 B；5 D；6 A；7 E；8 D；9 B；10 C；11 A；12 E；13 F（关于缩放方式见说明）。
+
+======================================================================
+Question 1 — Batch normalization（批归一化）
+======================================================================
+题干：Which of the following best describes the primary benefit of applying batch normalization in a deep neural network during training?
+
+A. Batch normalization eliminates the need for an activation function by ensuring that pre-activation values are always within a range where a linear model suffices.
+B. Batch normalization removes the need for a bias term in each layer because the normalization step already centers the activations around zero.
+C. Batch normalization normalizes the layer inputs to have approximately zero mean and unit variance within each mini-batch, which stabilizes training and allows higher learning rates to be used.
+D. Batch normalization randomly shuffles the neurons in each layer at every training step, acting as a strong regularizer equivalent to dropout with a 50% drop rate.
+E. Batch normalization computes the loss on the entire training dataset rather than a mini-batch, eliminating the gradient noise that causes oscillations during stochastic training.
+F. Batch normalization ensures that all weight matrices have unit Frobenius norm at every update step, preventing any single layer from dominating the forward pass computation.
+
+截图选中：C。判断：C 最符合题意。
+核心依据：对一个 mini-batch 中同一特征/通道的激活 x_i，通常计算 μ_B、σ_B²，然后令 x̂_i=(x_i−μ_B)/sqrt(σ_B²+ε)，再用可学习的 γ、β 得到 y_i=γx̂_i+β。归一化后的 x̂ 在该 batch 上近似零均值、单位方差；y 因 γ、β 不必仍为零均值、单位方差。
+
+逐项解析：
+A 错：归一化没有使多层线性变换获得非线性表达能力。去掉所有非线性激活后，多层仿射层仍可合并为一个仿射层。
+B 不作为本题答案：若 BN 紧接在线性层偏置之后，那个偏置在训练时的中心化中会抵消，因此该特定位置的偏置常可省略；但“每一层都不需要偏置”过于绝对，而且这不是题目所问的主要收益。BN 的 β 也提供可学习平移。
+C 对：描述了训练时按 mini-batch 统计量归一化的主要操作及通常的优化收益。“允许较大学习率”是常见效果，不是任何任务都保证。
+D 错：BN 不随机打乱神经元。batch 统计量带来一定随机性，有时有正则化作用，但机制和固定 50% 丢弃率的 dropout 不同。
+E 错：BN 不改变损失从 mini-batch 还是全数据计算，也不消除随机梯度噪声。
+F 错：BN 处理激活的统计量，不强制权重矩阵的 Frobenius 范数为 1；这是把激活归一化与权重约束混淆了。
+
+======================================================================
+Question 2 — Dying ReLU（ReLU 死亡）
+======================================================================
+题干：What is the root cause of the “dying ReLU” problem, in which a ReLU neuron permanently outputs zero throughout the remainder of training?
+
+A. The ReLU output saturates at large positive values in the same way that sigmoid saturates near 1, pushing the neuron into an inactive plateau.
+B. When the pre-activation input to a ReLU neuron becomes and stays negative, the gradient through that neuron is zero, so its weights receive no updates and it never recovers.
+C. ReLU neurons die because the learning rate decays to zero over time, freezing all weight updates and causing the entire network to stop learning.
+D. The dying ReLU problem occurs when the batch size is too large, causing the gradient estimate to become too smooth and preventing individual neurons from activating.
+E. ReLU neurons die when the number of training epochs is insufficient, leaving the network without enough updates to bring inactive neurons into the positive region.
+F. Dying ReLU is caused by weight initialization that sets all biases to exactly zero, making the initial pre-activation values zero and preventing the neurons from ever turning on.
+
+截图选中：B。判断：B 最符合题意。
+核心依据：ReLU(z)=max(0,z)；在 z<0 时 ReLU'(z)=0。若某神经元对相关训练样本持续满足 z<0，它通过该激活传回的梯度为零，本身的输入权重和偏置无法靠这条梯度路径更新。
+
+逐项解析：
+A 错：ReLU 在 z>0 时输出 z、导数为 1，不会像 sigmoid 在大正值处饱和；其零梯度区在负半轴。
+B 对，但“never recovers”有条件：必须对相关样本持续处于负半轴，且没有其他使其改变的机制。前一层参数变化可能改变送入此神经元的输入，使它再次进入正半轴，因此不能把“永不恢复”当作无条件数学定理。
+C 错：学习率衰减到零会使大量参数更新变慢或停止；dying ReLU 的特定原因是负半轴局部导数为零。两者不是一回事。
+D 错：batch size 影响梯度估计噪声，但不是 ReLU 负半轴零导数的根因；大 batch 也不必然阻止神经元激活。
+E 错：训练轮数少可能造成欠训练，但不能解释为什么该神经元即使继续训练也可能无法靠自身梯度恢复。
+F 错：偏置初值为零并不意味着 z=wᵀx+b 对所有输入都为零；权重和输入通常仍给出非零 z。零偏置初始化本身不是这一现象的根因。
+
+======================================================================
+Question 3 — Single-layer perceptron and XOR
+======================================================================
+题干：Which of the following best explains the fundamental limitation of the single-layer perceptron that prevents it from solving the XOR problem?
+
+A. The perceptron uses a sigmoid activation function whose output saturates near 0 and 1, causing gradients to vanish and preventing convergence on XOR.
+B. The perceptron lacks a bias term, so its decision boundary is forced to pass through the origin and cannot be shifted to separate the XOR classes.
+C. The perceptron can only update its weights one sample at a time, making it too slow to discover the non-linear structure needed for XOR.
+D. The perceptron can only represent a linear decision boundary, and the XOR problem requires a non-linear boundary to separate the two classes correctly.
+E. The perceptron applies only a step activation function which produces no gradient signal, so no weight update can ever improve the XOR classification.
+F. The perceptron has too few weights to store the four distinct input-output pairs of the XOR truth table simultaneously.
+
+截图选中：D。判断：D 正确。
+核心依据：单个感知机按 sign(wᵀx+b) 分类，其决策边界 wᵀx+b=0 是一条直线/超平面。XOR 的 (0,0)、(1,1) 为一类，(1,0)、(0,1) 为另一类，无法用一条直线将两类完全分开。
+
+逐项解析：
+A 错：经典感知机通常使用阶跃/符号输出；即使用 sigmoid 替换输出，单个仿射输入后的分类阈值边界仍是线性的，无法表达 XOR。饱和不是根本障碍。
+B 错：感知机可以有偏置 b；即使允许直线平移，XOR 仍线性不可分。
+C 错：逐样本更新是训练方式，不改变模型可表示的决策边界；训练再久也不能让单个线性边界分开 XOR。
+D 对：问题是表达能力，而不是优化速度。加入隐藏层和非线性激活后才能组合出所需的非线性边界。
+E 错：经典感知机的更新规则不依赖对阶跃函数做通常意义下的反向传播求导；“没有梯度”不等于“任何权重更新都不能改善分类”。但其单层表达限制仍在。
+F 错：感知机不是逐条存储真值表的记忆器；关键是四个点的几何排列无法被单条直线分开。
+
+======================================================================
+Question 4 — L2 regularization（L2 正则化）
+======================================================================
+题干：Which of the following correctly describes what L2 regularization adds to the training objective and its intended effect on the learned weights?
+
+A. L2 regularization adds a penalty proportional to the sum of the absolute values of the weights, encouraging many weights to become exactly zero and producing a sparse model.
+B. L2 regularization adds a penalty proportional to the sum of the squared weights, discouraging large weight values and producing a model that generalizes better by keeping weights small.
+C. L2 regularization adds a penalty equal to the number of non-zero weights, acting as a direct measure of model complexity that forces the network to use as few active connections as possible.
+D. L2 regularization adds noise drawn from a Gaussian distribution to each weight update, preventing the optimizer from converging to sharp minima that correspond to overfitting.
+E. L2 regularization adds a penalty proportional to the maximum weight value in each layer, constraining the largest weights and preventing individual neurons from dominating.
+F. L2 regularization adds a fixed constant to the loss at every training step, acting as a learning rate schedule that gradually reduces the effective step size as training progresses.
+
+截图选中：B。判断：B 最符合题意。
+核心依据：常见目标 J_reg(W)=J_data(W)+(λ/2)Σ_j w_j²，λ≥0。对 w_j 的惩罚梯度为 λw_j，故大权重受到更强的回拉。具体是否改善测试集泛化取决于任务、数据和 λ，不是必然保证。
+
+逐项解析：
+A 错：Σ|w_j| 是 L1 惩罚；L1 更容易产生恰好为零的稀疏权重。
+B 对：Σw_j² 对应 L2 惩罚，倾向于缩小权重。题目中的“generalizes better”应理解为设计意图或常见效果，而非无条件保证。
+C 错：非零权重个数是 L0 “范数”/计数惩罚，不是 L2；它直接针对稀疏性。
+D 错：在每次更新中添加高斯噪声是另一种训练操作。虽然某些贝叶斯解释把 L2 与高斯先验联系起来，但那不等于向权重更新注入高斯噪声。
+E 错：惩罚最大权重与惩罚所有权重平方不同；且未取绝对值的“maximum weight”甚至无法约束大幅负权重。
+F 错：加一个与权重无关的常数不改变梯度，不能产生权重收缩，也不会自动改变学习率。
+
+======================================================================
+Question 5 — Leaky ReLU
+======================================================================
+题干：How does the Leaky ReLU activation function address the dying ReLU problem found in the standard ReLU?
+
+A. Leaky ReLU clips the output at a fixed maximum value, preventing large activations from causing exploding gradients that push neurons into a permanently inactive state.
+B. Leaky ReLU adds a trainable bias to each neuron’s output, allowing the network to shift the activation threshold and bring dead neurons back into the active region.
+C. Leaky ReLU replaces the zero output for negative inputs with the output of a sigmoid function, providing a smooth transition that prevents the gradient from vanishing entirely.
+D. Leaky ReLU allows a small non-zero gradient for negative inputs by multiplying them by a small positive constant, so neurons with negative activations can still receive weight updates.
+E. Leaky ReLU randomly reactivates dead neurons at each training step by adding Gaussian noise to their output, preventing them from staying at zero indefinitely.
+F. Leaky ReLU solves the dying ReLU problem by normalizing the pre-activation inputs to zero mean and unit variance before applying the activation, ensuring inputs are rarely negative.
+
+截图选中：未见勾选。判断：D 正确。
+核心依据：LeakyReLU(z)=z（z>0），αz（z<0），其中 α 是小的正常数。因此负半轴导数为 α，不再恒为 0；它降低“死亡”风险，但不保证整个网络的梯度在任何情况下都足够大。
+
+逐项解析：
+A 错：Leaky ReLU 的正半轴仍是 z，没有固定最大值；题目把负半轴零导数问题误写成正半轴输出过大问题。
+B 错：通常的神经元本来就可有偏置；Leaky ReLU 的定义性变化是负半轴斜率 α，不是新增一个偏置。
+C 错：负半轴输出为 αz，不是 sigmoid(z)。Leaky ReLU 在 0 处为分段线性函数，通常并不要求平滑连接的导数。
+D 对：负输入仍有小的非零局部梯度，使权重有机会更新。严格说是否更新还取决于损失传来的梯度等因素。
+E 错：没有随机重激活或添加高斯噪声；Leaky ReLU 是确定性的分段函数。
+F 错：均值/方差归一化是另一种操作。即使输入均值为零，也可能约有一半为负，不能说负输入“很少”。
+
+======================================================================
+Question 6 — “2-layer neural network”
+======================================================================
+题干：In the standard terminology used in neural network literature, what does the phrase “a 2-layer neural network” most commonly refer to?
+
+A. A network with one hidden layer and one output layer, where the input layer is not counted because it performs no computation.
+B. A network with exactly two hidden layers and no output layer, used only for feature extraction tasks.
+C. A network with two input layers that each receive a different modality, such as one for images and one for text.
+D. A network with two output layers that each produce a different prediction target simultaneously.
+E. A network in which every neuron is connected to at most two other neurons, making it sparse and fast to compute.
+F. A network that runs two separate forward passes on each input, one for computing features and one for computing the loss.
+
+截图选中：未见勾选。判断：A 最符合常见计数法。
+核心依据：常见约定把带有可学习权重的隐藏层和输出层计入层数，输入层仅存放输入，不计入。因此“2-layer”通常是 1 个隐藏层 + 1 个输出层。不同教材可能另有约定，遇到课程图示应先核对计数方式。
+
+逐项解析：
+A 对：它准确描述该常见约定。不过“input layer performs no computation”应理解为在这种层数计数中不承担一次可学习的仿射映射，并非说输入数据不能做任何预处理。
+B 错：两个隐藏层再加输出层，按此约定至少是 3 个可学习层；有输出任务时不能无故去掉输出层。
+C 错：“2-layer”说的是网络深度，不是输入模态的数量。
+D 错：双输出头描述多任务架构，不是“2-layer”的定义。
+E 错：层数不限制每个神经元的连接数；这是把深度与连接稀疏度混淆。
+F 错：前向传播次数与网络层数无关；损失通常在输出得到后计算，也不需要由“2-layer”一词推断两次前向传播。
+
+======================================================================
+Question 7 — tanh versus sigmoid
+======================================================================
+题干：The tanh activation function is often preferred over sigmoid for hidden layers in neural networks. Which of the following correctly identifies the key advantage of tanh over sigmoid?
+
+A. Unlike sigmoid, tanh does not saturate at extreme input values, so its gradient never approaches zero and the vanishing gradient problem is completely eliminated.
+B. Tanh outputs values in the range [0, 1], making it more suitable than sigmoid for representing probabilities at hidden layers.
+C. Tanh is computationally cheaper than sigmoid because it requires only a single exponential evaluation instead of two, speeding up training on large networks.
+D. Tanh has a gradient that is always exactly 1, making gradient descent updates uniform in magnitude across all layers.
+E. Tanh is zero-centered, meaning its outputs range from -1 to 1, which tends to produce more balanced gradient updates compared to sigmoid whose outputs are always positive.
+F. Tanh applies a linear transformation for negative inputs, which prevents dead neurons that permanently output zero and makes training more stable.
+
+截图选中：未见勾选。判断：E 正确。
+核心依据：tanh(z) 的值域为 (-1,1)，且是奇函数 tanh(-z)=-tanh(z)；sigmoid(z) 的值域为 (0,1)，输出始终为正。这里“zero-centered”指函数输出可围绕 0 正负变化；实际一个 batch 的输出均值不保证恰为 0。
+
+逐项解析：
+A 错：tanh 也在 z→±∞ 时饱和，tanh'(z)=1−tanh²(z)→0，因此不能完全消除梯度消失。
+B 错：(0,1) 是 sigmoid 的值域；tanh 输出可为负数，不适合直接当概率。
+C 错：计算成本随实现和硬件变化；“tanh 只需一个指数、sigmoid 需两个”也不是通用事实，更不是本题的关键优势。
+D 错：tanh'(0)=1，但其余位置一般小于 1，极端输入时趋近 0。
+E 对：正负输出使下一层接收的激活较少受“全部为正”的偏移影响，训练中常有利于更新；这并非严格的优化保证。
+F 错：负半轴线性小斜率是 Leaky ReLU 的特点；tanh 在负半轴仍是非线性并且会饱和。
+
+======================================================================
+Question 8 — Overfitting from loss curves（从损失曲线判断过拟合）
+======================================================================
+题干：When monitoring training and validation loss curves, which pattern is the clearest indicator that a neural network is overfitting the training data?
+
+A. Both training loss and validation loss remain high and flat throughout training, indicating that the model is underfitting and has not learned any useful features.
+B. Both training loss and validation loss decrease steadily and converge to the same low value, indicating that the model has found a good generalizing solution.
+C. The validation loss decreases faster than the training loss early in training, indicating that the model is learning features that transfer more readily to unseen data than to the training set.
+D. The training loss continues to decrease while the validation loss stops decreasing and begins to increase, showing that the model is memorizing the training data rather than learning general patterns.
+E. The training loss oscillates with high variance while the validation loss remains smooth, indicating that the mini-batch gradient estimates are too noisy to guide stable optimization.
+F. Both training loss and validation loss oscillate in synchrony with the same amplitude, indicating that the learning rate is too large and the optimizer is bouncing around the minimum.
+
+截图选中：未见勾选。判断：D 最符合题意。
+核心依据：训练损失继续下降而验证损失持续回升，意味着在训练样本上的拟合改善没有转化为未见数据上的表现，泛化差距扩大。这是典型过拟合信号；单次波动不能据此下结论。
+
+逐项解析：
+A 错：两条曲线都高且平，更像没有学好或欠拟合；没有“训练好、验证差”的分离。
+B 错：两条曲线都降到接近的低值，通常是泛化尚可的信号，不能据此说过拟合。当然验证集也必须具有代表性。
+C 错：早期验证损失下降更快本身不能诊断过拟合，可能受 dropout、数据增强、训练/验证计算方式或样本差异影响；关键要看后续是否出现持续泛化差距。
+D 对：这是典型曲线模式。“memorizing”是直观说法，不能单凭曲线证明模型逐条记住了数据，但足以作为过拟合的强信号。
+E 错：训练损失高方差而验证损失平滑可由训练按 mini-batch 记录、验证按全验证集平均等方式造成；它不是过拟合的特征模式。
+F 错：同步振荡更指向优化不稳定，例如学习率偏大；它没有显示训练与验证表现持续分叉。
+
+======================================================================
+Question 9 — Universal Approximation Theorem（通用逼近定理）
+======================================================================
+题干：What does the Universal Approximation Theorem guarantee about a feedforward neural network with a single hidden layer and a sufficient number of neurons?
+
+A. It guarantees that gradient descent will always converge to the global minimum of the loss function, regardless of the initial weights.
+B. It guarantees that the network can approximate any continuous function on a compact domain to arbitrary accuracy, provided enough hidden neurons are used.
+C. It guarantees that the network will never overfit the training data as long as the number of hidden neurons does not exceed the number of training examples.
+D. It guarantees that training a neural network with backpropagation will always produce the same weights when run multiple times on the same dataset.
+E. It guarantees that a single hidden layer is always more efficient than multiple hidden layers for any given classification task.
+F. It guarantees that any neural network can be compressed to a single hidden layer without loss of accuracy by doubling the number of neurons at each compression step.
+
+截图选中：未见勾选。判断：B 最符合标准表述。
+核心依据：在适当的非线性激活函数等条件下，对紧致定义域上的连续目标函数 f 和任意 ε>0，存在足够宽的单隐藏层网络 g，使整个定义域上的逼近误差可小于 ε。定理讲“存在某些参数”，不保证训练算法能找到这些参数。
+
+逐项解析：
+A 错：函数可表达性不等于优化保证。网络损失通常非凸，定理不保证梯度下降到全局最优，也不保证与初始化无关。
+B 对：抓住“连续函数、紧致域、任意精度、足够多隐藏神经元”的核心；需默认激活函数满足定理条件。不是说固定有限宽度就能精确表示任意函数。
+C 错：定理不涉及泛化或训练样本数与神经元数的简单安全阈值；宽度小于样本数也可能过拟合。
+D 错：反向传播的结果受初始化、随机训练顺序和优化路径等影响，定理不保证每次得到同一组权重。
+E 错：定理不比较所需参数数目或计算效率；深层网络在某些函数上可能用更少参数表达。
+F 错：定理只说满足条件的目标函数可被逼近，没有“每压缩一步神经元翻倍就无损”的构造或资源上界；任意网络也不能直接从该定理推出这种精确压缩。
+
+======================================================================
+Question 10 — Sigmoid saturation（sigmoid 饱和）
+======================================================================
+题干：What is the main problem caused by the saturation behaviour of the sigmoid activation function when its input becomes very large or very small?
+
+A. The sigmoid output becomes negative for large positive inputs, reversing the sign of the activation and causing incorrect predictions in deep networks.
+B. The sigmoid function amplifies small inputs, making the network extremely sensitive to noise and causing training to diverge on clean datasets.
+C. The gradient of the sigmoid approaches zero in the saturated regions, causing the vanishing gradient problem and very slow learning in early layers during backpropagation.
+D. The sigmoid saturates at 0.5 rather than at 0 or 1, making it impossible for the output to produce confident class predictions during multi-class classification.
+E. The sigmoid function is not differentiable at its saturation points, so backpropagation cannot compute valid gradients and weight updates fail entirely.
+F. Saturation causes the sigmoid to output values outside the range [0, 1], violating the probability interpretation required for classification networks.
+
+截图选中：未见勾选。判断：C 正确。
+核心依据：σ(z)=1/(1+e^(−z))，σ'(z)=σ(z)(1−σ(z))。当 z→−∞ 或 +∞，σ(z) 分别趋于 0 或 1，故导数趋于 0；反向传播中的链式法则会乘上这些小导数。
+
+逐项解析：
+A 错：sigmoid 对任何有限实数输入都在 (0,1) 内；大正输入趋近 1，不会变负。
+B 错：题目问极端输入的饱和；在 0 附近 σ'(0)=1/4，并非对小扰动无限放大，也不能推断干净数据集训练发散。
+C 对：饱和区域局部导数很小，深层网络中多个小因子相乘可使早层梯度极小、学习变慢。具体是否发生还受架构、初始化等影响。
+D 错：σ(0)=0.5 是中点，不是饱和值；两端分别逼近 0 和 1。多类别互斥分类通常使用 softmax，亦与该错项的主张不同。
+E 错：sigmoid 在所有有限 z 上可微；“导数趋近 0”不等于“不可微”。0 和 1 是在无穷远处逼近的极限值。
+F 错：饱和只使输出接近端点，不会超出 (0,1)；这里把数值趋近边界误认为越界。
+
+======================================================================
+Question 11 — Softmax
+======================================================================
+题干：Which of the following correctly describes a defining mathematical property of the softmax function applied to the output layer of a classification network?
+
+A. Softmax transforms the output logits into non-negative values that sum to exactly 1 across all output neurons, forming a valid probability distribution over the classes.
+B. Softmax sets the largest logit to 1 and all other logits to 0, producing a hard one-hot encoding of the predicted class at every forward pass.
+C. Softmax scales each logit by the total number of output neurons so that the average output across all neurons is always equal to 1 divided by the number of classes.
+D. Softmax clips each output value independently to the range [0, 1] without considering the other outputs, functioning like a separate sigmoid applied to each logit.
+E. Softmax divides each logit by the maximum logit value, ensuring that the largest output is always 1 and all others are fractions between 0 and 1.
+F. Softmax maps each logit to a value between -1 and 1 using a hyperbolic tangent, then normalizes so that the sum of absolute values equals 1.
+
+截图选中：未见勾选。判断：A 正确。
+核心依据：对 K 类 logits z_1,…,z_K，p_i=e^(z_i)/Σ_j e^(z_j)。分子均为正，分母是所有分子之和，所以 p_i>0 且 Σ_i p_i=1。有限 logits 下 p_i 严格大于 0；A 的“non-negative”是正确但稍弱的表述。
+
+逐项解析：
+A 对：输出是归一化的类别分布。若 K>1 且 logits 都有限，最大一项通常也严格小于 1。
+B 错：这是 argmax 后的 one-hot 决策，不是 softmax 本身；softmax 保留各类别的连续概率值。
+C 错：输出平均为 1/K 的确由总和为 1 推出，但实现方式不是“每个 logit 除以 K”；原始 logit 可以为负，直接缩放不能保证概率分布。
+D 错：每个 softmax 输出都依赖所有 logits 的分母，不能独立裁剪；独立 sigmoid 的 K 个输出一般不保证和为 1。
+E 错：softmax 先取指数再按指数和归一化，并非除以最大 logit；最大 logit 还可能为 0 或负数，直接相除甚至无定义或产生负值。
+F 错：softmax 不使用 tanh，也不以绝对值之和归一化；概率要求每项非负，tanh 可输出负值。
+
+======================================================================
+Question 12 — Learning rate too large（学习率过大）
+======================================================================
+题干：What is the most likely consequence of choosing a learning rate that is too large when training a neural network with gradient descent?
+
+A. The network learns very slowly because each parameter update moves only a tiny step, requiring a very large number of epochs to reach acceptable performance.
+B. The network immediately memorizes the training set on the first epoch, achieving zero training loss but very high test loss due to severe overfitting.
+C. The loss decreases monotonically but flattens out at a plateau far above the global minimum because the large steps overshoot the optimal region in a predictable direction.
+D. The network converges to the global minimum faster than with a small learning rate because larger steps allow it to escape all local minima efficiently.
+E. The parameter updates overshoot the minimum repeatedly, causing the training loss to oscillate or even increase rather than converge smoothly.
+F. All gradients become exactly zero after the first update because the large step brings parameters into a flat region of the loss surface where all partial derivatives vanish.
+
+截图选中：未见勾选。判断：E 正确。
+核心依据：更新式 θ_(t+1)=θ_t−η∇L(θ_t)。以一维二次损失 L(θ)=(a/2)θ²、a>0 为例，θ_(t+1)=(1−ηa)θ_t：若 1<ηa<2，会跨过最小点交替振荡但仍收敛；若 ηa≥2，则可能持续振荡或发散。这说明“大”是否过大要相对损失曲率判断。
+
+逐项解析：
+A 错：每步很小、学习慢是学习率过小的典型情形，与“过大”方向相反。
+B 错：学习率过大不保证一次记住训练集，更不能保证零训练损失；过拟合是训练/验证泛化差距的问题，不是大步长的必然直接结果。
+C 错：跨越最优区域时损失未必单调下降，也不会必然停在固定高平台或朝可预测的同一方向前进；该描述比证据强得多。
+D 错：较大步长在某些范围内可加快优化，但过大时不保证收敛，更不保证全局最优或逃离“所有”局部极小值。
+E 对：过大步长易反复越过低损失区域，损失可振荡、上升，严重时发散。并非每次都必须出现这三种现象中的全部。
+F 错：一次大更新不必然落入平坦区，更不可能普遍让所有参数的偏导数恰为 0；这是把“可能出现小梯度”绝对化。
+
+======================================================================
+Question 13 — Dropout at inference（推理期 dropout）
+======================================================================
+题干：Dropout is applied during training but behaves differently at inference time. Which of the following correctly describes how dropout is handled at inference?
+
+A. At inference, dropout continues to randomly deactivate neurons with the same probability used during training, providing an implicit ensemble prediction at each forward pass.
+B. At inference, dropout is replaced by a stronger regularizer such as L2 weight decay, because the stochasticity of dropout is no longer needed once training is complete.
+C. At inference, only the neurons that were active in the last training step are used, and all other neurons are permanently removed from the network.
+D. At inference, all neurons are activated but their outputs are clipped to zero unless they were active in more than half of the training steps, filtering out unreliable neurons.
+E. At inference, dropout doubles the dropout rate compared to training to compensate for the fact that no gradient updates are being made.
+F. At inference, dropout is turned off so all neurons are active, and the neuron outputs are typically scaled by the keep probability to maintain the same expected activation magnitude as during training.
+
+截图选中：未见勾选。判断：F 是本题预期答案，但缩放细节有版本差异。
+核心依据：令保留概率 q=1−p，训练时 mask m~Bernoulli(q)。经典 dropout 用 h_train=m·h，此时 E[h_train]=q h，推理时用 h_infer=q h 来匹配期望，正是 F 的说法。如今常见的 inverted dropout 用 h_train=(m/q)·h，此时 E[h_train]=h，推理时直接用 h_infer=h，不再乘 q。两种实现都在常规推理时关闭随机丢弃。
+
+逐项解析：
+A 错：常规确定性推理关闭 dropout；若特意用 Monte Carlo dropout，可以在推理时保留随机丢弃并多次采样，但这是额外的推断方法，不是题目问的通常做法。单次随机前向传播也不等于完整 ensemble 平均。
+B 错：推理时不会自动“替换”为 L2 正则化；L2 是训练目标/参数约束机制，不是 dropout 推理开关的替代品。
+C 错：训练末次 mask 是一次临时随机样本，不决定永久保留哪些神经元；推理通常使用全部神经元。
+D 错：dropout 不追踪神经元在训练中激活超过一半的次数，也不按该次数在推理时裁剪输出；mask 的随机保留与激活值本身也不是一回事。
+E 错：推理时不因停止梯度更新而增加丢弃率；常规做法是关闭随机丢弃。
+F 对于经典 dropout：推理时所有神经元参与，并乘 q 对齐训练期未缩放激活的期望。对 inverted dropout，前半句仍对，但后半句“推理时乘 q”不对；缩放已在训练时除以 q 完成。因此选 F 时要知道题目默认了经典实现。
+
+======================================================================
+学习记录
+======================================================================
+当前材料：用户提供的 Q2 Practice 截图，共 Question 1–13；本文件已整理全部可见题干、选项和逐项解析。
+已完成：13 题的概念辨析与答案核对。截图所示 Q1–4 的选中项均与上述判断一致；其余题在截图中未见勾选。
+掌握状态：这些解析只说明题目，不等于已经通过独立作答验证掌握。若需巩固，可针对易混点另做变式题。

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EE6497 Practice Quiz 2</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2430;--muted:#6b7280;--line:#e3e6eb;--ok:#15803d;--okbg:#e7f6ec;--bad:#b91c1c;--badbg:#fdecec;--accent:#4f46e5}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1d2026;--text:#e6e8eb;--muted:#9aa1ab;--line:#2d313a;--ok:#4ade80;--okbg:#16301f;--bad:#f87171;--badbg:#3a1a1a;--accent:#818cf8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif}
+.wrap{max-width:820px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:1.5rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+.bar{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);margin-bottom:18px;z-index:2}
+.score{font-weight:600}
+button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button:hover{border-color:var(--accent)}
+.q{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.qh{display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem;margin-bottom:6px}
+.qt{font-weight:600;margin:0 0 12px}
+label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer}
+label:hover{border-color:var(--accent)}
+label b{min-width:1.3em}
+input{margin-top:4px}
+.done label{cursor:default}
+.done label:hover{border-color:var(--line)}
+label.correct{background:var(--okbg);border-color:var(--ok)}
+label.wrong{background:var(--badbg);border-color:var(--bad)}
+.fb{display:none;margin-top:6px;font-weight:600}
+.done .fb{display:block}
+.fb.ok{color:var(--ok)}.fb.no{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>EE6497 Practice Quiz 2</h1>
+<p class="sub">13 questions · select an option to reveal the correct answer</p>
+<div class="bar"><span class="score" id="score">Answered 0 / 13 · Correct 0</span><button id="reset">Reset</button></div>
+<div id="quiz"></div>
+</div>
+<script>
+const Q=[
+{t:"The tanh activation function is often preferred over sigmoid for hidden layers in neural networks. Which of the following correctly identifies the key advantage of tanh over sigmoid?",o:[
+"Unlike sigmoid, tanh does not saturate at extreme input values, so its gradient never approaches zero and the vanishing gradient problem is completely eliminated.",
+"Tanh outputs values in the range [0, 1], making it more suitable than sigmoid for representing probabilities at hidden layers.",
+"Tanh is computationally cheaper than sigmoid because it requires only a single exponential evaluation instead of two, speeding up training on large networks.",
+"Tanh has a gradient that is always exactly 1, making gradient descent updates uniform in magnitude across all layers.",
+"Tanh is zero-centered, meaning its outputs range from -1 to 1, which tends to produce more balanced gradient updates compared to sigmoid whose outputs are always positive.",
+"Tanh applies a linear transformation for negative inputs, which prevents dead neurons that permanently output zero and makes training more stable."],a:4},
+{t:"Which of the following best describes the primary benefit of applying batch normalization in a deep neural network during training?",o:[
+"Batch normalization eliminates the need for an activation function by ensuring that pre-activation values are always within a range where a linear model suffices.",
+"Batch normalization removes the need for a bias term in each layer because the normalization step already centers the activations around zero.",
+"Batch normalization normalizes the layer inputs to have approximately zero mean and unit variance within each mini-batch, which stabilizes training and allows higher learning rates to be used.",
+"Batch normalization randomly shuffles the neurons in each layer at every training step, acting as a strong regularizer equivalent to dropout with a 50% drop rate.",
+"Batch normalization computes the loss on the entire training dataset rather than a mini-batch, eliminating the gradient noise that causes oscillations during stochastic training.",
+"Batch normalization ensures that all weight matrices have unit Frobenius norm at every update step, preventing any single layer from dominating the forward pass computation."],a:2},
+{t:"Dropout is applied during training but behaves differently at inference time. Which of the following correctly describes how dropout is handled at inference?",o:[
+"At inference, dropout continues to randomly deactivate neurons with the same probability used during training, providing an implicit ensemble prediction at each forward pass.",
+"At inference, dropout is replaced by a stronger regularizer such as L2 weight decay, because the stochasticity of dropout is no longer needed once training is complete.",
+"At inference, only the neurons that were active in the last training step are used, and all other neurons are permanently removed from the network.",
+"At inference, all neurons are activated but their outputs are clipped to zero unless they were active in more than half of the training steps, filtering out unreliable neurons.",
+"At inference, dropout doubles the dropout rate compared to training to compensate for the fact that no gradient updates are being made.",
+"At inference, dropout is turned off so all neurons are active, and the neuron outputs are typically scaled by the keep probability to maintain the same expected activation magnitude as during training."],a:5},
+{t:"How does the Leaky ReLU activation function address the dying ReLU problem found in the standard ReLU?",o:[
+"Leaky ReLU clips the output at a fixed maximum value, preventing large activations from causing exploding gradients that push neurons into a permanently inactive state.",
+"Leaky ReLU adds a trainable bias to each neuron's output, allowing the network to shift the activation threshold and bring dead neurons back into the active region.",
+"Leaky ReLU replaces the zero output for negative inputs with the output of a sigmoid function, providing a smooth transition that prevents the gradient from vanishing entirely.",
+"Leaky ReLU allows a small non-zero gradient for negative inputs by multiplying them by a small positive constant, so neurons with negative activations can still receive weight updates.",
+"Leaky ReLU randomly reactivates dead neurons at each training step by adding Gaussian noise to their output, preventing them from staying at zero indefinitely.",
+"Leaky ReLU solves the dying ReLU problem by normalizing the pre-activation inputs to zero mean and unit variance before applying the activation, ensuring inputs are rarely negative."],a:3},
+{t:"In the standard terminology used in neural network literature, what does the phrase \"a 2-layer neural network\" most commonly refer to?",o:[
+"A network with one hidden layer and one output layer, where the input layer is not counted because it performs no computation.",
+"A network with exactly two hidden layers and no output layer, used only for feature extraction tasks.",
+"A network with two input layers that each receive a different modality, such as one for images and one for text.",
+"A network with two output layers that each produce a different prediction target simultaneously.",
+"A network in which every neuron is connected to at most two other neurons, making it sparse and fast to compute.",
+"A network that runs two separate forward passes on each input, one for computing features and one for computing the loss."],a:0},
+{t:"When monitoring training and validation loss curves, which pattern is the clearest indicator that a neural network is overfitting the training data?",o:[
+"Both training loss and validation loss remain high and flat throughout training, indicating that the model is underfitting and has not learned any useful features.",
+"Both training loss and validation loss decrease steadily and converge to the same low value, indicating that the model has found a good generalizing solution.",
+"The validation loss decreases faster than the training loss early in training, indicating that the model is learning features that transfer more readily to unseen data than to the training set.",
+"The training loss continues to decrease while the validation loss stops decreasing and begins to increase, showing that the model is memorizing the training data rather than learning general patterns.",
+"The training loss oscillates with high variance while the validation loss remains smooth, indicating that the mini-batch gradient estimates are too noisy to guide stable optimization.",
+"Both training loss and validation loss oscillate in synchrony with the same amplitude, indicating that the learning rate is too large and the optimizer is bouncing around the minimum."],a:3},
+{t:"What is the root cause of the \"dying ReLU\" problem, in which a ReLU neuron permanently outputs zero throughout the remainder of training?",o:[
+"The ReLU output saturates at large positive values in the same way that sigmoid saturates near 1, pushing the neuron into an inactive plateau.",
+"When the pre-activation input to a ReLU neuron becomes and stays negative, the gradient through that neuron is zero, so its weights receive no updates and it never recovers.",
+"ReLU neurons die because the learning rate decays to zero over time, freezing all weight updates and causing the entire network to stop learning.",
+"The dying ReLU problem occurs when the batch size is too large, causing the gradient estimate to become too smooth and preventing individual neurons from activating.",
+"ReLU neurons die when the number of training epochs is insufficient, leaving the network without enough updates to bring inactive neurons into the positive region.",
+"Dying ReLU is caused by weight initialization that sets all biases to exactly zero, making the initial pre-activation values zero and preventing the neurons from ever turning on."],a:1},
+{t:"What is the most likely consequence of choosing a learning rate that is too large when training a neural network with gradient descent?",o:[
+"The network learns very slowly because each parameter update moves only a tiny step, requiring a very large number of epochs to reach acceptable performance.",
+"The network immediately memorizes the training set on the first epoch, achieving zero training loss but very high test loss due to severe overfitting.",
+"The loss decreases monotonically but flattens out at a plateau far above the global minimum because the large steps overshoot the optimal region in a predictable direction.",
+"The network converges to the global minimum faster than with a small learning rate because larger steps allow it to escape all local minima efficiently.",
+"The parameter updates overshoot the minimum repeatedly, causing the training loss to oscillate or even increase rather than converge smoothly.",
+"All gradients become exactly zero after the first update because the large step brings parameters into a flat region of the loss surface where all partial derivatives vanish."],a:4},
+{t:"What does the Universal Approximation Theorem guarantee about a feedforward neural network with a single hidden layer and a sufficient number of neurons?",o:[
+"It guarantees that gradient descent will always converge to the global minimum of the loss function, regardless of the initial weights.",
+"It guarantees that the network can approximate any continuous function on a compact domain to arbitrary accuracy, provided enough hidden neurons are used.",
+"It guarantees that the network will never overfit the training data as long as the number of hidden neurons does not exceed the number of training examples.",
+"It guarantees that training a neural network with backpropagation will always produce the same weights when run multiple times on the same dataset.",
+"It guarantees that a single hidden layer is always more efficient than multiple hidden layers for any given classification task.",
+"It guarantees that any neural network can be compressed to a single hidden layer without loss of accuracy by doubling the number of neurons at each compression step."],a:1},
+{t:"Which of the following best explains the fundamental limitation of the single-layer perceptron that prevents it from solving the XOR problem?",o:[
+"The perceptron uses a sigmoid activation function whose output saturates near 0 and 1, causing gradients to vanish and preventing convergence on XOR.",
+"The perceptron lacks a bias term, so its decision boundary is forced to pass through the origin and cannot be shifted to separate the XOR classes.",
+"The perceptron can only update its weights one sample at a time, making it too slow to discover the non-linear structure needed for XOR.",
+"The perceptron can only represent a linear decision boundary, and the XOR problem requires a non-linear boundary to separate the two classes correctly.",
+"The perceptron applies only a step activation function which produces no gradient signal, so no weight update can ever improve the XOR classification.",
+"The perceptron has too few weights to store the four distinct input-output pairs of the XOR truth table simultaneously."],a:3},
+{t:"Which of the following correctly describes what L2 regularization adds to the training objective and its intended effect on the learned weights?",o:[
+"L2 regularization adds a penalty proportional to the sum of the absolute values of the weights, encouraging many weights to become exactly zero and producing a sparse model.",
+"L2 regularization adds a penalty proportional to the sum of the squared weights, discouraging large weight values and producing a model that generalizes better by keeping weights small.",
+"L2 regularization adds a penalty equal to the number of non-zero weights, acting as a direct measure of model complexity that forces the network to use as few active connections as possible.",
+"L2 regularization adds noise drawn from a Gaussian distribution to each weight update, preventing the optimizer from converging to sharp minima that correspond to overfitting.",
+"L2 regularization adds a penalty proportional to the maximum weight value in each layer, constraining the largest weights and preventing individual neurons from dominating.",
+"L2 regularization adds a fixed constant to the loss at every training step, acting as a learning rate schedule that gradually reduces the effective step size as training progresses."],a:1},
+{t:"Which of the following correctly describes a defining mathematical property of the softmax function applied to the output layer of a classification network?",o:[
+"Softmax transforms the output logits into non-negative values that sum to exactly 1 across all output neurons, forming a valid probability distribution over the classes.",
+"Softmax sets the largest logit to 1 and all other logits to 0, producing a hard one-hot encoding of the predicted class at every forward pass.",
+"Softmax scales each logit by the total number of output neurons so that the average output across all neurons is always equal to 1 divided by the number of classes.",
+"Softmax clips each output value independently to the range [0, 1] without considering the other outputs, functioning like a separate sigmoid applied to each logit.",
+"Softmax divides each logit by the maximum logit value, ensuring that the largest output is always 1 and all others are fractions between 0 and 1.",
+"Softmax maps each logit to a value between -1 and 1 using a hyperbolic tangent, then normalizes so that the sum of absolute values equals 1."],a:0},
+{t:"What is the main problem caused by the saturation behaviour of the sigmoid activation function when its input becomes very large or very small?",o:[
+"The sigmoid output becomes negative for large positive inputs, reversing the sign of the activation and causing incorrect predictions in deep networks.",
+"The sigmoid function amplifies small inputs, making the network extremely sensitive to noise and causing training to diverge on clean datasets.",
+"The gradient of the sigmoid approaches zero in the saturated regions, causing the vanishing gradient problem and very slow learning in early layers during backpropagation.",
+"The sigmoid saturates at 0.5 rather than at 0 or 1, making it impossible for the output to produce confident class predictions during multi-class classification.",
+"The sigmoid function is not differentiable at its saturation points, so backpropagation cannot compute valid gradients and weight updates fail entirely.",
+"Saturation causes the sigmoid to output values outside the range [0, 1], violating the probability interpretation required for classification networks."],a:2}
+];
+const L="ABCDEF",box=document.getElementById("quiz"),sc=document.getElementById("score");
+let ans=0,cor=0;
+function upd(){sc.textContent=`Answered ${ans} / ${Q.length} · Correct ${cor}`}
+function build(){
+ box.innerHTML="";ans=0;cor=0;upd();
+ Q.forEach((q,i)=>{
+  const d=document.createElement("div");d.className="q";
+  d.innerHTML=`<div class="qh"><span>Question ${i+1}</span><span>1 Point</span></div><p class="qt">${q.t}</p>`+
+   q.o.map((o,j)=>`<label><input type="radio" name="q${i}" value="${j}"><b>${L[j]}.</b><span>${o}</span></label>`).join("")+
+   `<div class="fb"></div>`;
+  d.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>{
+   if(d.classList.contains("done"))return;
+   const pick=+inp.value,labs=d.querySelectorAll("label"),fb=d.querySelector(".fb");
+   d.classList.add("done");d.querySelectorAll("input").forEach(x=>x.disabled=true);
+   labs[q.a].classList.add("correct");
+   ans++;
+   if(pick===q.a){cor++;fb.className="fb ok";fb.textContent="✓ Correct — answer: "+L[q.a]}
+   else{labs[pick].classList.add("wrong");fb.className="fb no";fb.textContent="✗ Wrong — correct answer: "+L[q.a]}
+   upd();
+  }));
+  box.appendChild(d);
+ });
+}
+document.getElementById("reset").onclick=()=>{build();window.scrollTo(0,0)};
+build();
+</script>
+</body>
+</html>
