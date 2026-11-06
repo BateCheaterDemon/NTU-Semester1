@@ -4086,3 +4086,113 @@ $$\text{pre-penalty Gain}=\frac12\left[\frac{10^2}{8}+\frac{(-4)^2}{5}-\frac{6^2
   3. 记住 **XGBoost vs LightGBM** 的对比表；
   4. 记住 **GOSS / EFB / leaf-wise** 的直觉和数字（40%/20%/×3、80% 降维）；
   5. 记住 **Quiz 3 时间/形式/范围**，不要记成 15 分钟。
+
+---
+
+## Week 12 — Lecture 12：Reinforcement Learning with Ensemble Learning（不考 Quiz 3）
+
+> **本周材料**：`week12/EE6406_Lecture12_SL.pdf`（Simon Liu，51 页）、`week12/week12.txt`。
+>
+> **⭐ 考试定位**：老师明确说**本周 RL 内容不考**（"this topic is not going to be tested"）；本周课堂前 1 小时讲 RL，后半段进行 **Quiz 3**（2026-11-05 20:00，50 min，覆盖 Week 9–11）。因此本周笔记只做**概念速览**，不进入 Quiz 3 复习重点；Final 中 Simon Liu 部分也只覆盖 **Week 9–11**。
+
+### 1. 机器学习三大范式
+
+| 范式 | 数据 | 目标 | 例子 |
+|---|---|---|---|
+| **Supervised** | labeled `(x,y)` | 学输入→输出映射 | 分类、回归 |
+| **Unsupervised** | unlabeled | 发现结构/模式 | 聚类、降维 |
+| **Reinforcement Learning (RL)** | 与环境交互的 reward | 最大化**cumulative reward** | 游戏、机器人、导航 |
+
+### 2. RL 的基本组件
+
+| 组件 | 含义 |
+|---|---|
+| **Agent** | 做决策的主体 |
+| **Environment** | 外部系统，提供 observation + reward |
+| **State `s`** | 当前情况的表示 |
+| **Action `a`** | agent 可采取的动作 |
+| **Reward `r`** | 动作后的反馈（正/负） |
+| **Policy `π(a|s)`** | 从 state 到 action 的策略（要优化的对象） |
+
+⭐ 经典例子：迷宫中的机器人——state = 当前格子；action = 上下左右；reward = 靠近出口为正、撞墙为负；policy = 怎么走。
+
+### 3. MDP（Markov Decision Process）
+
+MDP 是 RL 的形式化框架：
+
+| 元素 | 含义 |
+|---|---|
+| **S** | 所有 states |
+| **A** | 所有 actions |
+| **P(s'|s,a)** | transition probability：在 s 做 a 到达 s' 的概率 |
+| **R(s,a,s')** | reward function |
+| **γ** | discount factor（0–1），越接近 0 越重视即时 reward |
+
+⭐ **Markov property**：下一个 state 只依赖当前 state 和 action，不依赖更早的历史。
+
+### 4. Return、Value、Q
+
+**Return（cumulative reward）**：
+
+```
+G_t = r_(t+1) + γ r_(t+2) + γ^2 r_(t+3) + ...
+```
+
+**State-value function**：
+
+```
+V(s) = E[ G_t | s_t = s ]
+```
+
+**Action-value function（Q function）**：
+
+```
+Q(s,a) = E[ G_t | s_t = s, a_t = a ]
+```
+
+- `V(s)`：在 state s 有多好；
+- `Q(s,a)`：在 s 做 action a 有多好；
+- 目标：找最优 policy，使 `V`/`Q` 最大。
+
+**Bellman 方程（直觉）**：
+
+```
+V(s) = E[ r + γ V(s') ]
+Q(s,a) = E[ r + γ max_a' Q(s',a') ]    （Q-learning 的目标）
+```
+
+### 5. Q-learning 与 exploration
+
+Q-learning 更新（概念）：
+
+```
+Q(s,a) ← Q(s,a) + α [ r + γ max_a' Q(s',a') - Q(s,a) ]
+```
+
+- `α`：learning rate；
+- `γ`：discount；
+- `r + γ max Q(s',a')`：TD target；
+- 括号内是 TD error。
+
+⭐ **Exploration vs exploitation**：
+- 只 exploitation → 可能卡在次优策略；
+- 只 exploration → 学不到好策略；
+- 常用 **ε-greedy**：以 ε 概率随机探索，否则选当前最优 action。
+
+### 6. Ensemble + RL（本周标题）
+
+- 用多个 agent/Q-function/模型组合，降低 variance、提高鲁棒性；
+- 类似 bagging/ensemble 的思想：多个模型的预测投票/平均；
+- 代表成就：DQN（Atari）、AlphaGo、OpenAI Five、AlphaStar、MuZero；
+- 具体算法不在 Quiz 3 范围，了解关键词即可。
+
+### 7. 本周要点（仅概念）
+
+- RL = agent 与环境交互，通过 reward 学习 policy，最大化 cumulative reward。
+- MDP = `(S, A, P, R, γ)`；Markov property。
+- `G_t`、`V(s)`、`Q(s,a)`；Bellman 方程；Q-learning + ε-greedy。
+- **不考 Quiz 3**；Quiz 3 已在 2026-11-05 20:00 进行，覆盖 Week 9–11。
+
+---
+
+> **下一周（Week 13）预告**：老师会做 **industry sharing / 课程收尾**（Week 13 为纯 industry sharing，按 Week 9 说明）；Final Exam 中 Simon Liu 部分覆盖 **Week 9–11**。

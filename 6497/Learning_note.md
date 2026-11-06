@@ -4539,3 +4539,253 @@ input image
 - **Quiz 2 范围 Week 8–11**：神经网络导论、MLP/forward/backprop、训练技巧（正则化/dropout/batch norm/超参数）、CNN 基础。
 - **Homework 2**：Week 12 末截止（以 NTULearn 为准）；内容是用神经网络逼近函数，注意 underfit / overfit / just-right 的对比。
 - 之后 Week 13 进入 **CNN 的后续内容 / 课程收尾**，并准备 Final Exam（可带一张 A4 reference sheet）。
+
+---
+
+## Week 12 — Part 2.3：Convolutional Neural Networks（CNN）详解
+
+> **本周材料**：`week12/Part 2.3_CNN(1).pdf`（Wang Lipo，82 页）、`week12/weeek12.txt`（录播转写）、`week12/cnn_tutorial.ipynb`（CNN 代码 tutorial）。
+>
+> **本周定位**：这是 **最后一次 face-to-face lecture**；前半段讲 CNN，后半段进行 **Quiz 2**。⚠️ **Quiz 2 覆盖 Week 8–11**（NN 导论、MLP/forward/backprop、训练、正则化/CNN 基础）；**本周新讲的 CNN 细节不进入 Quiz 2**，但属于 **Final Exam** 范围。下周改为 **online**（老师会发链接），之后进入课程收尾。
+>
+> **ASR 错拼**：Covent/convolution on → **CNN**；convolute → **convolve**；pulling → **pooling**；Mx pulling → **max pooling**；rest net → **ResNet**；feature map → 特征图；cross correlation → **cross-correlation**；Lc/Banjo → **LeCun/Bengio**；Alex sNt → **AlexNet**；Hub and Whistle → **Hubel & Wiesel**。
+
+### 1. 为什么 MLP 不适合图像
+
+**Translation（平移）问题**：
+
+- 同一个 object 在图像中左移/右移，语义上仍是同一个 object；
+- 但 MLP 把图像 flatten 成一维向量，平移后**每个位置的输入值都变了**；
+- 所以 MLP **不具备 translation invariance**：object 在左边响应强，移到右边响应弱；
+- 需要 CNN 的 **local receptive field + parameter sharing** 来解决。
+
+### 2. CNN 的历史（考点：人物/模型/贡献）
+
+| 时间 | 工作 | 要点 |
+|---|---|---|
+| 1959/1962 | **Hubel & Wiesel** | 猫视觉皮层：orientation-selective cells、topographic mapping、simple/complex/hypercomplex cells；**分层组织** |
+| 1980 | **Neocognitron**（Fukushima） | "sandwich" architecture（SCSCSC…）；simple cells 可调参数；complex cells 做 pooling；filter 手工设计 |
+| 1998 | **LeNet-5**（LeCun, Bottou, Bengio, Haffner） | 用 **backprop** 训练 CNN；手写数字/文档识别 |
+| 2012 | **AlexNet**（Krizhevsky, Sutskever, Hinton） | ImageNet；GPU；deep CNN 的起点 |
+
+⭐ 关键转变：早期 filter **handcrafted**；后来用 **backprop + 大数据**让 filter **自己学**。
+
+### 3. Convolution（卷积）
+
+#### 3.1 1D convolution
+
+连续：
+
+```
+(f * g)(t) = ∫ f(τ) g(t - τ) dτ
+```
+
+离散：
+
+```
+(f * g)[n] = Σ_k f[k] g[n - k]
+```
+
+- 数学定义：先**翻转 kernel** `g(-τ)`，再滑动、相乘、求和；
+- 例：`x=[1,2,3,4]`，`w=[5,6,7]` → `z=[5,16,34,52,45,28]`（按 full convolution）。
+
+⭐ **深度学习框架不 flip kernel**：
+
+- PyTorch/TensorFlow 的 `Conv2d` 实际做的是 **cross-correlation**；
+- 因为 filter 是**学出来的**：flip 与不 flip 只是学到一套"翻转的"filter，表达能力相同；
+- 所以实践中不用纠结，统一叫 convolution。
+
+#### 3.2 2D convolution
+
+- filter 在 image 上滑动，element-wise 相乘再求和；
+- 得到一个 **response map / activation map**；
+- filter 与局部 pattern 越相似，response 越大；
+- 例：Laplacian kernel `[[0,1,0],[1,-4,1],[0,1,0]]` 做 edge detection，平坦区域响应≈0，边缘处响应大。
+
+#### 3.3 CNN 的关键概念
+
+| 概念 | 含义 |
+|---|---|
+| **Local receptive field** | 每个 neuron 只连接上一层的**局部区域**（如 3×3/5×5），不是全连接 |
+| **Parameter sharing** | 同一个 filter 在整张图上共享权重 → 参数量大大减少 |
+| **Feature map depth** | 该层 filter 的数量 = 输出 feature map 的通道数（RGB 输入 depth=3） |
+| **Stride** | filter 每次滑动的步长 |
+| **Padding** | 边界补零，控制输出尺寸 |
+
+⭐ CNN 的参数量远小于全连接：一个 5×5×3 filter 只有 `5*5*3+1=76` 个参数；10 个 filter 共 760 个参数，而不是全连接的巨大矩阵。
+
+### 4. 输出尺寸与参数量（必考计算）
+
+#### 4.1 Convolution layer
+
+输入 `W1 × H1 × C`，超参数：
+
+- `K`：filter 数量；
+- `F`：filter 大小（F×F）；
+- `S`：stride；
+- `P`：zero padding。
+
+输出：
+
+```
+W2 = (W1 - F + 2P) / S + 1
+H2 = (H1 - F + 2P) / S + 1
+输出尺寸 = W2 × H2 × K
+```
+
+参数量：
+
+```
+F * F * C * K + K   （+K 是每个 filter 一个 bias）
+```
+
+**例**：输入 `32×32×3`，10 个 `5×5` filter，stride=1，pad=2：
+
+```
+W2 = (32 - 5 + 2*2)/1 + 1 = 32
+输出 = 32 × 32 × 10
+每个 filter: 5*5*3 + 1 = 76
+总参数 = 76 * 10 = 760
+```
+
+**例**：`7×7` 输入，`3×3` filter：
+
+- stride 1 → `(7-3)/1+1 = 5` → 5×5；
+- stride 2 → `(7-3)/2+1 = 3` → 3×3；
+- stride 3 → `(7-3)/3+1 = 2.33` → **不能整除，不合法**。
+
+⭐ 常用设置：
+- `F=3, S=1, P=1` → 保持空间尺寸；
+- `F=5, S=1, P=2` → 保持空间尺寸；
+- `F=1, S=1, P=0` → 1×1 convolution（改变通道数，不改变空间尺寸）。
+
+#### 4.2 Pooling layer
+
+输入 `W1 × H1 × C`，超参数：
+
+- `F`：pooling window 大小；
+- `S`：stride。
+
+输出：
+
+```
+W2 = (W1 - F) / S + 1
+H2 = (H1 - F) / S + 1
+输出 = W2 × H2 × C
+参数量 = 0
+```
+
+- **Max pooling**：窗口内取最大值；
+- **Average pooling**：窗口内取平均；
+- 作用：降低 spatial size、减少参数、防止 overfit；
+- 常设 `stride = window size`（如 2×2, stride 2）。
+
+**例**：`4×4` 输入，2×2 max pooling，stride 2：
+
+```
+[[1,3,5,3],
+ [4,2,3,1],
+ [3,1,1,3],
+ [0,1,0,4]]
+→ max: [[4,5],[3,4]]
+```
+
+### 5. CNN 整体结构
+
+典型结构：
+
+```
+input
+→ [CONV → ReLU] × N
+→ POOL
+→ [CONV → ReLU] × N
+→ POOL
+→ ...
+→ Flatten
+→ Fully Connected (MLP) → Softmax
+```
+
+- **Convolution**：提特征；
+- **ReLU**：非线性；
+- **Pooling**：降维/简化；
+- **Flatten**：把 `C×H×W` 拉成一维；
+- **FC**：分类；
+- **Softmax**：输出概率。
+
+⭐ 重要观察：
+- CNN 的"深度"主要来自 **convolution 层**；
+- **分类仍由最后的 fully connected MLP 完成**；
+- convolution 层参数少（parameter sharing），参数大多集中在 FC 层。
+
+#### 5.1 ResNet（Residual Network）
+
+- 引入 **identity skip connection**：
+
+```
+x_(l+1) = x_l + F(x_l)
+```
+
+- 输入直接加到输出上；
+- 缓解 **vanishing gradient**；
+- 可以训练 **1000+ 层**；
+- 常见 variants：ResNet-18/34/50/101/152/200；
+- 其他类似：ResNeXT、DenseNet。
+
+### 6. PyTorch 实现要点
+
+```python
+import torch
+
+# Conv2d: [N, C_in, H, W] -> [N, C_out, H_out, W_out]
+conv = torch.nn.Conv2d(in_channels=3, out_channels=2,
+                       kernel_size=3, stride=1, padding=0)
+x = torch.randn(1, 3, 7, 7)   # batch=1, channels=3, 7x7
+print(conv(x).shape)          # [1, 2, 5, 5]
+
+# MaxPool2d
+pool = torch.nn.MaxPool2d(kernel_size=2, stride=2)
+print(pool(torch.randn(1, 3, 6, 6)).shape)  # [1, 3, 3, 3]
+
+# Flatten
+flat = torch.nn.Flatten(start_dim=1, end_dim=2)
+print(flat(torch.randn(2, 6, 6)).shape)     # [2, 36]
+```
+
+⭐ PyTorch 的 `Conv2d` 输入 shape 是 `[batch, channels, height, width]`；**每次都要检查 shape**，否则 `Linear` 层会 dimension mismatch。
+⭐ `Conv2d` 名字叫 Conv，但实际是 **cross-correlation**（不 flip kernel）。
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **MLP 为什么不适合图像** | 无 translation invariance；平移后输入向量完全不同 |
+| **Hubel & Wiesel** | 猫视觉皮层；orientation-selective；simple/complex/hypercomplex；topographic map |
+| **Neocognitron** | 1980；SCSCSC；simple cells + complex cells（pooling）；handcrafted |
+| **LeNet-5** | 1998；backprop 训练 CNN；手写数字 |
+| **AlexNet** | 2012；ImageNet；GPU；deep CNN 起点 |
+| **Convolution** | 数学 flip kernel；深度学习不 flip = cross-correlation；filter 学出来，无影响 |
+| **Local receptive field** | 每个 neuron 只看局部区域 |
+| **Parameter sharing** | 同一 filter 全图共享 → 参数少 |
+| **Feature map depth** | = filter 数量 |
+| **Output size** | `(W - F + 2P)/S + 1` |
+| **Params** | `F*F*C*K + K` |
+| **Pooling** | max/average；`(W-F)/S+1`；0 参数 |
+| **CNN 架构** | CONV-ReLU-POOL-...-Flatten-FC-Softmax |
+| **ResNet** | identity skip connection；缓解 vanishing gradient；1000+ 层 |
+| **PyTorch shape** | Conv2d: `[N,C,H,W]`；Flatten 后接 Linear |
+| **Quiz 2** | 本周课后进行；覆盖 Week 8–11；CNN 本周新内容不考 |
+
+### 8. 本周要点小结
+
+- **CNN 的动机**：MLP 对图像平移不鲁棒；CNN 用 **local receptive field + parameter sharing**。
+- **历史**：Hubel & Wiesel → Neocognitron → LeNet-5 → AlexNet；从 handcrafted filter 到 backprop 学习 filter。
+- **Convolution**：filter 滑动 + 内积；数学上 flip，深度学习实际 cross-correlation；filter 学出来，无影响。
+- **关键概念**：local receptive field、parameter sharing、feature map depth、stride、padding。
+- **尺寸计算**：`(W-F+2P)/S+1`；参数量 `F*F*C*K+K`；pooling `(W-F)/S+1`、0 参数。
+- **CNN 架构**：CONV-ReLU-POOL 堆叠 → Flatten → FC → Softmax；conv 提特征，FC 分类。
+- **ResNet**：identity skip connection，缓解 vanishing gradient，可训练 1000+ 层。
+- **PyTorch**：注意 `[N,C,H,W]` 和 Flatten/Linear 的 shape。
+
+---
+
+> **下一周（Week 13）预告**：本周是最后一次 face-to-face lecture；下周改为 **online**（老师会发链接），课程收尾/复习。**Quiz 2 已在本次课进行**，覆盖 Week 8–11；本周 CNN 细节属于 **Final Exam** 范围（Final 可带一张 A4 reference sheet）。

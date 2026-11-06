@@ -4186,3 +4186,283 @@ $$J(\boldsymbol{\theta})=\|\boldsymbol{y}-F\boldsymbol{\theta}\|^2+\lambda\|\bol
 > - 之后开始 **clustering**（主要是 **k-means**，data grouping）。
 >
 > **Quiz 2**：**2026-11-10（周二）9:30–10:30**，约 1 小时（可提前 15–20 分钟交卷）；**只考到 Week 12 的内容，Week 13 的内容不考**。老师会尽量安排大教室，具体考场看 NTULearn。
+
+---
+
+## Week 12 — Feature Selection / Dimensionality Reduction + K-means Clustering
+
+> **本周材料**：`week12/week12.txt`（录播转写）、`week12/ML-Slides9.pdf`（*Feature Selection for Dimensionality Reduction and Classification*，35 页）。本周是 **Quiz 2 前最后一节新内容**；K-means 也在 Quiz 2 范围内。
+>
+> **⭐ Quiz 2（11/10 周二 9:30–10:30）范围**：从 **classification tree** 那周一直到 **本周 K-means**；老师明确说 **Quiz 2 可能有一道 K-means 题**，必须会**手算迭代过程**（assignment + centroid update）。Week 13 的内容不考。
+>
+> **ASR 错拼**：curso dominty → **curse of dimensionality**；fai/fish ratio → **Fisher's ratio**；Mob/Maharnob → **Mahalanobis**；scomtri → **scatter matrix**；Km cluster → **K-means**；WCS/WCSS → **within-cluster sum of squares**；picking → **peaking**；elbow → **elbow method**。
+
+### 1. 为什么高维会出问题：Curse of Dimensionality
+
+高维 feature vector 会带来两个核心问题：
+
+| 问题 | 含义 |
+|---|---|
+| **Data sparsity（数据稀疏）** | 高维空间中样本分布很稀疏；有限的 training samples 覆盖不了整个空间，分类器很难学到可靠区域 |
+| **Distance concentration（距离集中）** | 高维空间中，任意两点之间的距离趋于**相同/接近**；"同类近、异类远"的假设失效，分类变难 |
+
+⭐ 降低维度（减少 feature 数）的两个主要理由：
+
+1. **Computational complexity**：feature 越多，参数越多（线性模型至少 `n+1` 个；Gaussian 协方差约 `n(n+1)/2` 个），训练/推理都更贵。
+2. **Generalization**：sample/parameter 比例越高，泛化越好；feature 多 → 参数多 → 比例下降 → 容易 overfit。减少 feature 可以提高这个比例。
+
+### 2. Feature Selection vs Feature Extraction
+
+| | Feature selection | Feature extraction |
+|---|---|---|
+| 做法 | 从原始 feature 中**选一个子集** | 对原始 feature 做**变换**，生成新 feature |
+| 是否保留原 feature | ✅ 保留子集 | ❌ 生成新 feature，原 feature 的物理含义可能丢失 |
+| 例子 | 选 `x1, x3, x5` | **PCA**、线性/非线性组合 |
+| 优点 | 可解释、保留物理含义 | 压缩效率更高，能用更少维度保留大部分信息 |
+| 缺点 | 可能丢掉有用信息 | 新 feature 难解释 |
+
+⭐ 一句话：**selection = 挑；extraction = 造**。
+
+### 3. Peaking Phenomenon（峰值现象）
+
+- 横轴：feature 数；纵轴：classification error。
+- 一开始增加 feature → error 下降（信息变多）；
+- 超过某个临界值 `L` → error 开始**上升**（维度太高、样本不够、过拟合）。
+- 这个"先降后升"的现象叫 **peaking phenomenon**。
+
+⭐ 两个重要结论：
+
+1. **Training samples 越多，最佳 feature 数 `L` 越大，峰值性能越好**；
+2. 所以实践中：**小数据 → 少 feature；大数据 → 可以用更多 feature**。
+3. 注意：peaking 是 **validation/test error** 的现象；training error 通常随 feature 增加一直下降。
+
+### 4. Individual Feature Evaluation（单特征评价）
+
+#### 4.1 Fisher's ratio（Fisher 比率）
+
+对二分类、连续 feature：
+
+```
+Fisher = (m1 - m2)^2 / (s1^2 + s2^2)
+```
+
+- `m1, m2`：两类在该 feature 上的均值；
+- `s1^2, s2^2`：两类在该 feature 上的方差；
+- 分子 = **between-class difference**（类间差异）；
+- 分母 = **within-class scatter**（类内散度）；
+- **Fisher 越大 → 该 feature 越有判别力**。
+
+⭐ 好 feature：**类间差异大、类内方差小**。
+⚠️ Fisher's ratio 只适用于 **continuous/numerical** feature；categorical/nominal feature 不能直接算均值和方差。
+
+#### 4.2 Mutual information（互信息）
+
+```
+I(X; Y) = H(X) + H(Y) - H(X, Y)
+```
+
+- `H(X)`：feature 的 entropy；
+- `H(Y)`：class label 的 entropy；
+- `H(X,Y)`：joint entropy；
+- 衡量 X 和 Y 的**相互依赖**：知道 X 后，Y 的不确定性减少多少；
+- **MI 越大 → feature 与 class label 越相关 → 越有用**。
+
+⭐ MI 常用于 **discrete/categorical** feature；continuous feature 可以先**离散化（bin）**再算 MI。
+
+⚠️ **不能把 Fisher 和 MI 的数值直接比较**；只能用同一种指标排序。
+
+### 5. Feature Subset Selection（特征子集选择）
+
+#### 5.1 为什么不直接选 top-k？
+
+因为 top-ranked features 之间可能**高度相关/冗余**：
+
+- 两个 feature 都很好，但几乎提供同样的信息；
+- 选 top-1 和 top-2 可能等于选了两遍同一个信息；
+- 好的子集应该 **maximum relevance + minimum redundancy**（最大相关、最小冗余）。
+
+#### 5.2 两个组成部分
+
+| 组件 | 作用 |
+|---|---|
+| **Search algorithm** | 生成候选 feature subset |
+| **Evaluation criterion** | 评价每个候选 subset 的好坏 |
+
+#### 5.3 Search algorithms
+
+| 方法 | 做法 | 特点 |
+|---|---|---|
+| **Exhaustive search** | 枚举所有 subset（1 个、2 个、…、n 个 feature 的所有组合） | 一定找到最优；组合爆炸，n 大时不可行 |
+| **Sequential forward selection** | 从空集开始，每次加入一个"最好"的 feature | 自底向上；次优但实用 |
+| **Sequential backward elimination** | 从全集开始，每次删掉一个"最不重要"的 feature | 自顶向下；次优但实用 |
+
+⭐ Sequential forward 的关键：第 2 步不是单独评价每个 remaining feature，而是**把它与已选 feature 组合起来评价**；第 3 步同理。这样才考虑 feature 之间的互补/冗余。
+
+#### 5.4 Evaluation criteria
+
+**(1) Classification performance（wrapper）**
+
+- 对每个候选 subset，**训练一个 classifier**，用 validation accuracy/error 评价；
+- 优点：选出的 subset **最匹配该 classifier**；
+- 缺点：要训练大量 classifier，计算很贵；不同 classifier 可能选出不同 subset。
+
+**(2) Separability measures（filter）**
+
+- 不训练 classifier，直接衡量 subset 中类的**可分性**；
+- **Mahalanobis distance**：
+
+```
+D = (m1 - m2)^T C^(-1) (m1 - m2)
+```
+
+  - `C`：协方差/相关矩阵；考虑 feature 之间的相关性；
+  - `C = I` 时退化为 Euclidean distance。
+- **Scatter-based**：
+
+```
+J = trace(Sw^(-1) Sb)   或   J = trace(Sb) / trace(Sw)
+```
+
+  - `Sb`：between-class scatter matrix；
+  - `Sw`：within-class scatter matrix；
+  - 越大越好。
+- 优点：不需要训练 classifier，计算更高效；与最终 classifier 无关；
+- 缺点：依赖分布假设，可能与真实分布不匹配。
+
+#### 5.5 Filter / Wrapper / Embedded
+
+| 方法 | 是否训练 classifier | 评价标准 | 例子 |
+|---|---|---|---|
+| **Filter** | ❌ | separability measure | Fisher、MI、Mahalanobis、scatter |
+| **Wrapper** | ✅ | classification performance | 用 SVM/RF 的 accuracy 搜索 subset |
+| **Embedded** | ✅（训练中自带） | 模型自带 feature selection | **Lasso**（L1 把不重要系数压到 0） |
+
+⭐ Embedded 的典型：**Lasso** 在 loss 中加 `λ Σ|θ|`，不重要的 feature 系数被压到 **exactly 0** → 自动 feature selection。
+
+### 6. Clustering（聚类）与 K-means
+
+#### 6.1 Clustering 是什么
+
+- **Unsupervised**：没有 class label；
+- 目标：把数据分成若干**自然组（natural groups）**：
+  - 同一 cluster 内样本**相似**；
+  - 不同 cluster 间样本**不相似**。
+- 与 classification 的区别：
+  - Classification 的 class 是**人为定义**的，同一类样本不一定"自然相似"（例如"异常"类可能包含过高和过低的血压）；
+  - Clustering 的 cluster 是**自然分组**，同组相似、异组不相似。
+
+#### 6.2 相似度/距离
+
+| 度量 | 公式/说明 |
+|---|---|
+| **Minkowski distance** | `(Σ_k |x_k - x'_k|^q)^(1/q)` |
+| **Euclidean** | q=2 |
+| **Manhattan / city-block** | q=1 |
+| **Mahalanobis** | 考虑 feature 间相关性；`C=I` 时退化为 Euclidean |
+| **Cosine similarity** | `x^T x' / (||x|| ||x'||)`；越大越相似 |
+
+⭐ 距离越小越相似；cosine similarity 越大越相似（常用于文本/embedding）。
+
+#### 6.3 Clustering 的四种类型
+
+| 类型 | 思想 | 代表算法 |
+|---|---|---|
+| **Centroid-based / partitional** | 把数据分成 K 个 subset，每个 subset 有一个 centroid | **K-means** |
+| **Hierarchical** | 树状合并/分裂，形成 dendrogram | 层次聚类 |
+| **Distribution-based** | 数据来自若干个分布（如 Gaussian） | **GMM** |
+| **Density-based** | 高密度区域是一个 cluster，低密度区域分隔 cluster | DBSCAN 类 |
+
+#### 6.4 K-means 的目标函数
+
+把数据分成 K 个 cluster `C1..CK`，每个 cluster 的 centroid 为 `μk`。**Within-Cluster Sum of Squares（WCSS）**：
+
+```
+WCSS = Σ_k Σ_{x ∈ C_k} ||x - μ_k||^2
+```
+
+K-means 的目标：**找到一种 partition，使 WCSS 最小**。
+
+⭐ 直觉：让每个点到它所属 centroid 的距离平方和尽量小 → cluster 尽量紧凑。
+
+#### 6.5 K-means 算法（必须会手算）
+
+**准备**：
+
+1. 设定 K（cluster 数）；
+2. 初始化 K 个 centroid（随机选点/随机生成）。
+
+**迭代**（每轮两个操作）：
+
+1. **Assignment step**：对每个样本，计算它到 K 个 centroid 的距离，把它分到**最近**的 centroid；
+2. **Update step**：对每个 cluster，重新计算 centroid = 该 cluster 内所有样本的**均值**；
+3. 重复 1–2，直到**centroid 不再变化**或**样本分配不再变化**（或达到 max iterations）。
+
+**1D 手算例子**：数据 `[1, 2, 3, 10, 11, 12]`，K=2，初始 centroid `μ1=1, μ2=12`。
+
+- 第 1 轮 assignment：
+  - 1,2,3 → 离 1 更近 → C1；
+  - 10,11,12 → 离 12 更近 → C2；
+- 第 1 轮 update：
+  - μ1 = mean(1,2,3) = 2；
+  - μ2 = mean(10,11,12) = 11；
+- 第 2 轮 assignment：分配不变；
+- 第 2 轮 update：centroid 不变 → **收敛**。
+
+⭐ Quiz 可能给你 2D 点和初始 centroid，要求写出每一轮的 assignment 和新的 centroid；**一定要真的算距离，不要只背步骤**。
+
+#### 6.6 如何选 K：Elbow method（肘部法）
+
+- 对 K=1,2,3,... 分别跑 K-means，计算 WCSS；
+- 画 `WCSS vs K` 曲线；
+- WCSS 随 K 增加**一定下降**（K=N 时 WCSS=0）；
+- 找曲线从"陡降"变为"平缓"的**拐点（elbow）**，作为合适的 K。
+
+⭐ 例：K=1→2 降很多，2→3 降很多，3→4 只降一点 → elbow 在 K=3。
+
+#### 6.7 K-means 的局限
+
+- 假设 cluster 是**球形/紧凑**的；非球形（长条、环形）效果差；
+- 对**初始化**敏感，可能陷入 local minimum（可多跑几次取最好）；
+- 必须预先给 K；
+- 对 feature scale 敏感（通常要先标准化）；
+- 对 outliers 敏感（均值会被拉偏）。
+
+### 7. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **Curse of dimensionality** | data sparsity + distance concentration |
+| **降维理由** | 计算复杂度 + 泛化（sample/parameter 比例） |
+| **Selection vs extraction** | 选子集 vs 造新 feature；PCA 是 extraction |
+| **Peaking phenomenon** | error 先降后升；样本越多，最佳 feature 数越大 |
+| **Fisher's ratio** | `(m1-m2)^2/(s1^2+s2^2)`；越大越好；连续 feature |
+| **Mutual information** | `H(X)+H(Y)-H(X,Y)`；离散 feature；越大越相关 |
+| **Top-k 不够** | 特征间可能冗余；要 max relevance + min redundancy |
+| **Search algorithms** | exhaustive（最优但爆炸）、forward（加）、backward（删） |
+| **Evaluation** | classifier performance（wrapper，贵）；separability（filter，快） |
+| **Mahalanobis** | `(m1-m2)^T C^-1 (m1-m2)`；考虑相关性 |
+| **Scatter** | `trace(Sw^-1 Sb)` 或 `trace(Sb)/trace(Sw)` |
+| **Filter/wrapper/embedded** | 无 classifier / 有 classifier / 模型自带（Lasso） |
+| **Clustering** | unsupervised；同簇相似、异簇不相似 |
+| **K-means 目标** | minimize WCSS = `Σ_k Σ_{x∈C_k} ||x-μ_k||^2` |
+| **K-means 两步** | assignment（最近 centroid）+ update（均值） |
+| **K-means 停止** | centroid/assignment 不变 |
+| **选 K** | elbow method：WCSS vs K 的拐点 |
+| **K-means 局限** | 球形假设、初始化、K 预设、scale、outlier |
+| **Quiz 2** | 11/10 9:30–10:30；覆盖到本周 K-means；可能考 K-means 手算 |
+
+### 8. 本周要点小结
+
+- **高维问题**：data sparsity + distance concentration → curse of dimensionality；降维可降计算量、提高泛化。
+- **Feature selection vs extraction**：selection 选子集（保留物理含义）；extraction 造新 feature（PCA，压缩效率高但难解释）。
+- **Peaking phenomenon**：feature 不是越多越好；样本越多，最佳 feature 数越大。
+- **单特征评价**：Fisher's ratio（连续、类间/类内）；mutual information（离散、相关性）。
+- **子集选择**：不能只选 top-k（会冗余）；需要 search + evaluation；exhaustive 最优但爆炸，forward/backward 实用。
+- **评价标准**：wrapper 用 classifier performance（准但贵）；filter 用 separability（快但依赖分布假设）；embedded 用 Lasso 等自带机制。
+- **Clustering**：无监督、自然分组；K-means 是 centroid-based 的代表。
+- **K-means**：最小化 WCSS；每轮 assignment + update；elbow 选 K；假设球形、对初始化和 scale 敏感。
+- **Quiz 2**：**K-means 手算**是明确可能考的题型；必须会做 assignment/update 迭代。
+
+---
+
+> **下一周（Week 13）预告**：老师会讲另外三种 clustering：**hierarchical（dendrogram）、distribution-based（GMM）、density-based**；但 **Quiz 2 不考 Week 13 内容**——Quiz 2 只考到本周 K-means。Quiz 2 时间：**2026-11-10（周二）9:30–10:30**，具体考场看 NTULearn。

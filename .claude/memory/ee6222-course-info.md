@@ -34,7 +34,7 @@ EE6222 Machine Vision（NTU，AY26-27 Semester1，School of EEE）。注意用�
 **课程进度（Cheng Jun 部分）**：
 - **Week 10 = Video (Part I)**；**Week 11 = Video (Part II)**：object detection & tracking、Re-ID / JDE、action recognition（LRCN / C3D / two-stream / Hidden Two-Stream）、video enhancement（motion blur / PSF / blind deconvolution / turbulence）、optical flow（brightness constancy、aperture problem）、video segmentation（FCN / U-Net / temporal consistency）。
 - ⭐ **Week 11 考试说明**：Final 4 题 × 25 分；Cheng Jun 的 **Q4 是概念题，不考计算**（往年题偏计算，但本学期他的部分考 concept/understanding）；不要战略放弃 Q4。
-- **Week 12–13 = 3D**（Topic 13–14：3D Machine Perception / Machine Vision；VLA、Vision-Language Navigation 等前沿）。
+- **Week 12–13 = 3D**：**Week 12 = Topic 13 3D Machine Perception**（ToF / LiDAR / Structured Light / SfM / Stereo；perspective projection `x=fX/Z`、extrinsics `R,T`、Euler angles roll/pitch/yaw；SfM 的 pixel correspondence → 3D points + camera poses；Harris / SIFT、scale space/DoG、invariance、mosaicking/object recognition）；**Week 13 = Topic 14**，继续 **stereo images / 双目视觉**（视差、深度恢复等）。
 
 **课程布局**：14 Topics。Topic 1–3 图像处理基础（image fundamentals / LSI & transforms / enhancement），4–5 识别决策（matching→classification、MAP decision），6–8 传统机器学习（统计估计→手工特征→特征选择/降维），9–10 深度学习（MLP→CNN→Transformer），11–14 Video + 3D（Cheng Jun）。
 

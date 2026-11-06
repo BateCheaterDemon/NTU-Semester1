@@ -4510,3 +4510,187 @@ $$\boxed{I_x u+I_y v+I_t=0}\qquad\text{或}\qquad \nabla I^T\begin{bmatrix}u\\v\
 - 老师会讲 3D 的表示、感知、以及 Vision-Language-Action / Navigation 等前沿方向。
 - **Final exam**：4 题 × 25 分；Cheng Jun 的 Q4 概念题；3 题来自 Jiang Xudong。
 - **Assignment 2**：按更正后的要求，不需要 revised design；重点是 own design + AI proposal + 四点比较。
+
+---
+
+## Week 12 — Topic 13：3D Machine Perception（三维感知基础：ToF / LiDAR / Structured Light / SfM / 相机模型）
+
+> **本周材料**：`week12/week12.txt`（录播转写）、`Lecture Notes Week 12-13.pdf`（Cheng Jun，*3D*，约 60+ 页；Week 12–13 共用）。
+>
+> **本周定位**：从 2D 视频进入 **3D**。老师先讲 3D 数据获取的几条路线（ToF、LiDAR、Structured Light、Structure from Motion、Stereo），再讲**相机模型 / 投影 / 旋转**，以及 **SfM + 特征点（Harris/SIFT）**。下周继续 **stereo images**。
+>
+> **ASR 错拼**：ta/treaty → **3D**；LDA → **LiDAR**；stretal → **stereo**；sift → **SIFT**；fitura → **feature**；Mobic → **Mahalanobis**；Euler → **Euler**；roll/pitch/yaw → **roll/pitch/yaw**。
+
+### 1. 3D 数据获取的五条路线
+
+| 方法 | 原理 | 优点 | 缺点 |
+|---|---|---|---|
+| **Time of Flight (ToF)** | 发射光/信号，测往返时间 → 距离 | 直接测深度、实时 | 背景光、多次反射、干扰 |
+| **LiDAR** | 激光测距（ToF 的一种） | 高精度、远距离 | **LiDAR ghost**（反射/散射造成假读数）、**blooming**（高反物体使光束扩散） |
+| **Structured Light** | 投射已知图案（网格/条纹），看变形 | 高精度、低成本 | **不适合室外**（强光干扰） |
+| **Structure from Motion (SfM)** | 多张图像 + 特征点对应 → 同时恢复场景几何与相机运动 | 只需普通相机 | 计算复杂、依赖特征点/匹配 |
+| **Stereo** | 两个相机（双目）→ 视差 → 深度 | 被动、密集 | 需要标定、纹理弱区域难匹配（下周讲） |
+
+⭐ **ToF / LiDAR / Structured Light 是"主动"（发射信号）；SfM / Stereo 是"被动"（只用相机图像）**。
+
+### 2. 相机模型与投影
+
+#### 2.1 Perspective projection（透视投影）
+
+1D 针孔模型：
+
+```
+x / f = X / Z      →      x = f * X / Z
+```
+
+- `X`：3D 点的横向坐标；
+- `Z`：深度（到相机）；
+- `f`：焦距；
+- `x`：图像平面上的坐标；
+- `Z` 越大 → `x` 越小（远处物体在图像上更小）。
+
+⭐ 透视投影是**非线性**的（除以 Z）；这是 3D→2D 信息丢失的根源：单张图像无法唯一恢复深度。
+
+#### 2.2 相机外参：Rotation + Translation
+
+3D 世界点 `(U,V,W)` → 相机坐标 → 2D 图像 `(x,y)`：
+
+```
+P_camera = R * P_world + T
+x = f * X_c / Z_c
+y = f * Y_c / Z_c
+```
+
+- `R`：旋转矩阵（3×3）；
+- `T`：平移向量（3×1）；
+- 合称 **extrinsic parameters**；
+- `f`（以及主点、像素尺寸）是 **intrinsic parameters**。
+
+#### 2.3 Euler angles（欧拉角）
+
+| 角 | 旋转轴 | 直觉 |
+|---|---|---|
+| **Roll** | z 轴 | 翻滚（左右倾斜） |
+| **Pitch** | x 轴 | 俯仰（上下点头） |
+| **Yaw** | y 轴 | 偏航（左右转头） |
+
+- 方向：`R = Rz(roll) * Rx(pitch) * Ry(yaw)`（具体顺序取决于约定）；
+- 绕 x 轴旋转 θ 的矩阵：
+
+```
+[1    0       0   ]
+[0  cosθ  -sinθ  ]
+[0  sinθ   cosθ  ]
+```
+
+- 绕 y、z 轴类似；三个矩阵相乘得到完整旋转。
+
+⭐ 考试若考旋转：记住**绕哪个轴、sin/cos 的位置、旋转方向**；不同教材的 roll/pitch/yaw 定义可能不同，按课件约定。
+
+### 3. Structure from Motion（SfM）
+
+#### 3.1 问题定义
+
+> 给定**两张或更多图像**，同时恢复：
+> 1. **场景几何**（3D 点坐标）；
+> 2. **相机运动**（每张图的 R, T）。
+
+输入：图像间的**像素对应**（pixel correspondence），通常通过 **tracking** 得到。
+输出：3D 结构 + 相机位姿。
+
+#### 3.2 流程
+
+1. 在图像中检测**关键点/特征**（corners、textured areas）；
+2. 在帧间**跟踪/匹配**这些关键点；
+3. 用对应点估计**相机参数**和**3D 点坐标**；
+4. 优化（bundle adjustment）——课件只提概念，不展开。
+
+#### 3.3 投影模型
+
+- 经典方法：**orthographic（正交）**；
+- 新方法：**perspective（透视）**；
+- 近年：**deep learning** 端到端。
+
+### 4. 特征点与跟踪
+
+#### 4.1 什么是好的 keypoint
+
+- **Corner（角点）**：两个方向都有明显梯度，容易定位；
+- **Textured area（纹理区域）**：有丰富变化；
+- 平坦区域/纯边缘：难以唯一匹配（aperture problem）。
+
+#### 4.2 Harris corner
+
+- 用图像梯度构造结构矩阵，检测"两个方向都变化大"的点；
+- 对旋转较鲁棒，对尺度不鲁棒。
+
+#### 4.3 SIFT（Scale-Invariant Feature Transform）
+
+> Lowe, 2004；**scale/rotation invariant**；最著名的 hand-crafted feature descriptor。
+
+三个步骤：
+
+1. **Detection**：在**尺度空间**中检测可重复的关键点；
+2. **Description**：给每个关键点分配方向，构造 descriptor；
+3. **Matching**：用 descriptor 匹配两幅图像的关键点。
+
+**尺度不变性**：
+
+- **Image pyramid**：不断降采样（宽高各除以 2），在不同尺度上检测；
+- **Scale space / DoG（Difference of Gaussians）**：金字塔 + 高斯模糊，取相邻高斯图像的差；在 DoG 中稳定出现的点 → scale invariant。
+
+**旋转不变性**：
+
+- 计算关键点邻域的**梯度方向直方图**（36 bins，每 10°）；
+- 把主方向作为参考方向，旋转归一化。
+
+**Descriptor**：
+
+- 在关键点周围取 16 个 block，每个 block 一个 8-bin 梯度直方图 → 128 维 descriptor；
+- 对光照、旋转、尺度、部分 affine 变化鲁棒。
+
+**不变性类型**：illumination、scale、rotation、affine、full perspective（SIFT 主要覆盖前四者）。
+
+#### 4.4 应用
+
+- **Mosaicking**：匹配 SIFT → 估计 homography → 拼接图像；
+- **Object recognition**：匹配特征点；
+- **Robot localization**：用已知地图的特征匹配定位。
+
+### 5. 本周与考试的关系
+
+- 本周是 **Cheng Jun 部分 Topic 13**；下周 **Topic 14** 继续 3D（stereo images）。
+- **Final Exam**：Cheng Jun 的 Q4 是**概念题**（25 分），3D 的**方法原理、优缺点、适用场景**是重点；不需要复杂计算。
+- **Assignment 2**：Cheng Jun 部分；系统允许**无限次提交**；5 页是建议，不是硬性上限；**不需要 revised design**；重点是 own design + AI proposal + 四点比较。
+
+### 6. ⭐ 本周考点速查
+
+| 考点 | 要点 |
+|---|---|
+| **ToF** | 测往返时间；背景光/多反射/干扰 |
+| **LiDAR** | ToF 的一种；ghost（假读数）、blooming（高反物体） |
+| **Structured Light** | 投图案；不适合室外 |
+| **SfM** | 多图 + 对应点 → 3D 结构 + 相机运动 |
+| **Stereo** | 双目视差 → 深度；下周讲 |
+| **Perspective projection** | `x = f X / Z`；非线性、深度丢失 |
+| **Extrinsic** | `R, T`；世界→相机 |
+| **Euler angles** | roll(z)、pitch(x)、yaw(y)；旋转矩阵相乘 |
+| **SfM 输入/输出** | 输入 pixel correspondence；输出 3D points + camera poses |
+| **Harris** | 角点检测；旋转鲁棒、尺度不鲁棒 |
+| **SIFT** | scale/rotation invariant；detection/description/matching |
+| **Scale space** | pyramid + DoG；找尺度不变关键点 |
+| **SIFT descriptor** | 16 blocks × 8 bins = 128 维；梯度方向直方图 |
+| **不变性** | illumination、scale、rotation、affine、perspective |
+| **应用** | mosaicking、object recognition、robot localization |
+
+### 7. 本周要点小结
+
+- **3D 获取**：主动（ToF、LiDAR、Structured Light）vs 被动（SfM、Stereo）；各有优缺点。
+- **相机模型**：透视投影 `x=fX/Z`；外参 `R,T`；内参 `f`；Euler angles 描述旋转。
+- **SfM**：从多张图像 + 特征对应，同时恢复 3D 结构和相机运动；经典 orthographic、新法 perspective、近年 deep learning。
+- **特征点**：Harris（角点，旋转鲁棒）；SIFT（scale/rotation invariant；pyramid + DoG + 梯度直方图 descriptor）。
+- **考试**：Cheng Jun Q4 是概念题；重点记方法原理、优缺点、应用，不需要复杂推导。
+
+---
+
+> **下一周（Week 13）预告**：继续 **3D**（Topic 14），重点是 **stereo images / 双目视觉**：视差、深度恢复、极线几何等。Week 13 也是最后一周；Final Exam 的 Q4 来自 Cheng Jun 部分（概念题）。

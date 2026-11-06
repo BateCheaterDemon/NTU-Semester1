@@ -28,6 +28,7 @@ EE6497 Pattern Recognition and Deep Learning（NTU，AY26-27 Semester1）。
   - Week 10 前半：MLP forward、softmax、sigmoid/tanh/ReLU/Leaky ReLU、cross-entropy/MSE、gradient descent、backprop、mini-batch/SGD、momentum、Adam、learning rate/scheduling、vanishing gradient；
   - **Week 11 后半**：generalization（under/overfitting）、L2/L1/elastic net、dropout、early stopping、batch normalization、hyperparameter tuning（grid/random/Bayesian）、K-fold CV、deep vs shallow；然后进入 **CNN 导论**（MLP 不适合图像 / translation；Hubel & Wiesel；Neocognitron/LeNet/AlexNet；convolution 与 cross-correlation；local receptive field、parameter sharing、pooling、ResNet/DenseNet）。
   - ⚠️ CNN 部分在 `week11.txt` 转写中，**`Part 2.2_Training(1).pdf` 未包含 CNN slides**。
+- **Week 12 = Part 2.3 Convolutional Neural Networks（CNN 详解）**：MLP 不适合图像（translation）、Hubel & Wiesel、Neocognitron/LeNet-5/AlexNet、convolution（数学 flip vs 深度学习 cross-correlation）、local receptive field/parameter sharing、pooling、输出尺寸 `(W-F+2P)/S+1`、参数量 `F*F*C*K+K`、Flatten/FC、ResNet；Pytorch `Conv2d` shape `[N,C,H,W]`。**Quiz 2 在本周课后进行**（覆盖 Week 8–11，CNN 本周新内容不考）；本周是最后一次 face-to-face，Week 13 改 online。
 
 **HW1 反馈（来自 Quiz 1 review session）**：批改时把 "EM algorithm" 当作 Baum-Welch 的写法**没有扣分**，但 Tay 明确提醒 **Quiz/Final 里必须具体写 Baum-Welch，只写 EM 会扣分**。
 
