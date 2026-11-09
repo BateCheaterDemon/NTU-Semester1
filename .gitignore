@@ -9,3 +9,11 @@
 Thumbs.db
 *~
 .~lock.*#
+
+# ── Python 缓存 / 个人数据 ────────────────────────────────────
+__pycache__/
+*.pyc
+
+# 6407 Quiz 2 考场名单：含全年级同学姓名/学号，仓库是 public，
+# 不入库；本地保留 6407/quiz2/Quiz2Venue.pdf 供自己查看。
+6407/quiz2/Quiz2Venue.pdf
