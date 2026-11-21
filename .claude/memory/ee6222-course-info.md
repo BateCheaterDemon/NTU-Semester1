@@ -12,7 +12,7 @@ EE6222 Machine Vision（NTU，AY26-27 Semester1，School of EEE）。注意用�
 - 后 4 周（Week 10–13，Topic 11–14）**Dr. Cheng Jun**，讲 Video Analysis / Video Recognition / 3D Machine Perception / 3D Machine Vision。
 
 **考核占比**：
-- Final Exam 期末 **60%**：**4 题 / 3 小时**。其中 **3 题来自 Jiang Xudong 部分（Topic 1–10）**，第 4 题来自 Cheng Jun 部分（Topic 11–14，纯英文简答）。
+- Final Exam 期末 **60%**：**2026-11-24（周二）**，**4 题 / 3 小时 / closed-book / 每题等分**。其中 **3 题来自 Jiang Xudong 部分（Topic 1–10）**，第 4 题来自 Cheng Jun 部分（Topic 11–14，纯英文简答）。复习资料：`6222/final/EE6222_Final_Review.md/.pdf`（29 页双语，含 6 套往年卷逐题规律）；往年卷在 `6222/final/`。
   - ⭐ **Jiang Xudong 亲口公布的命题范围（Week 9，2026-10）**：
     | 题 | 来源 | 备注 |
     |---|---|---|
