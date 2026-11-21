@@ -4466,3 +4466,451 @@ K-means 的目标：**找到一种 partition，使 WCSS 最小**。
 ---
 
 > **下一周（Week 13）预告**：老师会讲另外三种 clustering：**hierarchical（dendrogram）、distribution-based（GMM）、density-based**；但 **Quiz 2 不考 Week 13 内容**——Quiz 2 只考到本周 K-means。Quiz 2 时间：**2026-11-10（周二）9:30–10:30**，具体考场看 NTULearn。
+
+---
+
+## Week 13 — 其余 Clustering（Hierarchical / GMM / DBSCAN）＋ Clustering Evaluation ＋ 全课程 Review
+
+> **本周材料**：`week13/week13.txt`（录播转写）、`week13/Revision2026S1.pdf`（Mao Kezhi 的**全课程复习提纲**，18 页）。
+>
+> **本周定位**：本学期的**最后一课**，分两段：
+> 1. **前半段（知识）**：把 Week 12 没讲完的三种 clustering 讲完——**hierarchical（agglomerative，要会画 dendrogram）**、**distribution-based（GMM + EM）**、**density-based（DBSCAN）**；然后讲 **clustering evaluation metrics**（silhouette / Dunn / Davies-Bouldin / Calinski-Harabasz / Rand index）。
+> 2. **后半段（复习 + Quiz 2）**：用 `Revision2026S1.pdf` 把 **Data preparation → Bayes → Naïve Bayes → Fisher LDA → SVM → Classification tree/RF → Regression → Performance evaluation → Feature selection → Clustering** 全部过一遍；随后进行 **Quiz 2**（**40 分钟**，9:40 开始，9:35 前必须就座，**开考 20 分钟内不能交卷**，必须去自己被分配的考场/座位）。
+>
+> **ASR 错拼**：chemi/chemist/Kms/kmi → **K-means**；hierarchic/Her → **hierarchical**；dendro grab → **dendrogram**；glomertal → **agglomerative**；divion/divisive → **divisive**；linage → **linkage**；every linkage → **average linkage**；central → **centroid**；gai/gati/gau/gaca mission → **Gaussian mixture（GMM）**；pit maiz/MM prime → **EM algorithm**；t brig/DV/DBC sca/DB scan → **DBSCAN**；Epsilon/Eilme → **ε（epsilon）**；co point → **core point**；bot/board point → **border point**；autis/alias → **outliers**；ciltte/cilutte → **silhouette**；dine → **Dunn**；D index/DV/DB → **Davies-Bouldin**；CH → **Calinski-Harabasz**；Runo/Rand → **Rand index**；new free elunch → **No Free Lunch**。
+
+### 1. K-means 收尾：怎么选 K
+
+老师先回顾 Week 12 的 K-means：
+
+- K-means 属于 **centroid-based（partitioning）**，centroid 就是类中心（一个向量）；
+- 每轮两个操作：**assignment（把样本分到最近 centroid）→ update（用该类样本均值重算 centroid）**，反复迭代。
+
+**elbow method（肘部法）选 K**：
+
+- 横轴 = `K`，纵轴 = **WCSS**（within-cluster sum of squares）；
+- K 增大时 WCSS **单调下降**；
+- 找**下降速度突然变缓**的那个拐点（elbow）——拐点前每加一个 K 都大幅下降，拐点后下降不明显；
+- 拐点对应的 K 就是"合适"的聚类数。
+
+⭐ 老师补充：**K 越大模型越复杂**，通常 **training error 越小**（极端时 K=N，每个样本自成一类，WCSS=0，但模型完全 overfit）。所以还要看 **model size vs training error** 曲线，或用 **validation** 方法确定模型规模。这套"肘部"思路**不只用于 K-means 的 K**，也可用于其他模型选复杂度。
+
+### 2. Hierarchical clustering（层次聚类）
+
+#### 2.1 两种方向
+
+| 类型 | 方向 | 过程 |
+|---|---|---|
+| **Agglomerative（凝聚）** | **bottom-up** | 每个样本先自成一类 → 每步合并**最相似的两类** → 直到全部合成一类 |
+| **Divisive（分裂）** | **top-down** | 全部数据先是一类 → 每步把一类**劈成两类** → 直到每个样本自成一类 |
+
+两种都产生一棵树，叫 **dendrogram（谱系图/树状图）**。本课只要求 **agglomerative**。
+
+#### 2.2 ⭐ 四种 linkage（类间距离的定义）
+
+当每个 cluster 含多个样本时，"两类有多近"有四种定义：
+
+| Linkage | 定义 | 别名 |
+|---|---|---|
+| **Single linkage** | 两类中**最近**的一对样本的距离（min pairwise distance） | nearest neighbor |
+| **Complete linkage** | 两类中**最远**的一对样本的距离（max pairwise distance） | farthest neighbor |
+| **Centroid linkage** | 两个 cluster **centroid 之间**的距离 | — |
+| **Average linkage** | 两类之间**所有 pairwise 距离的平均** | — |
+
+#### 2.3 例题（6 个样本，4 维特征）
+
+样本 `S1..S6`，每步合并"距离最小"的两类（本例用 **single linkage**）：
+
+1. 先算 **distance matrix**：对角为 0、矩阵对称，每个元素是两两样本距离；
+2. 矩阵中非对角最小值 **1.28** = `d(S5, S6)` ⇒ 合并 **S5, S6 → S56**；
+3. 五类时用 single linkage：新类到其他类的距离 = **min**（直接读原矩阵对应列的最小值）；最小值 **1.29** = `d(S1, S4)` ⇒ 合并 **S1, S4 → S14**；
+4. 四类时最小值 **1.311** = `d(S3, S56)` ⇒ 合并 **S3, S56 → S356**；
+5. 三类时最小值 **2.294** = `d(S14, S356)` ⇒ 合并 **S14, S356 → S13456**；
+6. 最后一步 **2.327**：`S2` 与 `S13456` 合并为全体。
+
+⭐ **每做一步，类数减 1**；N 个样本一共合并 **N−1** 次。
+
+**Dendrogram 的画法要点**：
+
+- 横轴是样本/簇，纵轴是**合并时的高度**；
+- **高度必须正比于合并时的距离**（所以最后一步也要算距离——即使只剩两类，也要知道高度是 2.327）；
+- single linkage 下**不需要真的重算**，只要在原始距离矩阵里"查最小值"即可（这也是老师强调的技巧）。
+
+⭐ **老师明确提出的考试要求（原话）**："you should be able to know how to do this hierarchical cluster, and you should be able to **sketch this dendrogram**." —— **会手算合并顺序 + 会画 dendrogram**。
+
+**MATLAB**：`linkage(data, method, metric)`——`method` 指定 `single / complete / centroid / average`，`metric` 指定距离（Euclidean、cityblock、cosine 等）；再由结果画 dendrogram。
+
+### 3. Distribution-based clustering：GMM（高斯混合模型）
+
+#### 3.1 基本思想
+
+现实中很多数据可以用 **Gaussian** 建模。分类时我们用 Gaussian 建 **class-conditional density**；聚类时**没有 class label**，于是假设**全体数据**由 **M 个 Gaussian 分量混合**而成，**每个分量对应一个 cluster**：
+
+```
+p(x) = Σ_{i=1..M}  α_i * N(x; μ_i, Σ_i)
+
+其中  N(x; μ_i, Σ_i) 是第 i 个 Gaussian（均值 μ_i、协方差 Σ_i）
+      α_i 是第 i 个分量的权重（mixing coefficient），Σ_i α_i = 1
+```
+
+⭐ 与分类用 GMM 的区别：分类里 GMM 建模**单个类内**的密度（一个类可能是多峰的）；聚类里 GMM 建模**所有样本**的分布（没有 label）。
+
+#### 3.2 参数估计：EM 算法
+
+关键问题：估计每个分量的 **μ_i、Σ_i、α_i**。用 **EM（Expectation-Maximization）**：
+
+1. **初始化**：预设 M（= cluster 数），并给 `α_i, μ_i, Σ_i` 初值；
+2. **E-step**：按当前参数计算每个样本属于各分量的**responsibility**（后验概率）；
+3. **M-step**：用 responsibility 加权，**重估** `α_i, μ_i, Σ_i`；
+4. 反复 E/M 直到参数**稳定（收敛）**。
+
+聚类分配：训练完后，把每个样本分到**距离最近的分量中心**（或 responsibility 最大的分量）。
+
+**MATLAB**：`fitgmdist(data, M)` → 返回 `mu`（各分量均值）、`Sigma`、`ComponentProportion`（即 α）；再用 `cluster` 或按距离分配。
+
+#### 3.3 实际困难
+
+- **M 很难选**：数据高维时根本看不出有几个峰；M 只能靠试（如 M=2,3,4… 比较结果）；
+- 可能出现**只含极少数样本的"碎片类"**：可设**每个 cluster 的最少样本数**，不足则并入其他类；
+- 现实数据常常**没有清晰的分界**，只能得到"roughly 正确"的 K。
+
+### 4. Density-based clustering：DBSCAN
+
+#### 4.1 动机：前三种方法都假设"球形、紧凑"
+
+K-means / hierarchical / GMM 都**隐含假设 cluster 是球形（ball）**、类内紧凑、类间分隔清楚。但现实中：
+
+- cluster 可能是**环形、月牙形等不规则形状** ⇒ 前几种方法**效果差**；
+- 数据里有**噪声/离群点（outliers）** ⇒ 前几种方法**强行把每个样本都分进某一类**，离群点会**污染 centroid**（K-means 的均值被拉偏）。
+
+**DBSCAN**（**D**ensity-**B**ased **S**patial **C**lustering of **A**pplications with **N**oise）正是为此设计：
+
+- **cluster = 数据空间中"密度高"的区域**，被"密度低"的区域分隔开；
+- **低密度区域的点 = noise**，**不分配给任何 cluster** ⇒ 对噪声/离群点**鲁棒**。
+
+#### 4.2 两个参数
+
+| 参数 | 含义 |
+|---|---|
+| **minPts** | 一个区域至少要有多少个点才算"稠密"（构成 cluster） |
+| **ε (epsilon)** | 邻域半径——定义"邻域（neighborhood）"的大小 |
+
+#### 4.3 三类点
+
+| 类型 | 定义 |
+|---|---|
+| **Core point（核心点）** | 以它为圆心、半径 ε 的邻域内**至少 minPts 个点**（含自己） |
+| **Border point（边界点）** | 自己不是 core point，但**落在某个 core point 的 ε 邻域内** |
+| **Noise / outlier** | 既不是 core，也不在任何 core 的邻域内 |
+
+#### 4.4 三种"可达"关系
+
+| 关系 | 定义 | 强弱 |
+|---|---|---|
+| **Directly density-reachable** | 点 P 在 core point Q 的 ε 邻域内 ⇒ P 由 Q **直接密度可达** | 最强（一层） |
+| **Density-reachable** | 存在一条**core point 链** `Q → O → ... → P`，每一步都是 direct ⇒ P 由 Q **密度可达** | 中（多跳） |
+| **Density-connected** | 存在 core point O，使 P 与 Q 都从 O **密度可达** ⇒ P、Q **密度相连**（对称） | 弱（用于并类） |
+
+#### 4.5 算法流程
+
+1. 预设 **ε** 和 **minPts**；
+2. **随机**选一个未访问的点；
+3. 若它是 **core point**：找出所有与它**密度相连**的点，**递归扩张**成一个 cluster；
+4. 否则标记为 **noise**（后续可能因落入别的 core 邻域而改判为 border）；
+5. 重复 2–4，直到**所有点都被访问**；不属于任何 cluster 的点即 noise。
+
+#### 4.6 参数怎么定
+
+- **minPts**：至少 **d+1**（d = 样本维度）；经验法则 **minPts ≈ 2d**；
+- **ε**：画 **k-distance plot**（k = minPts，把每个点到第 k 近邻的距离**从大到小排序**作图），找**拐点（knee）**，拐点对应的距离作为 ε。
+
+#### 4.7 优缺点（考点：对比 K-means）
+
+| 优点 | 缺点 |
+|---|---|
+| **对噪声/离群点鲁棒**（noise 不参与聚类，不污染 centroid） | **对不同密度的 cluster 效果差**（全局只有一个 ε、一个 minPts，密度差异大时无法兼顾） |
+| **不需要预设 cluster 数** | **非确定性**：起始点随机 ⇒ 不同 run 结果可能不同（类似优化里的局部极小） |
+| **支持任意形状**（环形、月牙形） | **ε 与 minPts 难选**，尤其高维时 |
+
+⭐ 老师用 **No Free Lunch theorem** 收尾：**没有一种算法在所有场景都最好**；实际项目里要**试不同算法并评估结果**——因为我们既不知道 ground truth，也不知道 cluster 数。
+
+### 5. Clustering evaluation（聚类评价指标）
+
+⭐ 核心困难：**聚类没有 ground truth（没有 label）**，不能像分类那样算 accuracy。所有指标都基于 **"natural groups"** 的两个方面：
+
+- **Cohesion（类内凝聚）**：同一 cluster 的样本应**相似**（距离小）；
+- **Separation（类间分离）**：不同 cluster 的样本应**不相似**（距离大）。
+
+四个指标只是用**不同的度量方式**组合这两方面。
+
+#### 5.1 Silhouette coefficient（轮廓系数）
+
+对每个样本 `i`（属于 cluster `C_p`）：
+
+```
+a(i) = 样本 i 到【同簇其他所有样本】的平均距离        （cohesion；越小越好）
+b(i) = min over 其他簇 C_q  { 样本 i 到 C_q 中所有样本的平均距离 }   （separation；越大越好）
+s(i) = ( b(i) - a(i) ) / max( a(i), b(i) )
+```
+
+- `s(i) ∈ [-1, 1]`，**越大越好**；
+- 整个聚类结果取所有样本的**平均**：`SC = (1/N) Σ s(i)`；
+- `b(i)` 取"**最近的**那个其他簇"——是**最坏情况**的分离度估计（最容易混淆的对手）。
+
+**用途**：横轴 K、纵轴 SC 作图，**SC 最大**处对应的 K 往往是真实 cluster 数（例题中 K=3 时 SC ≈ 0.85+，明显高于 K=2/4/5）。所以 **silhouette 既能评价聚类质量，也能用来选 K**（与 K-means 的 elbow/WCSS 并列）。
+
+#### 5.2 Dunn index（DI）
+
+```
+DI = min_{p≠q} δ(C_p, C_q)  /  max_{r} Δ(C_r)
+
+δ(C_p, C_q) = 两类之间【最近】样本对的距离（single linkage，最坏情况的分离）
+Δ(C_r)      = 类内【最远】样本对的距离（diameter，最坏情况的凝聚）
+```
+
+- **越大越好**；
+- 思路：**最糟的类间分离 / 最糟的类内直径**——分子越大越好、分母越小越好；
+- 例题中同样在 K=3 时 DI 最大。
+
+#### 5.3 Davies-Bouldin index（DBI）
+
+对每个 cluster `i`：`S_i` = 类内**dispersion**（样本到 centroid 距离的均方根，类似标准差）；`M_ij` = 两个 centroid 的距离。
+
+```
+R_ij = ( S_i + S_j ) / M_ij          （i 与 j 的"相似度"，越小越好）
+DB   = (1/K) * Σ_i  max_{j≠i} R_ij
+```
+
+- **越小越好**（与 silhouette/Dunn 方向相反，注意别记反）；
+- 每个类取**最相似（最糟）**的另一个类，再对所有类取平均。
+
+#### 5.4 Calinski-Harabasz index（CH）
+
+```
+SS_W = Σ_i Σ_{x∈C_i} || x - m_i ||^2          （类内平方和，用 sum 不是 average）
+SS_B = Σ_i n_i * || m_i - m ||^2              （类间平方和；m 是【全局】均值）
+
+CH = [ SS_B / (K - 1) ] / [ SS_W / (N - K) ]
+```
+
+- **越大越好**；
+- 与 DBI 用 pairwise centroid 距离不同，CH 的 separation 用的是**每个类 centroid 到全局 centroid** 的距离。
+
+#### 5.5 Rand index（RI）——比较两个聚类结果
+
+前四个指标评价**一个**聚类结果；**Rand index 比较两个**聚类算法（或两次 run）的结果：
+
+```
+a = 在两种聚类中都被分到【同一簇】的样本对数
+b = 在两种聚类中都被分到【不同簇】的样本对数
+RI = (a + b) / C(N, 2)          其中 C(N,2) = N(N-1)/2 是所有样本对数
+```
+
+- `RI ∈ [0, 1]`：**1 = 两种结果完全一致**，0 = 完全不同；
+- 例题中 K=3 时各指标都最优，说明指标确实能反映"聚类质量"，也能辅助选 K。
+
+#### 5.6 五个指标速查
+
+| 指标 | 衡量 | 方向 | 用途 |
+|---|---|---|---|
+| Silhouette | 每个样本的 (b−a)/max(a,b) 平均 | **越大越好** | 评价 + 选 K |
+| Dunn | min 类间距离 / max 类内直径 | **越大越好** | 评价 + 选 K |
+| Davies-Bouldin | 类内 dispersion / 类间 centroid 距离 | **越小越好** | 评价 |
+| Calinski-Harabasz | 类间/类内平方和之比（带自由度） | **越大越好** | 评价 |
+| Rand index | 两次聚类结果的 pair 一致性 | **越大越好** | **比较两个聚类结果** |
+
+### 6. 全课程 Review（`Revision2026S1.pdf`，考试前必过）
+
+老师用约 20 分钟把整个 ML 部分串了一遍，**这份提纲就是 Final 的复习清单**。
+
+#### 6.1 Data preparation（数据准备）
+
+| 主题 | 要点 |
+|---|---|
+| **Data types** | quantitative（数值：continuous / discrete）vs qualitative（categorical） |
+| **Missing values** | 缺失值处理（删除 / 填补 / 作为特殊值）——要能说出常见做法与理由 |
+| **Outliers** | 离群点通常视为 **noise**，需检测与处理（否则污染均值/距离） |
+| **Standardisation** | 标准化：**零均值、单位方差**（z-score） |
+| **Normalization** | 归一化：把值**线性映射到 [0,1]**（min→0，max→1） |
+
+⭐ 为什么必须做 feature scaling：**距离型方法**（KNN、K-means、SVM、LDA）会**同时使用所有特征**，若各特征量纲差异大，数值大的特征会**主导距离**。
+
+#### 6.2 Bayes theorem + Naïve Bayes
+
+```
+P(ω_j | x) = p(x | ω_j) * P(ω_j) / p(x)
+```
+
+| 符号 | 含义 |
+|---|---|
+| `P(ω_j)` | **prior probability**（先验） |
+| `p(x ∣ ω_j)` | **class-conditional probability density**（类条件密度） |
+| `P(ω_j ∣ x)` | **posterior probability**（后验） |
+| `p(x)` | evidence（对所有类相同，比较时可忽略） |
+
+**Gaussian class-conditional density**：
+
+```
+p(x | ω_j) = 1 / ( (2π)^{d/2} |Σ_j|^{1/2} ) * exp( -1/2 (x-μ_j)^T Σ_j^{-1} (x-μ_j) )
+```
+
+**Bayes decision rule**：把 `x` 判给使 `P(ω_i|x)` 最大的类 `ω_i`；等价地（分母相同）可比 **joint probability** `p(x|ω_i)P(ω_i)`。
+
+**Naïve Bayes**：假设**特征之间条件独立**：
+
+```
+p(x | ω_j) = Π_{i=1..n} p(x_i | ω_j)
+```
+
+于是**不用估计高维协方差矩阵**（参数太多、样本不够时估不准），只需对**每个特征**估一维密度。
+
+| 变体 | 用于 |
+|---|---|
+| **Gaussian Naïve Bayes** | **连续**特征 |
+| **Bernoulli Naïve Bayes** | **二值**特征 |
+| **Multinomial Naïve Bayes** | **文本分类**（词频） |
+
+**Bernoulli 例题（PPT 表格）**：特征 `X_i` 取 A/B，类 `ω1/ω2`；由 2×2 计数表估 prior 与 class-conditional：
+
+```
+P(ω1) = 250/550,  P(ω2) = 300/550
+P(X_i=A | ω1) = 100/250,  P(X_i=B | ω1) = 150/250
+P(X_i=A | ω2) = 200/300,  P(X_i=B | ω2) = 100/300
+```
+
+⭐ 只要会"**从计数表读出先验和条件概率，再代入 Bayes 公式比较 joint**"即可。
+
+#### 6.3 Fisher linear discriminant（FDA / LDA）
+
+任何**线性分类器**：`g(x) = w^T x + w0`（二维是直线，高维是超平面）。关键是求 `w` 和 `w0`。
+
+**Fisher criterion（最大化类间/类内之比）**：
+
+```
+J(w) = ( w^T S_B w ) / ( w^T S_W w )
+
+S_B = (m1 - m2)(m1 - m2)^T                  （between-class scatter）
+S_W = Σ_{i=1,2} Σ_{x∈D_i} (x - m_i)(x - m_i)^T   （within-class scatter）
+```
+
+解：`w ∝ S_W^{-1} (m1 - m2)`（也可用广义特征值问题 `S_B w = λ S_W w` 求）。
+
+⭐ 老师反复强调的**两个易错点**：
+
+1. **必须同时用 S_B 和 S_W**——只用 `S_B`（类间）是**错的**，因为 `S_B` 的秩最多为 1，方向只由 `m1−m2` 决定，没有考虑类内散布；
+2. **阈值 w0 的求法**：**两类均值的中点应落在决策边界上**：
+
+```
+g( (m1 + m2)/2 ) = 0   =>   w0 = - w^T (m1 + m2)/2
+```
+
+   （隐含假设：两类**散布相同**；若散布不同，`w0` 应在该值附近调整。）
+
+#### 6.4 Linear SVM
+
+| 概念 | 公式/要点 |
+|---|---|
+| **Margin of separation** | 超平面到最近样本的距离；`margin = 2 / ‖w‖` |
+| **Separable primal** | `min ½ ‖w‖^2` s.t. `y_i (w^T x_i + b) >= 1`（等价于**最大化 margin**，同时**全部分对**） |
+| **Dual** | 引入 **Lagrange multiplier α_i >= 0**；`w = Σ_i α_i y_i x_i`（只对 **support vectors**，即 `α_i > 0` 的样本求和） |
+| **求 b（separable）** | 任一 support vector 满足 `y_i (w^T x_i + b) = 1` ⇒ 解出 b；实践中**对所有 SV 求 b 再取平均**（减少舍入误差） |
+| **Non-separable** | 引入 **slack variable ξ_i >= 0**：`y_i (w^T x_i + b) >= 1 - ξ_i`；目标 `min ½‖w‖^2 + C Σ ξ_i` |
+| **C 的作用** | 权衡 **margin（第一项）vs 训练误差（第二项）**；`0 <= α_i <= C` |
+| **求 b（non-separable）** | 只有**落在两个边界超平面上**的 SV 可用，即 **`0 < α_i < C`** 的那些；不要用 `α_i = C` 的（它们可能在间隔内部甚至分错） |
+
+⭐ 两个"求 b"的条件不同，是**最容易考倒**的点：**separable 用所有 SV；non-separable 只用 `0 < α_i < C` 的 SV**。
+
+#### 6.5 Classification tree + Random Forest
+
+**分类树**：本课只考虑**二叉树**——每个节点问**一个特征 + 一个阈值**，把数据劈成两份。关键是**选哪个特征、哪个阈值**：
+
+- 判据：**使子节点 impurity 最小**（等价于 **impurity drop 最大**）；
+- 连续特征：排序后取**相邻值的中点**作为候选阈值。
+
+**Impurity 公式**：
+
+```
+Entropy:        E = - Σ_j p_j * log2(p_j)
+Gini:           Gini = 1 - Σ_j p_j^2 = Σ_{j≠k} p_j p_k
+```
+
+⭐ 考试时**题目会指定用哪一个**（"use entropy impurity" 或 "use Gini impurity"）——按题目要求算，不要混用。
+
+**Random Forest = Bagging + 随机特征子集 + 聚合**：
+
+| 步骤 | 内容 |
+|---|---|
+| **(i) Bootstrapping** | 对样本做**有放回**随机抽样（bootstrap），每棵树用不同的子集；同一棵树的子集里**样本可能重复** |
+| **随机特征** | 每棵树/每次分裂只从**随机特征子集**中选（不是用全部特征） |
+| **(ii) Aggregating** | 把多棵树的结果**聚合**（分类用 **majority vote**） |
+
+⭐ 目的：**降低树之间的相关性、增加 diversity**——单棵树 variance 高，但**不相关的树平均后 variance 大幅下降**，从而提升整体性能。
+
+#### 6.6 Regression（回归）
+
+| 方法 | 目标/特点 |
+|---|---|
+| **OLS（ordinary least squares）** | 最小化残差平方和；闭式解 `θ = (F^T F)^{-1} F^T y` |
+| **Ridge（L2）** | 加 `λ‖θ‖^2` 惩罚；**压缩系数但不为 0** |
+| **Lasso（L1）** | 加 `λ‖θ‖_1` 惩罚；**把不重要的系数压到恰好 0** ⇒ 自带 **variable selection** |
+
+⭐ 老师原话重点：**ridge 只能约束参数大小，不能把参数变 0；lasso 能把参数收缩到 0，从而把变量从模型中剔除**。
+
+#### 6.7 Classifier performance evaluation
+
+| 类别 | 内容 |
+|---|---|
+| **Methods** | hold-out、repeated hold-out、**K-fold CV**、repeated K-fold CV、**leave-one-out（LOOCV）** |
+| **Metrics** | accuracy / error rate、sensitivity & specificity、precision / recall / F-score、**ROC curve & AUC** |
+
+#### 6.8 Feature subset selection
+
+| 概念 | 要点 |
+|---|---|
+| **Curse of dimensionality** | 维度越高，样本在空间中越稀疏，估计越难 |
+| **Peaking phenomenon** | 特征数增加时性能先升后降——**不是特征越多越好** |
+| **Selection vs extraction** | selection 选**子集**（保留物理含义）；extraction 造**新特征**（如 PCA，压缩但难解释） |
+| **Individual vs subset** | 单个特征好 ≠ 组合好（可能冗余） |
+
+**两个组成部分**：**search algorithm（怎么搜子集）+ evaluation criterion（怎么评价子集）**。
+
+| 按评价标准分 | 说明 |
+|---|---|
+| **Filter** | 用**可分性度量**评价（快，但与分类器无关） |
+| **Wrapper** | 用**分类器性能**评价（准，但计算贵） |
+
+| 按搜索策略分 | 说明 |
+|---|---|
+| **Optimal vs sub-optimal** | exhaustive 最优但组合爆炸 |
+| **Forward selection vs backward elimination** | 逐步**加**特征 / 逐步**删**特征（本课讲的两种 sub-optimal 方法） |
+
+#### 6.9 Clustering（本周新讲的三类 + Week 12 的 K-means）
+
+| 类别 | 代表算法 |
+|---|---|
+| **Centroid-based / partitioning** | **K-means**（assignment + update 迭代） |
+| **Hierarchical** | **Agglomerative**（dendrogram） |
+| **Density-based** | **DBSCAN** |
+| **Distribution-based** | **GMM**（EM 估参） |
+
+**评价指标**：silhouette、Dunn、Davies-Bouldin、Calinski-Harabasz、Rand index。
+
+### 7. Quiz 2 现场信息（本周课后进行，已结束）
+
+- 复习结束后**约 9:40 开始**，**40 分钟**；**9:35 前必须就座**（TA 9:35 开始发卷）；
+- **开考 20 分钟内不能交卷**；交卷后**按座位号签名**；
+- **必须去 NTULearn 上分配给你的考场/座位**——老师在每个考场有**点名册**，名单上没有你就不能在该考场考；
+- 老师原话："Easy questions. And no rush."（题目不难，不用赶）。
+
+### 8. 本周要点小结
+
+- **Hierarchical（agglomerative）**：每步合并最近的两类；四种 linkage（single/complete/centroid/average）；**要会算合并顺序 + 画 dendrogram（高度 ∝ 距离）**。
+- **GMM**：`p(x) = Σ α_i N(x; μ_i, Σ_i)`，每个分量 = 一个 cluster；用 **EM**（E/M 交替）估参；**M 难选**。
+- **DBSCAN**：cluster = 高密度区域；两参数 **ε / minPts**；三类点 **core / border / noise**；三种关系 **directly reachable / reachable / connected**；**抗噪、任意形状、不用预设 K**；但对**不同密度**无效、**非确定性**、参数难调。
+- **聚类评价**：全部基于 **cohesion（类内）+ separation（类间）**；silhouette（越大越好，可用来选 K）、Dunn（越大越好）、Davies-Bouldin（**越小越好**）、Calinski-Harabasz（越大越好）、Rand index（比较两个聚类）。
+- **Review 提纲**：data preparation → Bayes/Naïve Bayes → Fisher LDA（**同时用 S_B 与 S_W**；`w0` 取均值中点）→ SVM（**separable 用全部 SV 求 b；non-separable 用 `0<α<C` 的 SV**）→ tree/RF（bootstrap + 随机特征 + vote）→ regression（OLS/ridge/lasso，**lasso 会压到 0**）→ 评价方法/指标 → 特征选择（filter/wrapper；forward/backward）→ clustering 四类 + 五指标。
+- **课程结束**：教学于 2026-11-13 结束；Week 14 为复习周，随后 **Final Exam（60%，覆盖全课程，约 3/4 题来自 ML 部分）**。
+
+---
+
+> **课程收尾**：`Revision2026S1.pdf` 就是**期末复习的官方清单**，考前按第 6 节的 9 个板块逐条自测即可。补充材料：`6407/final/` 下有 **2024-2025 S1/S2、2025-2026 S1/S2 四套往年期末卷** + 一份双语复习资料，可用于刷题。

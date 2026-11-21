@@ -27,6 +27,7 @@ EE6405 Natural Language Processing（NTU，AY26-27 Semester1）。
 - **覆盖范围**：Coding quiz #3 (W7) 只考 W6；**Coding quiz #4 (W9) 只考 Week 7**；IRA/TRA #3 (W10)、#4 (W11) 只考当周；其余 quiz 考当周+前一周。
 
 **剩余日程（截至 2026-10-12 处于 Week 9）**：W9 Coding Quiz #4（只考 W7）+ project briefing → **W10 IRA/TRA #3** + **ML CA team project 提交（Week 7&8 发布、Week 10 交）** → **W11 IRA/TRA #4** → W12 make-up quizzes + project consultation → **W13 group project due + peer evaluation**。
+- **Week 13 实际内容 = Industry Sharing & Panel**（无 transcript，仅 `6405/week13/WEEK 13 NLP.pdf`）：MathWorks 生态 **Dr Marta Patricia Tjoa**（Agentic AI for NLP，live demo 用 agent 在 MATLAB 里搭工厂维修报告 triage app，human-in-the-loop）、VoiceraCX COO **Sunil Pawar**（Agent memory：promise keeper / trust passport）、AWS **Richard Goh**（Phygital / Physical AI）；后半场 panel + Q&A。**无新考点**。
 
 **ML CA team project**：用 ChatGPT/LLM 做 innovative NLP project，须含 6 个 topic 中 ≥2 个（translation / summarization / completion / QA / generation / sentiment），3–5 min presentation。
 

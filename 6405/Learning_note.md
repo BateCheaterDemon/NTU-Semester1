@@ -713,3 +713,65 @@ model.train() → optimizer.zero_grad() → output=model(x) → loss=criterion(o
 ---
 
 > **下一周（Week 8）预告**：进入课程后半段——**New NLP Trends / Business perspective**（Dr. Simon Liu 主讲），围绕 NLP 在真实项目中的应用与 ChatGPT-based 应用开发。ML CA team project 持续进行（Assignment 在 Week 7&8 发布、Week 10 提交）。具体以 Week 8 课件为准。
+
+---
+
+## Week 13 — Industry Sharing & Panel（业界专家分享与座谈）
+
+> **本周材料**：`week13/WEEK 13 NLP.pdf`（3 位业界讲者的分享提纲 + 座谈讨论题）。
+>
+> ⚠️ **本周无录播转写**：Week 13 是 **industry sharing session**，不是授课内容，因此没有 `week13.txt`。本笔记**完全基于官方 PDF** 整理。
+>
+> **本周定位**：课程最后一周的**业界专场**——上午/前半场由 3 位来自 **MathWorks 生态、VoiceraCX、AWS** 的讲者各讲 20–30 分钟，后半场是 **panel discussion + Q&A**。**没有新的可考技术内容**；价值在于了解 **NLP/LLM/AI 在产业中的真实落地形态**（正好对应 Week 10–11 的 NLP applications 与 Agentic AI）。
+
+### 1. Session 1：三位业界讲者
+
+| 讲者 | 职务 / 机构 | 主题 |
+|---|---|---|
+| **Dr Marta Patricia Tjoa** | Regional Technical Manager，**TechSource Asia**（MathWorks Authorized Reseller） | **Agentic AI for NLP: From Prompts to Working Pipelines** |
+| **Mr Sunil Pawar** | Chief Operating Officer，**VoiceraCX** | **Memory for AI agents** |
+| **Mr Richard Goh** | Head of Strategic Initiatives，**Amazon Web Services (AWS)** | **Phygital AI**（Physical AI） |
+
+#### 1.1 Dr Marta Patricia Tjoa — Agentic AI for NLP
+
+- 核心观点：AI agents 正在把 NLP 从**"回答问题"**推进到**"执行工作流"**；工程师的角色从**"写每一行代码"**变成**"编排 agent（orchestrating the agent）"**。
+- **现场 demo**：让一个 AI agent 在 **MATLAB** 里从零构建一个**可运行的 app**，用来 **triage（分诊/分流）工厂维修报告**。
+- 效果最好的做法：把 **MathWorks 工具当作"可信工具（trusted tool）"** 与 AI agent 配对——agent 负责**规划、写代码、运行、测试**，工程师负责**设定目标、逐步审查、决定什么能上线**。
+- ⭐ **human-in-the-loop**：把"很快的初稿"变成"可信赖的产出"，靠的就是人逐步审核。
+
+#### 1.2 Mr Sunil Pawar — Memory for AI agents
+
+- 痛点：面向客户的 AI agent 会**反复问同样的问题**（每次都"失忆"）；
+- 讨论内容：如何**避免重复提问**，以及如何用 **promise keeper** 与 **trust passport** 在工程上落地"记住对客户的承诺"。
+
+#### 1.3 Mr Richard Goh — Phygital AI（Physical AI）
+
+- 观点：AI 长期被视为**纯软件、只活在数字世界**；当它被赋予**传感器（sensors）与执行器（actuators）**去作用于真实世界，就进入 **Physical AI**；
+- 强调："**Not just about dancing robots**"——不只是会跳舞的机器人，而是感知—决策—行动的闭环。
+
+### 2. Session 2：Panel & Interaction
+
+**讨论主题**：NLP、LLMs 与 AI 在各行各业与各部门的**普及度与影响**。
+
+现场给出的讨论题（可用于准备面试/自我陈述）：
+
+1. 你公司产品的**直接与间接 stakeholder** 是谁？
+2. 你的组织对**应届毕业生（本科/硕士）**的适配度如何？
+3. 你认为**影响因子更大的是模型的技术原理，还是对终端用户的易用性**？
+4. 你的公司如何与**其他实体协作**？
+5. 你为什么认为 **AI 是未来**？如果不同意，也请说明理由。
+
+之后是 **Q&A**，以及向讲者致谢、**合影**。
+
+### 3. 本周要点小结
+
+- Week 13 = **industry sharing + panel**，**无新知识点、无 quiz/考核内容**；
+- 三个分享串起来正好是产业里 AI 的三种形态：
+  - **Agentic AI**（agent 编排工具、执行工作流，人在环中审核）；
+  - **Agent memory**（跨会话记忆、承诺管理）；
+  - **Physical AI**（感知 + 执行，走向真实世界）；
+- 对课程作业的直接启发：**Week 10–11 讲的 Agentic AI / RAG 正是这些产业实践的技术底座**；panel 里的"技术原理 vs 易用性"也是**期末/项目答辩**常被问到的思辨题。
+
+---
+
+> **课程收尾**：Week 13 之后课程结束。考核的**最后一项是 capstone group project（25%，Week 13 截止）**，以及 **peer evaluation（Week 13）**；Week 12 为 **make-up quizzes + project consultation**（无新课件）。期末无笔试，成绩由 quiz、CA、project 与 peer evaluation 构成（以 NTULearn 公告为准）。

@@ -4196,3 +4196,202 @@ Q(s,a) ← Q(s,a) + α [ r + γ max_a' Q(s',a') - Q(s,a) ]
 ---
 
 > **下一周（Week 13）预告**：老师会做 **industry sharing / 课程收尾**（Week 13 为纯 industry sharing，按 Week 9 说明）；Final Exam 中 Simon Liu 部分覆盖 **Week 9–11**。
+
+---
+
+## Week 13 — Lecture 13：Industry Applications of Ensemble Models（集成学习的产业应用，Simon Liu）
+
+> **本周材料**：`week13/EE6406_Lecture13_SL.pdf`（Simon Liu，46 页）、`week13/week13.txt`（录播转写）。
+>
+> **⭐ 考试定位**：本周是 **industry sharing / 课程收尾**，**不引入新的可考理论**；Final 中 Simon Liu 部分仍按 Week 9 的说明覆盖 **Week 9–11**（ensemble 基础、bagging/RF、AdaBoost/GBDT/XGBoost/LightGBM）。本周内容的价值在于：**把 Week 9–11 的 ensemble 概念落到真实业务场景**，尤其是 **credit risk** 的一整套工程流程，以及 **LightGBM 实战中的数据处理细节**。
+>
+> **课堂安排**（转写）：最后一次课，**不休息**，约 8:00 P.M. 提前结束——"we normally reserve the last hour of the semester for makeup quizzes"（学期最后一个小时留给补考）。Week 12 的 RL 已在上一周讲完且**明确不考**。
+
+### 1. 本周结构
+
+```
+Overview
+├── Applications in various industries      （行业全景，按领域列问题）
+├── Credit Risk Modelling Deep-dive         （银行风控：PD/LGD/EAD → 建模 → 验证 → MLOps）
+└── Sample Code Deep-dive                   （LightGBM 实战的数据处理流程）
+```
+
+### 2. 行业应用全景（每个领域：要解决什么问题）
+
+⭐ 共同点：这些问题大多是**表格型、高维、类别不平衡、需要可解释性**，正是 **ensemble（尤其是 GBDT 系）** 的主场。
+
+#### 2.1 金融
+
+| 场景 | 要解决的问题 | 文献 |
+|---|---|---|
+| **Credit scoring & risk modeling** | 估借款人**违约概率**；分风险等级定价；按 **Basel II/III** 计提监管资本；保证模型**稳定与公平**；满足**模型验证与可解释性**要求 | Lessmann et al. (2015), EJOR |
+| **Algorithmic trading & portfolio optimization** | 预测收益/波动率；构建**风险调整后收益**最大的组合；适应**市场 regime 切换**；控制交易成本与过拟合；融合技术面/基本面/另类数据 | Krauss et al. (2017), EJOR |
+| **Fraud detection** | **实时**检测欺诈交易；**降低 false positive**（避免打扰客户）；适应**概念漂移**（fraud tactic 演化）；处理高吞吐流数据；**极端类别不平衡** | Phua et al. (2010) |
+
+#### 2.2 医疗健康
+
+| 场景 | 要解决的问题 | 文献 |
+|---|---|---|
+| **Disease diagnosis & prognosis** | 用临床 + 影像数据分类患病/健康；预测疾病进展/生存；融合**多模态**（MRI、化验、人口学）；对噪声/缺失鲁棒；给医生**可解释的风险分数** | Sarica et al. (2017) |
+| **Genomics & biomarker discovery** | 从**超高维**（20,000+ 基因）中找表达特征；控制 **false discovery rate**；把 biomarker 转化为可临床使用的检测；处理相关且含噪的测量 | Díaz-Uriarte & Alvarez de Andrés (2006) |
+| **Drug response prediction** | 预测癌细胞系对药物的敏感性；融合基因组（突变/表达）+ 化学描述符；**小样本 vs 大特征**；可解释以指导精准治疗；适应新药/新细胞系 | Costello et al. (2014), Nature Biotech |
+
+#### 2.3 零售 / 营销 / 电商
+
+| 场景 | 要解决的问题 |
+|---|---|
+| **Customer churn prediction** | 预测哪些客户会流失；融合人口学/交易/互动数据；**类别不平衡**（少数 churner）；给留存活动**可执行的风险分**；随行为演化更新 |
+| **Recommendation systems** | 预测用户会购买/互动的物品；融合协同信号 + 内容特征 + 上下文；**稀疏** user–item 矩阵；百万级用户/物品；**实时**推荐 |
+| **Demand forecasting & inventory** | SKU/品类级需求预测；融合销量、促销、季节性、外部因素；处理**间歇性需求**与新品；优化库存；给**概率预测** |
+| **Dynamic pricing** | 个性化/时变定价最大化收入；融合需求预测、竞品价格、库存；**非线性需求弹性**；实时调整；公平性与合规 |
+| **Supply chain & logistics** | SKU–地点级补货预测；路由与库存分配优化；lead time、运输成本、服务水平；**概率化风险**评估 |
+| **E-commerce fraud** | 在线零售欺诈检测；降低 false positive；适应新攻击手法；不平衡数据；实时打分 |
+
+#### 2.4 工业 / 基础设施 / 其他
+
+| 场景 | 要解决的问题 |
+|---|---|
+| **Predictive maintenance** | 在停机前预测设备故障；融合传感器时序 + 运行日志 + 环境；高频流数据；给出维护**提前期**；降低**误报** |
+| **Energy load & price forecasting** | 小时/日级电力需求与价格预测；融合负荷、天气、市场；处理**非平稳与季节性**；概率预测支撑电网稳定 |
+| **Autonomous vehicles & CV** | 实时检测/分类行人、车辆、标志；多传感器融合（camera/LiDAR/radar）；光照/天气变化；低延迟高可靠；检测融合 |
+| **Telecom** | **网络故障预测**（提前发现设备故障）；**客户分群**（按用量与需求） |
+| **Insurance** | **理赔欺诈检测**（异常识别、优先调查高风险）；**保费定价**（个体化费率、动态更新） |
+| **Agriculture & environment** | **作物产量预测**；**空气质量预测** |
+| **Cybersecurity** | **入侵检测**（异常网络行为）；**恶意软件分类**（行为日志） |
+
+⭐ 一个反复出现的模式：**GBDT/随机森林在表格数据上几乎总是 baseline 甚至 SOTA**（Lessmann 2015 的结论就是"ensemble 在 credit scoring 上整体最优"）。
+
+### 3. Credit Risk Modelling Deep-dive（重点）
+
+#### 3.1 三个核心量 + ECL 公式
+
+| 量 | 含义 |
+|---|---|
+| **PD（Probability of Default）** | 借款人在给定时间范围内**违约的概率** |
+| **LGD（Loss Given Default）** | 违约发生时，银行**损失占暴露的比例** |
+| **EAD（Exposure at Default）** | 违约发生时**未偿还的金额** |
+
+```
+ECL = PD * LGD * EAD        （Expected Credit Loss）
+```
+
+**在银行风险管理中的角色**：
+
+- **Capital allocation**：决定监管资本与经济资本要求；
+- **Pricing & provisioning**：贷款定价、拨备、盈利分析；
+- **Risk appetite management**：使放贷策略匹配银行风险偏好。
+
+#### 3.2 监管框架（考点：名词对应关系）
+
+| 框架 | 内容 |
+|---|---|
+| **Basel II/III — Foundation IRB** | 银行**自己估 PD**；**LGD、EAD 由监管给定** |
+| **Basel II/III — Advanced IRB** | 银行**自己估 PD、LGD、EAD**（需监管批准） |
+| **CECL**（美国会计准则） | 从**贷款发放起**就计**全生命周期**预期信用损失 |
+| **IFRS 9**（国际准则） | 按 **staging** 计 **12 个月或全生命周期**的前瞻性预期损失 |
+
+#### 3.3 数据治理与组织
+
+- **内部数据**：征信局数据、还款历史、账户余额、人口学与交易记录；
+- **外部数据**：宏观经济指标（GDP、失业率）、**另类数据**（社交媒体情绪、水电缴费）；
+- **数据质量控制**：自动校验规则与异常报告、**data lineage（数据血缘）**、审计轨迹。
+
+| 团队 | 职责 |
+|---|---|
+| **Credit Risk Modeling Team** | 数据科学家/建模师开发并校准 **PD/LGD/EAD** 模型；负责特征工程、算法选择、文档 |
+| **Model Validation Team** | **独立**复核假设、方法、性能；做 **backtesting、stress testing、benchmarking** |
+| **Governance & Audit** | **Credit Risk Committee** 批准上线；内外部审计检查合规与控制 |
+
+#### 3.4 模型开发生命周期
+
+```
+Problem scoping & data preparation
+  → Feature engineering & model selection
+    → Training & documentation
+      → Model validation & approval
+        → Implementation & MLOps
+          → Monitoring & maintenance
+```
+
+| 阶段 | 关键点 |
+|---|---|
+| **Problem scoping** | 定义 target（违约期限）与业务要求；清洗/合并内外部数据 |
+| **Feature engineering** | 造预测特征（比率、行为评分、宏观 overlay）；选 ensemble 算法（**RF / XGBoost / LightGBM**） |
+| **Training** | **交叉验证**训练 + 调超参；记录方法、假设、验证结果 |
+| **Validation** | **Conceptual soundness**（经济逻辑、变量选择是否合理）+ **Performance backtesting**（**out-of-time** 样本上的 ROC、KS、calibration；RF 可看 **OOB error**）+ 审批 |
+| **MLOps** | **Docker** 容器化保证可复现；**CI/CD**；实时打分 API；记录输入与预测供审计；**Git + 语义化版本**；**自动回滚** |
+| **Monitoring** | 监控 **AUC、KS、PSI（Population Stability Index）**；**data drift**（特征分布变化，按变量看 PSI）vs **concept drift**（违约行为变化，看 lift curve）；**recalibration**（小修）vs **redevelopment**（重做） |
+
+**训练细节**：
+
+- **CV 策略**：**K-fold / stratified**（保证各折违约率代表性强）；**time-series split**（vintage analysis、时间稳定性）；
+- **超参优化**：grid / random search（树深、learning rate、正则）；**Bayesian optimization** 探索高维空间更高效；
+- **防过拟合**：**early stopping**（看 validation **AUC 或 KS**）；boosting 的**shrinkage + 树约束**（正则）。
+
+#### 3.5 可解释性（ensemble 尤其重要）
+
+| 方法 | 说明 |
+|---|---|
+| **Feature importance（MDI / gain）** | RF 的 **mean decrease in impurity**、GBDT 的 **gain**——**全局**重要性 |
+| **Permutation importance** | 打乱某特征后看性能下降多少——对模型性能的**真实影响** |
+| **SHAP（TreeSHAP）** | 给树 ensemble 算 **Shapley value**；既有**局部**（单个预测的解释）也有**全局**（特征效应） |
+| **Partial dependence plot（PDP）** | 画出某特征的**边际效应** |
+| **Surrogate model** | 用一棵**简单决策树**近似 ensemble 的决策 |
+
+#### 3.6 压力测试 / 治理 / 公平性
+
+- **压力测试框架**：美国 **CCAR**、欧洲 **EBA stress tests**；
+- **情景设计**：baseline vs **adverse** 宏观情景（GDP、失业率冲击）；**reverse stress test** 找组合的脆弱点；
+- **用 ensemble 输出**：情景下的 PD 变动 → 调整资本预测；聚合预测量化**尾部风险**；
+- **治理与文档**：模型清单（model inventory）与版本管理、**change management**（变更申请 + 影响评估 + 测试）、审计轨迹、监管报送（**SR 11-7**、EBA GL）；
+- **伦理与偏差**：
+  - **Fairness assessment**：不同人群的 **disparate impact**（种族、性别）；指标如 **demographic parity、equal opportunity**；
+  - **Bias mitigation**：**pre-processing**（重加权/重采样）、**in-processing**（训练时加公平约束）、**post-processing**；
+  - **治理**：伦理审查委员会、记录数据使用与缓解措施的决策依据。
+
+⭐ 老师举例：反洗钱（AML）模型**按法规不允许把国籍作为模型输入**，但国籍可用于**流程复核**——**"能不能进模型"和"能不能用于人工审核"是两回事**。
+
+#### 3.7 常见坑（Common Pitfalls）
+
+| 坑 | 表现 | 对策 |
+|---|---|---|
+| **Data leakage / look-ahead bias** | 训练时用了**未来信息** | 严格按时间切分训练/测试 **vintage** |
+| **Overfitting & instability** | 样本外性能崩 | 监控 **OOB error** 与样本外表现；正则 + early stopping |
+| **Reproducibility** | 结果无法复现 | 记录环境（库版本、随机种子） |
+
+### 4. Coding Deep-dive：LightGBM 实战流程
+
+老师用一个信用风险数据集演示了完整的数据处理 + 建模流程（**这些是工程实践，不是考试理论，但很值得记**）：
+
+1. **数据完整性检查**：数据量、**缺失值比例**、**重复行**（多源 merge 常产生重复，需去重）；
+2. **缺失值处理要看业务含义**：例如 `interest rate spread` 大量缺失——可能是**"利率为 0"被记成缺失**（免息贷款），也可能是系统默认值没录入；**要能解释为什么缺失**，解释不了且不重要就弃用该特征；
+3. **单变量分析**：看每个特征在**违约 vs 未违约**两组上的分布（如 loan amount 区分度低，interest rate 有区分度）；
+4. **相关性分析**：Pearson 相关矩阵看**高度相关**的特征（按业务与特征数量决定是否剔除）；
+5. **类别特征**：**LightGBM 原生支持 categorical**，不需要 one-hot；
+6. **特征多时**：先做**特征选择 / 降维**；
+7. **误差分析**：分别看 **false positive / false negative** 在哪些特征上集中，以及**特征扰动**（如某特征 +10%）对 PD 的影响（敏感性分析）。
+
+### 5. 本周与考试的关系（怎么用这一讲复习）
+
+| 本周内容 | 对应 Week 9–11 的考点 |
+|---|---|
+| Credit risk 里选 **RF / XGBoost / LightGBM** | 三种 ensemble 的**偏差-方差**差异：bagging 降 variance，boosting 降 bias |
+| **OOB error** 监控 | **bagging/RF 的 OOB（≈36.8% 袋外样本）** |
+| **Feature importance（MDI / gain）** | RF 用 **impurity 减少**、GBDT 用 **gain**；**impurity-based importance 对高基数特征有偏**（如 ID） |
+| **Early stopping on AUC/KS** | boosting 的 **learning rate / 树数 / 早停** |
+| **LightGBM 原生处理缺失与类别特征** | LightGBM 的 **EFB（Exclusive Feature Bundling）**、**GOSS**、缺失值处理 |
+| **Data drift / concept drift / PSI** | 模型**泛化与稳定性**（bias-variance 的实践面） |
+
+### 6. 本周要点小结
+
+- Week 13 是 **Simon Liu 的 industry sharing**，**不考新理论**；Final 仍覆盖 **Week 9–11**。
+- 行业全景的共同点：**表格数据 + 不平衡 + 可解释性要求** ⇒ **ensemble（GBDT 系）是主力**。
+- **Credit risk 核心公式**：`ECL = PD × LGD × EAD`；Basel **Foundation IRB**（银行估 PD，监管给 LGD/EAD）vs **Advanced IRB**（三者都自己估）；**CECL / IFRS 9**。
+- 银行建模的完整链条：**数据治理 → 建模 → 独立验证（backtesting/KS/ROC/calibration）→ MLOps → 监控（PSI、drift）→ 治理与公平性**。
+- **可解释性**：MDI/gain、permutation、**SHAP/TreeSHAP**、PDP、surrogate tree。
+- **工程细节**：LightGBM 原生支持 categorical 与缺失值；重复行要先去重；缺失值要结合业务解释。
+- 常见坑：**data leakage（look-ahead bias）**、过拟合、不可复现。
+
+---
+
+> **课程收尾**：Week 13 为最后一课（industry sharing，提前结束；学期最后一个小时留给 **makeup quizzes**）。**Final Exam** 中 Simon Liu 部分覆盖 **Week 9–11**（ensemble 的理论与计算），Week 13 的行业内容**不作为考点**。

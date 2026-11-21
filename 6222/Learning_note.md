@@ -4694,3 +4694,242 @@ y = f * Y_c / Z_c
 ---
 
 > **下一周（Week 13）预告**：继续 **3D**（Topic 14），重点是 **stereo images / 双目视觉**：视差、深度恢复、极线几何等。Week 13 也是最后一周；Final Exam 的 Q4 来自 Cheng Jun 部分（概念题）。
+
+---
+
+## Week 13 — Topic 14：Stereo Matching（双目立体视觉）＋ 课程回顾与 Assignment 说明
+
+> **本周材料**：`week13/week13.txt`（Cheng Jun 录播转写，约 6.2 万字符）。**本周没有单独的 PDF**——老师用 `Lecture Notes Week 12-13.pdf` 中 **Topic 14** 的部分，讲完最后一课。
+>
+> **本周定位**：本课程的**最后一课**，讲 **stereo matching（双目立体匹配）**——由两张（或多张）图像恢复**每个像素的深度**。老师强调：**放在最后不代表不重要**，"this is the very very important topic"。
+>
+> 结构：① 立体视觉的直觉与应用 → ② **stereo geometry + disparity** → ③ **epipolar geometry（essential / fundamental matrix）** → ④ **rectification** → ⑤ 经典 **block matching** → ⑥ **deep stereo（cost volume 系列）** → ⑦ ⭐ **keypoint matching vs stereo matching** → ⑧ 工程挑战 → ⑨ 3D 视觉的难点 → ⑩ Assignment 与考试说明。
+>
+> **ASR 错拼**：steal / ste / st / steer / serum → **stereo**；TD / T D / treaty / treat / three d → **3D**；dibuion → **disparition/disparity**（视差）；dis / dy → **disparity**；err / air / R → **baseline B**（基线）；apolar / AP polar → **epipolar**；episome / epsilon → **ε**；cost of volume → **cost volume**；CPR → **CVPR**；GW net → **GC-Net**；SQ group → **group-wise**；KT → **KITTI**；sift → **SIFT**；fiscal → **feature**；equation（在 "feature equation" 处）→ **extraction**；aggregation → **cost aggregation**；klass → **glass（hourglass）**；our glass → **hourglass**。
+
+### 1. 立体视觉的直觉与应用
+
+- 人眼就是**天然的 stereo 系统**：左右眼看到**略有差异**的两幅图像，大脑自动对齐 → 产生 3D 感知；
+- 3D 电影：**偏振眼镜**让左右眼分别看到不同画面；红蓝分色、或**视差屏障（barrier）**也是同一原理；
+- 医学应用：**视网膜立体图像（stereo fundus images）**可诊断**青光眼（glaucoma）**——视盘（optic disc）中的**视杯（optic cup）**是 3D 结构，患病时视杯扩大，用 stereo 可测其**深度/大小**；
+- 核心问题：**给定两幅图，如何用算法得到每个像素的深度（depth）**。
+
+### 2. ⭐ Stereo geometry：视差与深度
+
+两个相机光心 `O`、`O'`，**基线（baseline）** 距离为 `B`；3D 点 `P` 在左右图像上的投影为 `p`、`p'`。由相似三角形：
+
+```
+f / Z = d / B        （d 为两投影点的水平位移）
+
+=>  Z = f * B / d
+```
+
+| 符号 | 含义 |
+|---|---|
+| `Z` | 深度（到相机的距离） |
+| `f` | 焦距 |
+| `B` | baseline（两相机间距） |
+| `d` | **disparity（视差）**：同一点在左右图中的水平位移 |
+
+⭐ 三条必须记住的结论：
+
+1. **深度与视差成反比**：`Z ∝ 1/d`；
+2. **视差越大 ⇒ 物体越近**；
+3. 想得到**稠密深度图**，就必须为**每个像素**找到对应点 ⇒ 这是 **dense matching（稠密匹配）**问题。
+
+### 3. Epipolar geometry（极线几何）
+
+#### 3.1 基本定义
+
+| 术语 | 定义 |
+|---|---|
+| **Baseline** | 连接两个相机光心 `O`、`O'` 的直线 |
+| **Epipole（极点）** | baseline 与两个图像平面的交点 `e`、`e'` |
+| **Epipolar plane（极平面）** | 由 `P`、`O`、`O'` 三点确定的平面 |
+| **Epipolar line（极线）** | 极平面与图像平面的交线 `l`、`l'` |
+
+⭐ **核心约束（极线约束）**：左图上的点 `p`，其在右图的对应点 `p'` **一定落在极线 `l'` 上**。所以匹配搜索**从"整幅图"缩小到"一条线"**——这是立体匹配能高效求解的根本原因。
+
+#### 3.2 Essential matrix（本质矩阵）
+
+两相机坐标系的关系由**唯一一组** `R, T`（rotation + translation）决定。对同一 3D 点的两个相机坐标 `P`、`P'`：
+
+```
+P' = R (P - T)
+```
+
+经过叉积/转置推导（老师课上推了一遍），可得：
+
+```
+P'^T * [T]_x * R * P = 0        （[T]_x 是 T 的反对称矩阵）
+
+记 E = [T]_x * R                （essential matrix）
+则  p'^T E p = 0                 （epipolar constraint）
+```
+
+- **E 只由 R、T 决定** ⇒ 描述**标定相机**之间的几何关系；
+- 对极线：`l' = E p`（右图极线）、`l = E^T p'`（左图极线）。
+
+#### 3.3 Fundamental matrix（基础矩阵）
+
+实际中相机往往**未标定**（内参 K 未知/不同）。设 `p = K x`，`p' = K' x'`，代入得：
+
+```
+x'^T * K'^{-T} E K^{-1} * x = 0
+
+记 F = K'^{-T} E K^{-1}          （fundamental matrix）
+则  x'^T F x = 0
+```
+
+- **F 由 E + 两个内参矩阵决定**；未标定时只能求 F；
+- 有 ≥8 对匹配点即可**线性最小二乘**解 F（八点法）。
+
+⭐ 老师说明：这部分他**早年考过**，后来觉得内容太多、学生难以专注，**现在不作为重点**——但**"极线约束把搜索降到一条线"这个思想必须懂**。
+
+### 4. Rectification（极线校正）
+
+**目的**：把两幅图变换到**同一平面、光轴平行、基线水平**的配置，使**极线变成水平的同一行**。
+
+- 校正后，对应点只在**水平方向**移动 ⇒ 匹配只需**在同一行内搜索**；
+- 这也是绝大多数商用双目相机（两个镜头朝正前方）**出厂就做好 rectification** 的原因；
+- ⭐ 这是所有经典 stereo matching 的**基本假设**。
+
+### 5. 经典 stereo matching：block matching（块匹配）
+
+#### 5.1 思路
+
+对左图某个像素 `(x, y)`，在右图**同一行**上滑动，找**最相似**的位置，位移量就是**视差 d**。
+
+**逐像素比较（SAD/SSD）**：
+
+```
+E(d) = Σ_{(u,v) ∈ window} [ I_L(x+u, y+v) - I_R(x+u-d, y+v) ]^2
+
+d* = argmin_d E(d)
+```
+
+⭐ **为什么要用 window 而不是单像素**：图像有**噪声**（拍摄噪声、处理噪声），单像素比较不稳定；用**窗口内的像素一起比**可以**抑制噪声**。
+
+#### 5.2 窗口大小的 trade-off（考点）
+
+| 窗口 | 效果 |
+|---|---|
+| **太小** | 对噪声不鲁棒，匹配易错 |
+| **太大** | 覆盖了**不同深度的区域**（左右相机看到的场景略有差异），在**深度不连续处**产生错误 |
+| **实用做法** | 用**多个尺度/多个窗口**分别算，再**聚合（aggregate）** |
+
+#### 5.3 Sub-pixel disparity（亚像素视差）
+
+- `E(d)` 的最小值**不一定落在整数像素**上：真实视差可以是 `1.1、1.11、1.12…`（因为深度连续）；
+- 但数字图像只有整数像素 ⇒ 需要**亚像素插值**（常用**抛物线拟合**：用最小值点及其左右邻点拟合抛物线，取顶点）；
+- ⭐ 不做亚像素，深度估计就被限制在 1/2/3/4 像素的**台阶**上。
+
+#### 5.4 经典方法的局限
+
+- **弱纹理/同质区域（homogeneous region）**：没有可区分的模式 ⇒ 匹配失败；
+- 解决思路：**active stereo（主动立体）**——投射**已知图案**（不同颜色/结构光）到物体上，人为制造"特征点"，让同质区域也能匹配。
+
+### 6. Deep stereo：cost volume（深度立体匹配）
+
+#### 6.1 共同流程（**考点：能说出四步及各步目标**）
+
+```
+1. Feature extraction     左右图分别（通常共享权重）提特征
+2. Cost volume construction  在视差维度上拼接左右特征，形成 3D/4D 代价体
+3. Cost aggregation       用 3D CNN（或 hourglass）在代价体上聚合上下文
+4. Disparity estimation   回归出每个像素的视差
+```
+
+#### 6.2 Cost volume 的维度（老师特别爱问）
+
+- 尺寸约为 **`H × W × D_max`**（高 × 宽 × 最大视差），**第三维就是"候选视差"**；
+- 每个体素 `(x, y, d)` 记录"左图 `(x,y)` 与右图 `(x-d, y)` 在该视差下的匹配代价"；
+- 对 **256×256** 的图，最大视差理论上可达 **256**；实践中常用 **192** 或更小（省显存/计算）；
+- 若特征是多通道，则变成 **4D（`H × W × D × C`）**；老师原话：**曾用考题问"为什么 cost volume 要设计成 3D 或 4D、每个体素代表什么"**。
+
+#### 6.3 代表工作
+
+| 工作 | 关键点 |
+|---|---|
+| **GC-Net（2017）** | 用 **3D convolution** 在 cost volume 上做 aggregation，再用 **soft argmin** 回归视差（可微） |
+| **PSMNet（CVPR 2018）** | 特征提取加 **SPP（spatial pyramid pooling）** 聚合多尺度上下文；聚合用 **stacked hourglass（堆叠沙漏）3D CNN**；输出仍从 cost volume 回归 |
+| **Group-wise correlation（GW-Net 一类）** | 用 **group-wise correlation volume** 简化计算、提升性能 |
+| **2022 attention-based** | 把 **attention** 加到 cost volume 的计算上 |
+
+⭐ 老师对"深度学习是黑盒"的看法：**不是不能解释**——训练好后把 **cost volume 本身**拿出来看，就能理解网络为什么给出这个视差；**只是还没找到好的解释方式**。
+
+#### 6.4 数据集的困难
+
+- 合成数据（Scene Flow 一类）约 **3 万张**，但与**真实图像差异大**；
+- **KITTI** 真实数据只有**约 200 对**可用于 fine-tune/test ⇒ **参数极多、方程极少**，容易**过拟合/多解**；
+- 这正是 deep stereo 论文之间性能差异的部分原因（老师说他复现后发现：**有些 paper 声称的改进机制，真正起作用的原因未必是它声称的那个**）。
+
+### 7. ⭐ Keypoint matching vs Stereo matching（本课最重要的对比）
+
+| 维度 | **Keypoint matching**（Week 12 的 SIFT 等） | **Stereo matching** |
+|---|---|---|
+| **匹配密度** | **稀疏（sparse）**：只匹配关键点 | **稠密（dense）**：每个像素都要 |
+| **搜索范围** | **全图**任意位置（可有旋转/尺度/视角变化） | **受极线约束**：校正后只在**同一水平行**搜索 |
+| **几何先验** | 无（靠 descriptor 相似性） | 强（**极线约束 + rectification**） |
+| **目的** | 求相机位姿、做 SfM / 全景拼接 | 求**每个像素的深度** |
+| **失败场景** | 弱纹理、重复纹理 | 弱纹理、遮挡、深度不连续 |
+
+⭐ 老师给的统一视角：
+
+- **stereo matching 是 keypoint matching 的一个特例**——都是"找对应点"，只是 stereo **多了几何约束**；
+- 有**振动/温度漂移**时，极线不再严格水平，搜索要**上下小幅偏移**（2D 小窗口）——这就**更接近 keypoint matching**；
+- 反过来，keypoint matching 正在从 **sparse → dense** 演进（半稠密/稠密匹配），而 stereo 本来就是 dense ⇒ **两者在收敛**。
+
+⭐ 一句话总结（可作考题答案）：**"Stereo matching = dense keypoint matching + epipolar constraint."**
+
+### 8. 工程上的真实挑战
+
+| 挑战 | 说明 |
+|---|---|
+| **振动 / 温度漂移** | 车上的双目相机受震动、温度变化影响 ⇒ **焦距 f、基线 B 都会变**，而 `Z = fB/d`，即使 d 算对，深度也错 |
+| **在线校正（online rectification）** | 出厂是**离线**校正；实时系统需要**在线**重新校正 |
+| **cost volume 计算慢** | 3D 卷积在 `H×W×D` 上很贵，是 stereo 落地的瓶颈之一 |
+| **单图深度歧义** | 单张图像无法唯一恢复深度（不同深度、不同大小可产生同一图像）；人靠**先验**（近大远小、纹理、高度）判断 |
+
+### 9. 3D 视觉的整体难点（老师的研究视角）
+
+- **3D detection**：2D 只需 bounding box，标注一致性强；3D 还要 **6-DoF pose**（`X, Y, Z` + `pitch, roll, yaw`），标注**极其昂贵**；
+- **体数据（CT/MRI/OCT）**：结构常**跨切片**（如血管在每个切片里只是一个点），必须利用**邻域信息**；
+- **计算量**：`224×224` 的 2D 图 ≈ `30×30×30` 的 3D 体；`1024³` 的 CT 计算量爆炸（**立方增长**）；
+  - 对策：**投影到 XY / XZ / YZ 三个平面**（像 X-ray 一样处理）、**稀疏网格/降采样**、**octree**；
+- **多视角**：同一物体不同视角差异极大（椅子正面/侧面/背面），需要**多视角特征融合**。
+
+### 10. Assignment 2 说明（本周亲述）
+
+- 作业 = **自己的方案 vs AI 方案**的对比：Part 1 自己的设计，Part 2 用 AI 生成方案并按要点比较；
+- **5 页就够**：自己的方案 ~2 页 + AI 方案 ~2 页 + 结论/讨论 ~1 页；
+- **超过页数不扣分**（10 页、13 页都行），但"10 页不是好提交"；
+- **鼓励用 AI**，但**最后 10% 必须自己验证**——"AI will not turn you into someone who can do it"；AI 会**编造不存在的论文（hallucination）**，必须逐条核实；
+- 若**提交系统失败**，直接 **email 交给老师** 也可以。
+
+### 11. ⭐ 考试说明（Cheng Jun 部分，Final Q4）
+
+老师原话要点：
+
+- **Q4 是概念题**，"**more on the concept, more on how you understand the questions**"；**不考记忆、不考计算**（"I don't want to test your memory"）；
+- **只要来上过课就能答**；**千万不要留空**——"every semester I do have students who leave the entire question empty"；
+- 可能问的**典型概念题**（老师举例）：
+  - **What is stereo matching？**（答：由两幅图像找对应点 → 视差 → 深度）
+  - **Why is the cost volume 3D or 4D？What does each voxel mean？**
+  - **What is the objective of each stage**（feature extraction / cost volume / aggregation / disparity estimation）？
+- 老师明确说：**stereo matching 与 keypoint matching 的联系**是他认为**非常重要**的内容，要能讲清楚。
+
+### 12. 本周要点小结
+
+- **Stereo 的目的**：由左右图求**稠密深度**；核心公式 **`Z = f * B / d`**，**深度与视差成反比**。
+- **极线几何**：`p'^T E p = 0`（E = [T]×R，标定）；`x'^T F x = 0`（F = K'^{-T} E K^{-1}，未标定）；**极线约束把搜索降到一条线**。
+- **Rectification**：把极线变成水平行，是经典 stereo 的前提。
+- **经典匹配**：block matching + SAD/SSD；窗口大小是 **噪声 vs 深度不连续** 的 trade-off；需要 **sub-pixel** 才能精细。
+- **Deep stereo 四步**：feature extraction → **cost volume（H×W×D）** → aggregation（3D CNN/hourglass）→ disparity regression；代表：GC-Net、PSMNet、group-wise correlation、attention。
+- **Keypoint vs stereo**：sparse vs dense；全图搜索 vs 极线约束；**stereo = dense keypoint matching + epipolar constraint**。
+- **工程挑战**：振动/温度 → f、B 漂移；在线校正；cost volume 慢；弱纹理 → active stereo。
+- **考试**：Q4 **概念题**，会问"是什么、为什么这样设计、每一步的目标"；**不要留空**。
+
+---
+
+> **课程收尾**：Week 13 是最后一课。Final Exam 共 4 题 × 25 分：**Q1–Q3 来自 Jiang Xudong 部分（Topic 3 / Topic 5 / Topic 9+10）**，**Q4 来自 Cheng Jun 部分（Topic 11–14，概念题）**。Cheng Jun 的四个 lecture（video generation、video analysis、video enhancement、3D/stereo）**都可能进入 Q4**；他本人更看重 **video generation 的概念** 与 **stereo matching**，并强调 Q4 **不考记忆、不考计算，只考理解**。补充材料：`6222/final/` 下有 **2023-24 S1/S2、2024-25 S1/S2、2025-26 S1/S2 六套往年期末卷**，可按 Jiang Xudong（Q1–Q3）与 Cheng Jun（Q4）两部分分开刷。

@@ -23,11 +23,12 @@ EE6407 Genetic Algorithms and Machine Learning（NTU，AY26-27 Semester1）。
 - **截止：2026-10-19（周一，Week 10）**。
 - 工作目录 `/home/qwx/NTU/6407assigment1/`（含数据、Assignment 1.pdf 与我给出的 A1 解题方案）。
 
-**⭐ Quiz 2**：**10%**，**2026-11-10（周二）9:30–10:30**（Week 13，紧接课后；因 ~800 人选大阶梯教室，否则改周六/晚上）。
+**⭐ Quiz 2**：**10%**，**2026-11-10（周二）9:30–10:30**（Week 13，紧接课后；因 ~800 人选大阶梯教室，否则改周六/晚上）。**Week 13 课堂最终确认：复习结束后约 9:40 开始，时长为 40 分钟；9:35 前必须就座；开考 20 分钟内不能交卷；必须去 NTULearn 分配的考场/座位并签名。**
 （注：`Learning_note.md` 第 29 行写作"11 Nov 周二"，但 2026-11-11 是周三，**应以 11-10 周二为准**。）
 
 **课程进度与收尾**：
 - Week 8 = **Linear Discriminant Analysis / FDA**（Fisher criterion、within/between-class scatter、多类推广为 c−1 个判别函数）；**Week 9 = Linear SVM**（maximum margin / Lagrange-KKT / dual / soft margin / kernel SVM）；**Week 10 = classification tree + random forest**（impurity measure：entropy / variance / Gini / misclassification；impurity drop + gain ratio；continuous feature 的排序+中点 split；stopping + pruning + leaf majority；random forest = Bagging（bootstrap 有放回采样）+ 随机 feature 子集 + majority voting）；**Week 11 = performance evaluation for classifiers + linear regression**（holdout / repeated holdout / k-fold / LOOCV / repeated k-fold；confusion matrix、accuracy、sensitivity、specificity、precision、recall、F1、ROC/AUC；simple/multiple linear regression、OLS、ridge/L1 lasso、MSE/RMSE/MAE/$R^2$）；**Week 12 = feature selection / dimensionality reduction + K-means clustering**（curse of dimensionality、peaking phenomenon、Fisher's ratio、mutual information、exhaustive/forward/backward search、filter/wrapper/embedded、Mahalanobis/scatter、K-means WCSS + assignment/update、elbow method）；**Week 13 = 其余 clustering（hierarchical/distribution/density），不考**。
+- ⭐ **Week 13 实际内容（2026-11-13，最后一课）**：agglomerative hierarchical clustering（single/complete/centroid/average 四种 linkage；**老师明确考试要求"会手算合并顺序 + 会画 dendrogram"，高度 ∝ 距离**）、GMM + EM、DBSCAN（core/border/noise、directly reachable/reachable/connected、minPts ≥ d+1 经验 2d、k-distance 找 ε）、clustering evaluation（silhouette 越大越好且可用来选 K、Dunn 越大越好、Davies-Bouldin **越小**越好、Calinski-Harabasz 越大越好、Rand index 比较两个聚类结果）；随后用 `6407/week13/Revision2026S1.pdf` 做**全课程 Review**（data prep → Bayes → LDA → SVM → tree/RF → regression → evaluation → feature selection → clustering），再考 Quiz 2（**40 min**，9:40 开始，9:35 前就座，**开考 20 分钟内不能交卷**）。`6407/final/` 有 2024-25 S1/S2、2025-26 S1/S2 **四套往年期末卷** + 双语复习资料。
 - ⭐ **Quiz 2 范围（Week 12 亲述）**：只考到 **Week 12** 的内容，**Week 13 的内容不考**；老师明确说 **Quiz 2 可能有一道 K-means 题**，必须会手算 assignment + centroid update 的迭代。2026-11-10（周二）9:30–10:30，约 1 小时，考场看 NTULearn。作业 A1+A2 已于 **2026-10-19** 截止，**Quiz 2（11/10）是 6407 唯一剩余的 CA**。
 - **教学于 2026-11-13（周五）结束**，其后 Week 14 为复习周（11/16–20），**期末考试随后开始**（转写提到"20 号那个周一"但含糊，实际以教务排期为准）。
 
