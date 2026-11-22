@@ -5,6 +5,9 @@
 
 管线：Markdown → HTML（自带解析） → google-chrome --headless --print-to-pdf
 不依赖 pandoc / LaTeX / markdown 库；依赖系统安装的 google-chrome 与 Noto CJK 字体。
+
+数学公式：支持 $...$（行内）与 $$...$$（独立成行），由 MathJax v3（jsdelivr CDN）
+在 Chrome 内排版；渲染时需联网。若离线，公式会以原始 TeX 文本出现。
 """
 import html
 import os
@@ -50,6 +53,8 @@ hr { border: none; border-top: 1px solid #ccd8e3; margin: 16px 0; }
 .opts .opt { margin: 3px 0; padding-left: 14px; text-indent: -14px; }
 a { color: #14618f; text-decoration: none; }
 strong { color: #0b3d67; }
+.math-block { text-align: center; margin: 10px 0; page-break-inside: avoid; }
+mjx-container { font-size: 108% !important; }
 """
 
 
@@ -62,6 +67,12 @@ def inline(text: str) -> str:
         return f"\x00{len(slots) - 1}\x00"
 
     text = re.sub(r"`([^`]+)`", stash, text)
+
+    def stash_math(m):
+        slots.append('<span class="math-inline">' + html.escape(m.group(0)) + "</span>")
+        return f"\x00{len(slots) - 1}\x00"
+
+    text = re.sub(r"(?<!\\)\$(?!\$)([^$\n]+?)(?<!\\)\$", stash_math, text)
     text = html.escape(text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", text)
@@ -82,6 +93,27 @@ def convert(md: str) -> str:
 
     while i < len(lines):
         line = lines[i]
+
+        # 显示公式 $$ ... $$（可单行，也可跨多行）
+        if line.strip().startswith("$$"):
+            s = line.strip()
+            if len(s) > 4 and s.endswith("$$"):
+                tex = s[2:-2]
+                out.append(f'<div class="math-block">$${html.escape(tex)}$$</div>')
+                i += 1
+                continue
+            buf = [s[2:]]
+            i += 1
+            while i < len(lines):
+                if lines[i].strip().endswith("$$"):
+                    buf.append(lines[i].strip()[:-2])
+                    i += 1
+                    break
+                buf.append(lines[i])
+                i += 1
+            out.append('<div class="math-block">$$'
+                       + html.escape("\n".join(buf)) + '$$</div>')
+            continue
 
         # 代码块
         if line.strip().startswith("```"):
@@ -215,8 +247,12 @@ def main():
     with open(src, encoding="utf-8") as f:
         md = f.read()
 
+    mathjax = (
+        "<script>window.MathJax={tex:{inlineMath:[['$','$']],"
+        "displayMath:[['$$','$$']]},options:{enableMenu:false}};</script>"
+        "<script src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js\"></script>")
     page = (f'<!doctype html><html lang="zh"><head><meta charset="utf-8">'
-            f"<title>{html.escape(title)}</title><style>{CSS}</style></head>"
+            f"<title>{html.escape(title)}</title><style>{CSS}</style>{mathjax}</head>"
             f"<body>{convert(md)}</body></html>")
 
     with tempfile.TemporaryDirectory() as td:
@@ -224,8 +260,9 @@ def main():
         with open(hp, "w", encoding="utf-8") as f:
             f.write(page)
         cmd = ["google-chrome", "--headless", "--disable-gpu", "--no-sandbox",
-               "--no-pdf-header-footer", f"--print-to-pdf={os.path.abspath(dst)}",
-               f"file://{hp}"]
+               "--no-pdf-header-footer", "--virtual-time-budget=30000",
+               "--run-all-compositor-stages-before-draw",
+               f"--print-to-pdf={os.path.abspath(dst)}", f"file://{hp}"]
         r = subprocess.run(cmd, capture_output=True, text=True)
         if not os.path.exists(dst):
             print("PDF 生成失败：", r.stderr[-800:], file=sys.stderr)
