@@ -33,6 +33,8 @@ EE6497 Pattern Recognition and Deep Learning（NTU，AY26-27 Semester1）。
 
 **HW1 反馈（来自 Quiz 1 review session）**：批改时把 "EM algorithm" 当作 Baum-Welch 的写法**没有扣分**，但 Tay 明确提醒 **Quiz/Final 里必须具体写 Baum-Welch，只写 EM 会扣分**。
 
+**⭐ Final 具体形式（据 `6497/final/` 三套往年卷 IE4497/EE6497 2023-24 S2、2024-25 S2、2025-26 S2）**：**2 小时、4 题 × 25 分、全部必答、restricted open book**（一张双面 A4 reference sheet，不能贴便签）；试卷附 **Appendix A（常见分布）** 与 **Appendix B（DL 公式）**。题型高度稳定：Q1 = MLE/MAP/EM（Bernoulli/Exponential/截断几何 + 共轭先验），Q2 = HMM（joint/likelihood/Baum-Welch）或 Sampling/MCMC（rejection/importance/MH/Gibbs），Q3 = CNN shape/参数量/softmax/卷积手算，Q4 = ReLU 网络理论（kink/|x|/万能逼近）。旧卷有 PyTorch/NumPy 代码题，但 **Wang Lipo 明确说编程不考**，可跳过。复习资料：`6497/final/EE6497_Basics_Review.pdf`（21 页基础）与 `6497/final/EE6497_Final_Review.pdf`（22 页真题题型）。
+
 **权威来源**：`6497/week1/1_Introduction.pdf`（官方课件，57 页）、`6497/week1/Week 1.pdf`（标注讲义，AY26-27-S1）。笔记见 `6497/Learning_note.md`。
 
 相关：[[semester1-repo-purpose]]、[[transcript-quality-noise]]
